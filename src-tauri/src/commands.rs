@@ -5,11 +5,23 @@ use std::sync::Mutex;
 // --- Shared Editor State (for MCP bridge) ---
 
 #[derive(Default)]
+pub struct EditorStateInner {
+    pub content: String,
+    pub file_path: Option<String>,
+    pub cursor_pos: usize,
+    pub worker_url: Option<String>,
+}
+
 pub struct EditorState {
-    pub content: Mutex<String>,
-    pub file_path: Mutex<Option<String>>,
-    pub cursor_pos: Mutex<usize>,
-    pub worker_url: Mutex<Option<String>>,
+    pub inner: Mutex<EditorStateInner>,
+}
+
+impl Default for EditorState {
+    fn default() -> Self {
+        Self {
+            inner: Mutex::new(EditorStateInner::default()),
+        }
+    }
 }
 
 #[tauri::command]
@@ -20,12 +32,13 @@ pub fn sync_editor_state(
     worker_url: Option<String>,
     state: tauri::State<'_, std::sync::Arc<EditorState>>,
 ) -> Result<(), String> {
-    *state.content.lock().unwrap() = content;
-    *state.file_path.lock().unwrap() = file_path;
+    let mut s = state.inner.lock().unwrap();
+    s.content = content;
+    s.file_path = file_path;
     if let Some(pos) = cursor_pos {
-        *state.cursor_pos.lock().unwrap() = pos;
+        s.cursor_pos = pos;
     }
-    *state.worker_url.lock().unwrap() = worker_url;
+    s.worker_url = worker_url;
     Ok(())
 }
 
@@ -198,13 +211,9 @@ fn mime_from_extension(ext: &str) -> Option<&'static str> {
 
 // --- GitHub via gh CLI ---
 
-#[tauri::command]
-pub async fn github_fetch_issue(owner: String, repo: String, number: u64) -> Result<String, String> {
+fn run_gh(args: &[&str]) -> Result<String, String> {
     let output = Command::new("gh")
-        .args(["issue", "view", &number.to_string()])
-        .args(["--repo", &format!("{owner}/{repo}")])
-        .args(["--json", "body"])
-        .args(["--jq", ".body"])
+        .args(args)
         .output()
         .map_err(|e| e.to_string())?;
 
@@ -216,20 +225,17 @@ pub async fn github_fetch_issue(owner: String, repo: String, number: u64) -> Res
 }
 
 #[tauri::command]
+pub async fn github_fetch_issue(owner: String, repo: String, number: u64) -> Result<String, String> {
+    let num = number.to_string();
+    let repo_arg = format!("{owner}/{repo}");
+    run_gh(&["issue", "view", &num, "--repo", &repo_arg, "--json", "body", "--jq", ".body"])
+}
+
+#[tauri::command]
 pub async fn github_fetch_pr(owner: String, repo: String, number: u64) -> Result<String, String> {
-    let output = Command::new("gh")
-        .args(["pr", "view", &number.to_string()])
-        .args(["--repo", &format!("{owner}/{repo}")])
-        .args(["--json", "body"])
-        .args(["--jq", ".body"])
-        .output()
-        .map_err(|e| e.to_string())?;
-
-    if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).to_string());
-    }
-
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    let num = number.to_string();
+    let repo_arg = format!("{owner}/{repo}");
+    run_gh(&["pr", "view", &num, "--repo", &repo_arg, "--json", "body", "--jq", ".body"])
 }
 
 #[tauri::command]

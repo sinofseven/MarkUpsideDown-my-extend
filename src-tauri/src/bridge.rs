@@ -55,10 +55,7 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorState>) {
 }
 
 pub fn cleanup() {
-    let path = port_file_path();
-    if path.exists() {
-        std::fs::remove_file(path).ok();
-    }
+    std::fs::remove_file(port_file_path()).ok();
 }
 
 fn find_available_port() -> Option<u16> {
@@ -73,7 +70,7 @@ async fn health() -> Json<serde_json::Value> {
 }
 
 async fn get_content(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
-    let content = state.editor.content.lock().unwrap().clone();
+    let content = state.editor.inner.lock().unwrap().content.clone();
     Json(serde_json::json!({ "content": content }))
 }
 
@@ -86,7 +83,7 @@ async fn set_content(
     State(state): State<Arc<BridgeState>>,
     Json(body): Json<SetContentRequest>,
 ) -> StatusCode {
-    *state.editor.content.lock().unwrap() = body.content.clone();
+    state.editor.inner.lock().unwrap().content = body.content.clone();
     state.app.emit("bridge:set-content", &body.content).ok();
     StatusCode::OK
 }
@@ -122,10 +119,11 @@ struct EditorStateResponse {
 }
 
 async fn get_state(State(state): State<Arc<BridgeState>>) -> Json<EditorStateResponse> {
+    let s = state.editor.inner.lock().unwrap();
     Json(EditorStateResponse {
-        file_path: state.editor.file_path.lock().unwrap().clone(),
-        worker_url: state.editor.worker_url.lock().unwrap().clone(),
-        cursor_pos: *state.editor.cursor_pos.lock().unwrap(),
+        file_path: s.file_path.clone(),
+        worker_url: s.worker_url.clone(),
+        cursor_pos: s.cursor_pos,
     })
 }
 

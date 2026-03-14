@@ -5,10 +5,14 @@ import { join } from "node:path";
 const PORT_FILE = join(homedir(), ".markupsidedown-bridge-port");
 const TIMEOUT = 5000;
 
+let cachedBridgeUrl: string | null = null;
+
 async function getBridgeUrl(): Promise<string | null> {
+  if (cachedBridgeUrl) return cachedBridgeUrl;
   try {
     const port = (await readFile(PORT_FILE, "utf-8")).trim();
-    return `http://127.0.0.1:${port}`;
+    cachedBridgeUrl = `http://127.0.0.1:${port}`;
+    return cachedBridgeUrl;
   } catch {
     return null;
   }
@@ -36,7 +40,13 @@ async function bridgeRequest(
     init.body = JSON.stringify(options.body);
   }
 
-  const response = await fetch(url, init);
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch {
+    cachedBridgeUrl = null;
+    throw new Error("MarkUpsideDown app is not reachable");
+  }
   if (!response.ok) {
     throw new Error(`Bridge returned ${response.status}`);
   }

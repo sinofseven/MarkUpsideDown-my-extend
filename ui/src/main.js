@@ -482,11 +482,16 @@ document.addEventListener("mouseup", () => { isDragging = false; });
 // --- MCP Bridge: State Sync & Event Listeners ---
 
 let syncTimeout = null;
+let lastSyncedContent = null;
+let lastSyncedFilePath = null;
 
 function syncEditorState() {
   clearTimeout(syncTimeout);
   syncTimeout = setTimeout(() => {
     const content = editor.state.doc.toString();
+    if (content === lastSyncedContent && currentFilePath === lastSyncedFilePath) return;
+    lastSyncedContent = content;
+    lastSyncedFilePath = currentFilePath;
     const cursorPos = editor.state.selection.main.head;
     invoke("sync_editor_state", {
       content,
