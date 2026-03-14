@@ -311,13 +311,16 @@ fn get_env_token() -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-/// Read CLOUDFLARE_API_TOKEN from the user's login shell.
-/// macOS GUI apps don't inherit shell environment variables, so we spawn a
-/// login shell to evaluate the variable.
+/// Read CLOUDFLARE_API_TOKEN from the user's default shell.
+/// macOS GUI apps don't inherit shell env, so we spawn a non-interactive login
+/// shell which sources ~/.zshenv (zsh) or ~/.profile (bash) to pick up exports.
+/// We avoid `-i` (interactive) because it hangs without a TTY.
 fn get_env_token_from_shell() -> Option<String> {
+    let home = dirs::home_dir()?;
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     Command::new(&shell)
         .args(["-lc", "printf '%s' \"$CLOUDFLARE_API_TOKEN\""])
+        .env("HOME", &home)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .output()
@@ -329,12 +332,16 @@ fn get_env_token_from_shell() -> Option<String> {
 }
 
 fn set_wrangler_secret(name: &str, value: &str) -> Result<(), String> {
-    let mut child = Command::new("wrangler")
-        .args(["secret", "put", name, "--name", "markupsidedown-converter"])
+    let mut cmd = Command::new("wrangler");
+    cmd.args(["secret", "put", name, "--name", "markupsidedown-converter"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .stderr(Stdio::piped());
+    // macOS GUI apps may lack HOME, causing wrangler to look for /.wrangler/cache
+    if let Some(home) = dirs::home_dir() {
+        cmd.env("HOME", home);
+    }
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to run wrangler secret put: {e}"))?;
 
     if let Some(mut stdin) = child.stdin.take() {
