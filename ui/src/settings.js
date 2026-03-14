@@ -61,7 +61,7 @@ function renderFeatureList(container, status) {
     .join("");
 }
 
-export function showSettings({ onSave } = {}) {
+export function showSettings({ onSave, onClose: onCloseCallback } = {}) {
   document.getElementById("settings-panel")?.remove();
 
   const overlay = document.createElement("div");
@@ -91,7 +91,7 @@ export function showSettings({ onSave } = {}) {
             type="url"
             id="settings-worker-url"
             placeholder="https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev"
-            value="${workerUrl}"
+            value=""
           />
           <button id="settings-test-btn">Test</button>
         </div>
@@ -185,8 +185,11 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     }
   });
 
+  // Set value via DOM API (avoids HTML injection from localStorage)
+  urlInput.value = workerUrl;
+
   // Close actions
-  const close = () => overlay.remove();
+  const close = () => { overlay.remove(); if (onCloseCallback) onCloseCallback(); };
   const saveAndClose = () => {
     const url = urlInput.value.trim();
     setWorkerUrl(url);
@@ -228,8 +231,10 @@ export function ensureWorkerUrl() {
   if (url) return Promise.resolve(url);
 
   return new Promise((resolve) => {
+    let resolved = false;
     showSettings({
-      onSave: (savedUrl) => resolve(savedUrl || null),
+      onSave: (savedUrl) => { resolved = true; resolve(savedUrl || null); },
+      onClose: () => { if (!resolved) resolve(null); },
     });
   });
 }

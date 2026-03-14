@@ -15,7 +15,6 @@ import { showSettings, ensureWorkerUrl, getWorkerUrl, checkFirstRun } from "./se
 import { marked } from "marked";
 
 let mermaidModule = null;
-let mermaidReady = false;
 let mermaidIdCounter = 0;
 
 async function getMermaid() {
@@ -41,7 +40,6 @@ async function getMermaid() {
     fontFamily: '"SF Mono", "Fira Code", "JetBrains Mono", monospace',
   });
   mermaidModule = mermaid;
-  mermaidReady = true;
   return mermaid;
 }
 
@@ -56,10 +54,6 @@ const IMPORT_EXTENSIONS = [
   "pdf", "docx", "xlsx", "pptx", "html", "htm", "csv", "xml",
   "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif",
 ];
-
-const IMAGE_EXTENSIONS = new Set([
-  "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif",
-]);
 
 // --- CodeMirror Editor ---
 
@@ -127,7 +121,10 @@ async function renderPreview(source) {
           el.innerHTML = svg;
           el.classList.add("mermaid-rendered");
         } catch (err) {
-          el.innerHTML = `<pre class="mermaid-error">${err.message || err}</pre>`;
+          const pre = document.createElement("pre");
+          pre.className = "mermaid-error";
+          pre.textContent = err.message || String(err);
+          el.replaceChildren(pre);
           // mermaid.render creates a temp element on error; clean up
           document.getElementById(id)?.remove();
         }
