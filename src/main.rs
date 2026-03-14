@@ -10,12 +10,12 @@ fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1200.0, 800.0])
-            .with_title("markupsidedown"),
+            .with_title("MarkUpsideDown"),
         ..Default::default()
     };
 
     eframe::run_native(
-        "markupsidedown",
+        "MarkUpsideDown",
         options,
         Box::new(|cc| Ok(Box::new(app::App::new(cc)))),
     )

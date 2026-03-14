@@ -1,4 +1,4 @@
-# markupsidedown
+# MarkUpsideDown
 
 AI-era Markdown editor built with Rust and egui.
 

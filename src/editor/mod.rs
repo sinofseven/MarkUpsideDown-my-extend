@@ -13,7 +13,7 @@ pub struct EditorPanel {
 impl EditorPanel {
     pub fn new() -> Self {
         Self {
-            content: String::from("# Welcome to markupsidedown\n\nStart typing your Markdown here…\n"),
+            content: String::from("# Welcome to MarkUpsideDown\n\nStart typing your Markdown here…\n"),
             file_path: None,
             show_url_fetch: false,
             url_input: String::new(),
