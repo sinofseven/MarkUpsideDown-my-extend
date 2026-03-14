@@ -18,7 +18,15 @@ const { readTextFile, writeTextFile } = window.__TAURI__.fs;
 let currentFilePath = null;
 let previewTimeout = null;
 
-const WORKER_URL = "https://markupsidedown-converter.ravers.workers.dev";
+const STORAGE_KEY_WORKER_URL = "markupsidedown:workerUrl";
+
+function getWorkerUrl() {
+  return localStorage.getItem(STORAGE_KEY_WORKER_URL) || "";
+}
+
+function setWorkerUrl(url) {
+  localStorage.setItem(STORAGE_KEY_WORKER_URL, url);
+}
 
 const IMPORT_EXTENSIONS = [
   "pdf", "docx", "xlsx", "pptx", "html", "htm", "csv", "xml",
@@ -133,7 +141,24 @@ document.getElementById("btn-fetch-url").addEventListener("click", async () => {
 
 // --- Import Document ---
 
+async function ensureWorkerUrl() {
+  let url = getWorkerUrl();
+  if (url) return url;
+  url = prompt(
+    "Enter your Worker URL for document conversion.\n" +
+    "Deploy the worker/ directory first. See docs/worker-deployment.md for details.\n\n" +
+    "Worker URL (e.g. https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev):"
+  );
+  if (!url) return null;
+  url = url.replace(/\/+$/, "");
+  setWorkerUrl(url);
+  return url;
+}
+
 async function convertFile(filePath) {
+  const workerUrl = await ensureWorkerUrl();
+  if (!workerUrl) return;
+
   const isImage = await invoke("detect_file_is_image", { filePath });
 
   if (isImage) {
@@ -150,7 +175,7 @@ async function convertFile(filePath) {
   try {
     const result = await invoke("convert_file_to_markdown", {
       filePath,
-      workerUrl: WORKER_URL,
+      workerUrl,
     });
     editor.dispatch({
       changes: { from: 0, to: editor.state.doc.length, insert: result.markdown },
@@ -226,6 +251,21 @@ if (window.__TAURI__?.event) {
     }
   });
 }
+
+// --- Settings ---
+
+document.getElementById("btn-settings").addEventListener("click", () => {
+  const current = getWorkerUrl() || "(not set)";
+  const url = prompt(`Worker URL (current: ${current}):\n\nLeave empty to clear.`);
+  if (url === null) return;
+  if (url === "") {
+    localStorage.removeItem(STORAGE_KEY_WORKER_URL);
+    document.getElementById("status").textContent = "Worker URL cleared";
+  } else {
+    setWorkerUrl(url.replace(/\/+$/, ""));
+    document.getElementById("status").textContent = `Worker URL set: ${url}`;
+  }
+});
 
 // --- Resizable divider ---
 
