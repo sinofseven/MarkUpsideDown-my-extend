@@ -1,7 +1,7 @@
 interface Env {
   AI: Ai;
-  CF_ACCOUNT_ID: string;
-  CF_API_TOKEN: string;
+  CLOUDFLARE_ACCOUNT_ID: string;
+  CLOUDFLARE_API_TOKEN: string;
 }
 
 const IMAGE_TYPES = new Set([
@@ -73,8 +73,8 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
     return jsonResponse({ error: "Missing ?url= parameter" }, 400);
   }
 
-  if (!env.CF_ACCOUNT_ID || !env.CF_API_TOKEN) {
-    return jsonResponse({ error: "CF_ACCOUNT_ID and CF_API_TOKEN secrets are required for rendering" }, 500);
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) {
+    return jsonResponse({ error: "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required for rendering" }, 500);
   }
 
   const skipCache = url.searchParams.get("nocache") === "1";
@@ -91,11 +91,11 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
   }
 
   try {
-    const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/browser-rendering/markdown`;
+    const apiUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/markdown`;
     const apiResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${env.CF_API_TOKEN}`,
+        "Authorization": `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

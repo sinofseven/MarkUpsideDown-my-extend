@@ -14,41 +14,45 @@ Each user deploys their own Worker instance.
 
 ## API Token Setup
 
-Create a single API token that covers both Worker deployment and Browser Rendering:
+Create a single API token that covers deployment, document import, and rendered fetch:
 
-1. Go to [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → **Create Token** → **Custom Token**
-2. Set permissions:
-   - `Account` → `Workers Scripts` → `Edit` (deploy Workers)
-   - `Account` → `Browser Rendering` → `Edit` (rendered fetch)
-3. Account Resources: select your account
-4. Create the token and save it
+1. Go to [API Tokens](https://dash.cloudflare.com/profile/api-tokens) → **Create Token**
+2. Use the **"Edit Cloudflare Workers"** template → **Use template**
+3. Add these additional permissions:
+   - `Account` → `Workers AI` → `Read`
+   - `Account` → `Browser Rendering` → `Edit`
+4. Account Resources: select your account
+5. Create the token and save it
 
-### Set Worker secrets
+The final token should have these permissions:
+
+| Scope | Permission | Purpose |
+|-------|-----------|---------|
+| Account > Workers Scripts | Edit | `wrangler deploy` |
+| Account > Workers AI | Read | `AI.toMarkdown()` (document import) |
+| Account > Browser Rendering | Edit | `/render` endpoint |
+
+## Deploy
+
+```bash
+export CLOUDFLARE_API_TOKEN="your-token-here"
+cd worker && npm install && wrangler deploy
+```
+
+## Set Worker Secrets
 
 Get your **Account ID** from [Cloudflare Dashboard](https://dash.cloudflare.com/) → Workers & Pages → right sidebar.
 
 ```bash
 cd worker
-wrangler secret put CF_ACCOUNT_ID
+wrangler secret put CLOUDFLARE_ACCOUNT_ID
 # Paste your Account ID
 
-wrangler secret put CF_API_TOKEN
-# Paste the API token created above
+wrangler secret put CLOUDFLARE_API_TOKEN
+# Paste the same API token created above
 ```
 
-> **Note**: If you only need Document Import (not Rendered Fetch), you can skip the secrets. The `Browser Rendering - Edit` permission and secrets are only required for the "Render JS" feature.
-
-## Deploy
-
-```bash
-# Authenticate with Cloudflare (or use the API token)
-wrangler login
-
-# Install dependencies and deploy
-cd worker
-npm install
-wrangler deploy
-```
+> **Note**: The secrets are required for the `/render` endpoint (Rendered Fetch). If you only need Document Import, you can skip this step — the `/convert` endpoint uses the AI binding directly and works without secrets.
 
 On success, wrangler outputs your Worker URL:
 
@@ -110,11 +114,11 @@ The app shows a confirmation dialog before processing images.
 
 ### Authentication error on deploy
 
-Run `wrangler login` or set `CLOUDFLARE_API_TOKEN` env var with a token that has `Workers Scripts - Edit` permission.
+Ensure `CLOUDFLARE_API_TOKEN` is set and the token has `Workers Scripts: Edit` permission. See [API Token Setup](#api-token-setup).
 
-### "CF_ACCOUNT_ID and CF_API_TOKEN secrets are required" error
+### "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required" error
 
-Set the secrets as described in [API Token Setup](#api-token-setup). This is only required for the "Render JS" feature.
+Set the secrets as described in [Set Worker Secrets](#set-worker-secrets). This is only required for the "Render JS" feature.
 
 ### Browser Rendering API errors
 

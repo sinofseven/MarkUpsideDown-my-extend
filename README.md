@@ -44,13 +44,15 @@ cargo tauri dev
 The Worker powers two features: **Document Import** and **Rendered Fetch (Render JS)**.
 
 ```bash
-wrangler login
+# Create an API token from the "Edit Cloudflare Workers" template,
+# then add Workers AI: Read and Browser Rendering: Edit permissions.
+export CLOUDFLARE_API_TOKEN="your-token-here"
 cd worker && npm install && wrangler deploy
 ```
 
 Then click **Settings** in the app toolbar and paste your Worker URL.
 
-See [docs/worker-deployment.md](docs/worker-deployment.md) for full setup guide including API token configuration, supported formats, and pricing.
+See [docs/worker-deployment.md](docs/worker-deployment.md) for full setup guide including API token creation, secrets, supported formats, and pricing.
 
 ## MCP Server (Optional)
 
