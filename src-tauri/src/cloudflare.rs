@@ -30,37 +30,46 @@ fn run_wrangler(args: &[&str], cwd: Option<&Path>, timeout_secs: u64) -> Result<
         cmd.current_dir(dir);
     }
 
-    // macOS GUI apps don't inherit shell PATH, so add common npm global bin dirs
+    // macOS GUI apps don't inherit shell PATH, so add common Node/npm bin dirs.
+    // Covers: Homebrew (Intel + ARM), nvm, nodebrew, fnm, Volta, asdf, mise, n, proto
     if let Ok(current_path) = std::env::var("PATH") {
         let mut extra_paths = Vec::new();
         if let Some(home) = dirs::home_dir() {
+            // Simple dirs: just check existence and add
             for dir in [
                 ".npm-packages/bin",
-                ".nvm/versions/node",
-                ".local/bin",
+                ".nodebrew/current/bin",
                 ".volta/bin",
+                ".local/bin",
+                ".asdf/shims",
+                ".local/share/mise/shims",
+                ".local/share/fnm/aliases/default/bin",
+                ".proto/shims",
+                "n/bin",
             ] {
                 let p = home.join(dir);
                 if p.exists() {
-                    if dir == ".nvm/versions/node" {
-                        // Find the latest node version's bin dir
-                        if let Ok(entries) = std::fs::read_dir(&p) {
-                            let mut versions: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-                            versions.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
-                            if let Some(latest) = versions.first() {
-                                extra_paths.push(latest.path().join("bin").to_string_lossy().to_string());
-                            }
-                        }
-                    } else {
-                        extra_paths.push(p.to_string_lossy().to_string());
+                    extra_paths.push(p.to_string_lossy().to_string());
+                }
+            }
+            // nvm: find the latest installed version's bin dir
+            let nvm_dir = home.join(".nvm/versions/node");
+            if nvm_dir.exists() {
+                if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
+                    let mut versions: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+                    versions.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+                    if let Some(latest) = versions.first() {
+                        extra_paths.push(
+                            latest.path().join("bin").to_string_lossy().to_string(),
+                        );
                     }
                 }
             }
-            // Also check /usr/local/bin and /opt/homebrew/bin
-            for p in ["/usr/local/bin", "/opt/homebrew/bin"] {
-                if !current_path.contains(p) {
-                    extra_paths.push(p.to_string());
-                }
+        }
+        // Homebrew: /opt/homebrew/bin (ARM), /usr/local/bin (Intel)
+        for p in ["/opt/homebrew/bin", "/usr/local/bin"] {
+            if !current_path.contains(p) {
+                extra_paths.push(p.to_string());
             }
         }
         if !extra_paths.is_empty() {
