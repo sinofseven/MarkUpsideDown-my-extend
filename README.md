@@ -26,13 +26,27 @@ AI-era Markdown editor built with Rust (Tauri v2) and CodeMirror 6.
 - **MCP Server** — AI agents (Claude Desktop, etc.) can read/write editor content via Model Context Protocol
 - **GitHub** — Read Issues and PRs via `gh` CLI
 
-## Requirements
+## Install
+
+### Homebrew (macOS)
+
+```bash
+brew install M-Igashi/tap/markupsidedown
+```
+
+> **Note:** This app is not code-signed. On first launch, right-click the app and select "Open" to bypass Gatekeeper.
+
+### Manual
+
+Download the `.dmg` from the [latest release](https://github.com/M-Igashi/markupsidedown/releases/latest), open it, and drag **MarkUpsideDown.app** to your Applications folder.
+
+## Build from Source
+
+### Requirements
 
 - Rust 1.85+
 - Node.js 18+
 - [gh CLI](https://cli.github.com/) (optional, for GitHub integration)
-
-## Getting Started
 
 ```bash
 cd ui && npm install && cd ..

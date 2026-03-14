@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust (stable)
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Install frontend dependencies
+        run: cd ui && npm ci
+
+      - name: Build Tauri app (universal)
+        uses: tauri-apps/tauri-action@73fb865345c54760d875b94642314f8c0c894afa # v0.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "MarkUpsideDown ${{ github.ref_name }}"
+          releaseBody: |
+            See the [README](https://github.com/M-Igashi/markupsidedown#readme) for features and setup instructions.
+
+            ## Install
+
+            ### Homebrew (macOS)
+            ```bash
+            brew install M-Igashi/tap/markupsidedown
+            ```
+
+            ### Manual
+            Download the `.dmg` file below, open it, and drag **MarkUpsideDown.app** to your Applications folder.
+
+            > **Note:** This app is not code-signed. On first launch, right-click the app and select "Open" to bypass Gatekeeper.
+          releaseDraft: false
+          prerelease: false
+          args: --target universal-apple-darwin
