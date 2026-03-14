@@ -30,6 +30,45 @@ fn run_wrangler(args: &[&str], cwd: Option<&Path>, timeout_secs: u64) -> Result<
         cmd.current_dir(dir);
     }
 
+    // macOS GUI apps don't inherit shell PATH, so add common npm global bin dirs
+    if let Ok(current_path) = std::env::var("PATH") {
+        let mut extra_paths = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            for dir in [
+                ".npm-packages/bin",
+                ".nvm/versions/node",
+                ".local/bin",
+                ".volta/bin",
+            ] {
+                let p = home.join(dir);
+                if p.exists() {
+                    if dir == ".nvm/versions/node" {
+                        // Find the latest node version's bin dir
+                        if let Ok(entries) = std::fs::read_dir(&p) {
+                            let mut versions: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+                            versions.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
+                            if let Some(latest) = versions.first() {
+                                extra_paths.push(latest.path().join("bin").to_string_lossy().to_string());
+                            }
+                        }
+                    } else {
+                        extra_paths.push(p.to_string_lossy().to_string());
+                    }
+                }
+            }
+            // Also check /usr/local/bin and /opt/homebrew/bin
+            for p in ["/usr/local/bin", "/opt/homebrew/bin"] {
+                if !current_path.contains(p) {
+                    extra_paths.push(p.to_string());
+                }
+            }
+        }
+        if !extra_paths.is_empty() {
+            let new_path = format!("{}:{}", extra_paths.join(":"), current_path);
+            cmd.env("PATH", new_path);
+        }
+    }
+
     let child = cmd.spawn().map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
             "wrangler is not installed. Install it with: npm install -g wrangler".to_string()
