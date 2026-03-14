@@ -2,6 +2,9 @@
 /target
 dist/
 build/
+ui/dist/
+ui/node_modules/
+app-icon.png
 
 # Environment & secrets
 .env

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MarkUpsideDown</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="toolbar">
+      <button id="btn-open" title="Open file">Open</button>
+      <button id="btn-save" title="Save file">Save</button>
+      <span class="separator"></span>
+      <button id="btn-fetch-url" title="Fetch URL as Markdown">Fetch URL</button>
+      <span class="spacer"></span>
+      <span id="status"></span>
+    </div>
+    <div id="app">
+      <div id="editor-pane"></div>
+      <div id="divider"></div>
+      <div id="preview-pane"></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
