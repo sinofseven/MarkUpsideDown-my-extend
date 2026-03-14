@@ -4,14 +4,27 @@ AI-era Markdown editor built with Rust (Tauri v2) and CodeMirror 6.
 
 ## Features
 
+### Editor
 - **Live Preview** — Split-pane editor with real-time Markdown rendering
-- **CodeMirror 6** — Syntax highlighting, vim keybindings, IME support, code folding
+- **CodeMirror 6** — Syntax highlighting for Markdown and nested code blocks, line numbers, bracket matching
+- **Search & Replace** — Full search and replace with regex support (Ctrl/Cmd+H)
+- **Table Editor** — Spreadsheet-like Markdown table editing with keyboard navigation
+- **Mermaid Diagrams** — Live rendering of Mermaid diagrams in the preview pane
+- **Dark Theme** — Catppuccin-inspired design
+
+### Import & Conversion
 - **Cloudflare Markdown for Agents** — Fetch any URL as clean Markdown using `Accept: text/markdown`
 - **Browser Rendering** — Fetch JavaScript-rendered pages (SPAs, dynamic sites) as Markdown via Cloudflare Browser Rendering API
 - **Document Import** — Convert PDF, Office, CSV, XML, and images to Markdown via Workers AI
 - **Drag & Drop** — Drop files onto the editor to import or open them
-- **GitHub Integration** — Read/write Issues, PRs, and Wikis via `gh` CLI
-- **Dark theme** — Catppuccin-inspired design
+
+### Export
+- **Export PDF** — Print/save the preview pane as PDF
+- **Copy Rich Text** — Copy the preview as rich text (HTML + plain text) to clipboard (Cmd+Shift+C)
+
+### Integration
+- **MCP Server** — AI agents (Claude Desktop, etc.) can read/write editor content via Model Context Protocol
+- **GitHub** — Read Issues and PRs via `gh` CLI
 
 ## Requirements
 
@@ -26,11 +39,9 @@ cd ui && npm install && cd ..
 cargo tauri dev
 ```
 
-## Document Import (Optional)
+## Cloudflare Worker (Optional)
 
-The Import feature converts documents to Markdown using a Cloudflare Worker powered by [`AI.toMarkdown()`](https://developers.cloudflare.com/workers-ai/markdown-conversion/).
-
-**Quick setup:**
+The Worker powers two features: **Document Import** and **Rendered Fetch (Render JS)**.
 
 ```bash
 wrangler login
@@ -39,7 +50,17 @@ cd worker && npm install && wrangler deploy
 
 Then click **Settings** in the app toolbar and paste your Worker URL.
 
-See [docs/worker-deployment.md](docs/worker-deployment.md) for full setup guide, supported formats, and cost details.
+See [docs/worker-deployment.md](docs/worker-deployment.md) for full setup guide including API token configuration, supported formats, and pricing.
+
+## MCP Server (Optional)
+
+The MCP server lets AI agents interact with the editor.
+
+```bash
+cd mcp-server && npm install && npm run build
+```
+
+See [docs/mcp-server.md](docs/mcp-server.md) for Claude Desktop configuration and available tools.
 
 ## Architecture
 
@@ -47,30 +68,40 @@ See [docs/worker-deployment.md](docs/worker-deployment.md) for full setup guide,
 src-tauri/           # Rust backend (Tauri v2)
 ├── src/
 │   ├── main.rs      # App entry point
-│   └── commands.rs  # IPC commands (URL fetch, file conversion, GitHub)
+│   ├── commands.rs  # IPC commands (URL fetch, file conversion, GitHub)
+│   └── bridge.rs    # MCP HTTP bridge (axum server on localhost:31415)
 ├── Cargo.toml
 └── tauri.conf.json
 
 ui/                  # Frontend (Vite + CodeMirror 6)
 ├── src/
 │   ├── main.js      # Editor, preview, toolbar, drag & drop
+│   ├── table-editor.js  # Spreadsheet-like table editing
 │   ├── theme.js     # Dark theme (Catppuccin-inspired)
 │   └── styles.css   # Layout and styling
 ├── index.html
 └── package.json
 
-worker/              # Cloudflare Worker (document conversion + rendered fetch)
+worker/              # Cloudflare Worker
 ├── src/
-│   └── index.ts     # /convert and /render endpoints
+│   └── index.ts     # POST /convert (AI.toMarkdown) + GET /render (Browser Rendering)
 ├── wrangler.jsonc
+└── package.json
+
+mcp-server/          # MCP Server (Model Context Protocol)
+├── src/
+│   ├── index.ts     # MCP tool definitions
+│   └── bridge.ts    # HTTP client to Tauri bridge
+├── tsconfig.json
 └── package.json
 
 docs/                # Documentation
 ├── architecture.md
+├── mcp-server.md
 └── worker-deployment.md
 ```
 
-See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
+See [docs/architecture.md](docs/architecture.md) for detailed data flow and component documentation.
 
 ## License
 
