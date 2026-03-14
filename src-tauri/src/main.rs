@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod bridge;
+mod cloudflare;
 mod commands;
 
 use std::sync::Arc;
@@ -29,6 +30,10 @@ fn main() {
             commands::github_fetch_pr,
             commands::github_list_repos,
             commands::sync_editor_state,
+            cloudflare::check_wrangler_status,
+            cloudflare::wrangler_login,
+            cloudflare::deploy_worker,
+            cloudflare::setup_worker_secrets,
         ])
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::Destroyed = event {

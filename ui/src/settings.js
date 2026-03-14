@@ -53,13 +53,210 @@ function renderFeatureList(container, status) {
     .map(
       (r) => `
     <div class="feature-row ${r.ok ? "feature-ok" : "feature-needs"}">
-      <span class="feature-icon">${r.ok ? "✓" : "●"}</span>
+      <span class="feature-icon">${r.ok ? "\u2713" : "\u25CF"}</span>
       <span class="feature-name">${r.name}</span>
       <span class="feature-hint">${r.hint}</span>
     </div>`
     )
     .join("");
 }
+
+// --- Auto Setup ---
+
+const SETUP_STEPS = [
+  { id: "wrangler", label: "Check wrangler" },
+  { id: "login", label: "Cloudflare login" },
+  { id: "deploy", label: "Deploy Worker" },
+  { id: "secrets", label: "Configure secrets" },
+  { id: "verify", label: "Verify" },
+];
+
+function renderSetupProgress(container, currentStep, stepStates) {
+  container.innerHTML = SETUP_STEPS.map((step) => {
+    const state = stepStates[step.id] || "pending";
+    let icon, cls;
+    if (state === "done") {
+      icon = "\u2713";
+      cls = "setup-step-done";
+    } else if (state === "running") {
+      icon = "\u25CF";
+      cls = "setup-step-running";
+    } else if (state === "error") {
+      icon = "\u2717";
+      cls = "setup-step-error";
+    } else if (state === "skipped") {
+      icon = "\u2014";
+      cls = "setup-step-skipped";
+    } else {
+      icon = "\u25CB";
+      cls = "setup-step-pending";
+    }
+    return `<div class="setup-step ${cls}"><span class="setup-step-icon">${icon}</span> ${step.label}</div>`;
+  }).join("");
+}
+
+async function startAutoSetup(progressContainer, urlInput, onComplete) {
+  const states = {};
+  const update = (id, state) => {
+    states[id] = state;
+    renderSetupProgress(progressContainer, id, states);
+  };
+
+  let accountId = null;
+
+  // Step 1: Check wrangler
+  update("wrangler", "running");
+  let status;
+  try {
+    status = await invoke("check_wrangler_status");
+  } catch (e) {
+    update("wrangler", "error");
+    showSetupError(progressContainer, `Failed to check wrangler: ${e}`);
+    return;
+  }
+
+  if (!status.installed) {
+    update("wrangler", "error");
+    showSetupError(
+      progressContainer,
+      "wrangler is not installed. Install it with:\nnpm install -g wrangler"
+    );
+    return;
+  }
+  update("wrangler", "done");
+
+  // Step 2: Login
+  if (status.logged_in && status.accounts.length > 0) {
+    update("login", "skipped");
+    accountId = status.accounts.length === 1 ? status.accounts[0].id : null;
+  } else {
+    update("login", "running");
+    try {
+      await invoke("wrangler_login");
+      // Re-check to get account info
+      status = await invoke("check_wrangler_status");
+      if (!status.logged_in) {
+        update("login", "error");
+        showSetupError(progressContainer, "Login failed. Please try again.");
+        return;
+      }
+      update("login", "done");
+      accountId = status.accounts.length === 1 ? status.accounts[0].id : null;
+    } catch (e) {
+      update("login", "error");
+      showSetupError(progressContainer, `Login failed: ${e}`);
+      return;
+    }
+  }
+
+  // Handle multiple accounts
+  if (!accountId && status.accounts.length > 1) {
+    accountId = await showAccountPicker(progressContainer, status.accounts);
+    if (!accountId) {
+      update("login", "error");
+      showSetupError(progressContainer, "No account selected.");
+      return;
+    }
+    update("login", "done");
+  }
+
+  if (!accountId && status.accounts.length === 0) {
+    update("login", "error");
+    showSetupError(progressContainer, "No Cloudflare accounts found.");
+    return;
+  }
+
+  // Step 3: Deploy
+  update("deploy", "running");
+  let workerUrl;
+  try {
+    workerUrl = await invoke("deploy_worker", { accountId });
+  } catch (e) {
+    update("deploy", "error");
+    showSetupError(progressContainer, `Deploy failed: ${e}`);
+    return;
+  }
+  update("deploy", "done");
+
+  // Step 4: Secrets
+  update("secrets", "running");
+  try {
+    await invoke("setup_worker_secrets", { accountId });
+  } catch (e) {
+    update("secrets", "error");
+    // Save URL even if secrets fail — /convert still works
+    urlInput.value = workerUrl;
+    showSetupError(
+      progressContainer,
+      `Worker deployed at ${workerUrl} but secret setup failed: ${e}\nYou can set secrets manually or use Import without Render JS.`
+    );
+    return;
+  }
+  update("secrets", "done");
+
+  // Step 5: Verify
+  update("verify", "running");
+  urlInput.value = workerUrl;
+  try {
+    const testStatus = await invoke("test_worker_url", {
+      workerUrl: workerUrl.replace(/\/+$/, ""),
+    });
+    currentTestStatus = testStatus;
+    if (testStatus.reachable) {
+      update("verify", "done");
+      showSetupSuccess(progressContainer, workerUrl);
+      onComplete(workerUrl, testStatus);
+    } else {
+      update("verify", "error");
+      showSetupError(
+        progressContainer,
+        `Worker deployed but health check failed. URL: ${workerUrl}`
+      );
+      onComplete(workerUrl, testStatus);
+    }
+  } catch (e) {
+    update("verify", "error");
+    showSetupError(progressContainer, `Health check error: ${e}`);
+    onComplete(workerUrl, null);
+  }
+}
+
+function showSetupError(container, message) {
+  const errDiv = container.querySelector(".setup-error") || document.createElement("div");
+  errDiv.className = "setup-error";
+  errDiv.textContent = message;
+  if (!errDiv.parentNode) container.appendChild(errDiv);
+}
+
+function showSetupSuccess(container, url) {
+  const div = document.createElement("div");
+  div.className = "setup-success";
+  div.textContent = `Setup complete! Worker: ${url}`;
+  container.appendChild(div);
+}
+
+function showAccountPicker(container, accounts) {
+  return new Promise((resolve) => {
+    const pickerDiv = document.createElement("div");
+    pickerDiv.className = "setup-account-picker";
+    pickerDiv.innerHTML = `
+      <div class="setup-account-label">Select your Cloudflare account:</div>
+      <select class="setup-account-select">
+        ${accounts.map((a) => `<option value="${a.id}">${a.name} (${a.id.slice(0, 8)}...)</option>`).join("")}
+      </select>
+      <button class="setup-account-confirm">Continue</button>
+    `;
+    container.appendChild(pickerDiv);
+
+    pickerDiv.querySelector(".setup-account-confirm").addEventListener("click", () => {
+      const selected = pickerDiv.querySelector(".setup-account-select").value;
+      pickerDiv.remove();
+      resolve(selected);
+    });
+  });
+}
+
+// --- Settings Panel ---
 
 export function showSettings({ onSave, onClose: onCloseCallback } = {}) {
   document.getElementById("settings-panel")?.remove();
@@ -82,6 +279,16 @@ export function showSettings({ onSave, onClose: onCloseCallback } = {}) {
         <div class="settings-description">
           Powers document import and JS-rendered page fetching — the core of MarkUpsideDown.
         </div>
+
+        <div class="settings-auto-setup">
+          <button id="settings-auto-setup-btn" class="settings-setup-btn">Setup with Cloudflare</button>
+          <div id="settings-setup-progress" class="settings-setup-progress" style="display:none"></div>
+        </div>
+
+        <div class="settings-divider">
+          <span>Or configure manually</span>
+        </div>
+
         <div class="settings-deploy">
           <span class="settings-deploy-label">Deploy:</span>
           <code>cd worker && wrangler deploy</code>
@@ -129,6 +336,8 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   const testResult = document.getElementById("settings-test-result");
   const featureList = document.getElementById("settings-feature-list");
   const secretsHelp = document.getElementById("settings-secrets-help");
+  const autoSetupBtn = document.getElementById("settings-auto-setup-btn");
+  const setupProgress = document.getElementById("settings-setup-progress");
 
   // Initial feature list
   renderFeatureList(featureList, currentTestStatus);
@@ -137,6 +346,24 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   }
 
   urlInput.focus();
+
+  // Auto setup
+  autoSetupBtn.addEventListener("click", () => {
+    autoSetupBtn.disabled = true;
+    autoSetupBtn.textContent = "Setting up...";
+    setupProgress.style.display = "";
+    setupProgress.innerHTML = "";
+
+    startAutoSetup(setupProgress, urlInput, (workerUrl, testStatus) => {
+      if (testStatus) {
+        renderFeatureList(featureList, testStatus);
+        secretsHelp.style.display =
+          testStatus.reachable && !testStatus.render_available ? "" : "none";
+      }
+      autoSetupBtn.disabled = false;
+      autoSetupBtn.textContent = "Setup with Cloudflare";
+    });
+  });
 
   // Test connection
   testBtn.addEventListener("click", async () => {
@@ -148,9 +375,9 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     }
 
     testBtn.disabled = true;
-    testBtn.textContent = "Testing…";
+    testBtn.textContent = "Testing\u2026";
     testResult.className = "settings-test-result test-pending";
-    testResult.textContent = "Connecting…";
+    testResult.textContent = "Connecting\u2026";
 
     try {
       const status = await invoke("test_worker_url", { workerUrl: url.replace(/\/+$/, "") });
@@ -161,10 +388,10 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
         testResult.textContent = status.error || "Cannot reach Worker";
       } else if (status.render_available) {
         testResult.className = "settings-test-result test-ok";
-        testResult.textContent = "Fully configured — all features available";
+        testResult.textContent = "Fully configured \u2014 all features available";
       } else if (status.convert_available) {
         testResult.className = "settings-test-result test-warn";
-        testResult.textContent = "Connected — Import works, but Render JS needs secrets";
+        testResult.textContent = "Connected \u2014 Import works, but Render JS needs secrets";
       } else {
         testResult.className = "settings-test-result test-warn";
         testResult.textContent = "Reachable but returned unexpected response";
