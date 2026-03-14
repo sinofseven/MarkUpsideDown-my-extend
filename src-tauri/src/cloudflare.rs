@@ -137,9 +137,14 @@ fn write_temp_worker_files(dir: &Path) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn check_wrangler_status() -> WranglerStatus {
-    let version = match run_wrangler(&["--version"], None, 10) {
-        Ok(out) => Some(out.trim().to_string()),
-        Err(_) => {
+    let version_handle =
+        tokio::task::spawn_blocking(|| run_wrangler(&["--version"], None, 10));
+    let whoami_handle =
+        tokio::task::spawn_blocking(|| run_wrangler(&["whoami"], None, 15));
+
+    let version = match version_handle.await {
+        Ok(Ok(out)) => Some(out.trim().to_string()),
+        _ => {
             return WranglerStatus {
                 installed: false,
                 logged_in: false,
@@ -149,8 +154,8 @@ pub async fn check_wrangler_status() -> WranglerStatus {
         }
     };
 
-    let (logged_in, accounts) = match run_wrangler(&["whoami"], None, 15) {
-        Ok(out) => {
+    let (logged_in, accounts) = match whoami_handle.await {
+        Ok(Ok(out)) => {
             let is_logged_in = !out.contains("You are not authenticated");
             let accts = if is_logged_in {
                 parse_whoami_accounts(&out)
@@ -159,7 +164,7 @@ pub async fn check_wrangler_status() -> WranglerStatus {
             };
             (is_logged_in, accts)
         }
-        Err(_) => (false, vec![]),
+        _ => (false, vec![]),
     };
 
     WranglerStatus {
@@ -173,28 +178,8 @@ pub async fn check_wrangler_status() -> WranglerStatus {
 #[tauri::command]
 pub async fn wrangler_login() -> Result<(), String> {
     tokio::task::spawn_blocking(|| {
-        let child = Command::new("wrangler")
-            .arg("login")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    "wrangler is not installed. Install it with: npm install -g wrangler"
-                        .to_string()
-                } else {
-                    format!("Failed to run wrangler login: {e}")
-                }
-            })?;
-
-        let output = wait_with_timeout(child, Duration::from_secs(120))?;
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            Err(format!("Login failed: {stderr}"))
-        }
+        run_wrangler(&["login"], None, 120)?;
+        Ok(())
     })
     .await
     .map_err(|e| format!("Task error: {e}"))?
@@ -205,18 +190,21 @@ pub async fn deploy_worker(account_id: Option<String>) -> Result<String, String>
     let temp_dir = std::env::temp_dir().join("markupsidedown-worker-deploy");
     // Clean up any previous temp dir
     let _ = std::fs::remove_dir_all(&temp_dir);
-    write_temp_worker_files(&temp_dir)?;
 
-    let mut args = vec!["deploy"];
-    let account_flag;
-    if let Some(ref id) = account_id {
-        account_flag = format!("--account-id={id}");
-        args.push(&account_flag);
-    }
+    let result = (|| {
+        write_temp_worker_files(&temp_dir)?;
 
-    let result = run_wrangler(&args, Some(&temp_dir), 120);
+        let mut args = vec!["deploy"];
+        let account_flag;
+        if let Some(ref id) = account_id {
+            account_flag = format!("--account-id={id}");
+            args.push(&account_flag);
+        }
 
-    // Clean up temp dir
+        run_wrangler(&args, Some(&temp_dir), 120)
+    })();
+
+    // Always clean up temp dir
     let _ = std::fs::remove_dir_all(&temp_dir);
 
     let output = result?;
@@ -227,16 +215,30 @@ pub async fn deploy_worker(account_id: Option<String>) -> Result<String, String>
 #[tauri::command]
 pub async fn setup_worker_secrets(account_id: String) -> Result<(), String> {
     // Get OAuth token from wrangler
-    let oauth_token = run_wrangler(&["auth", "token"], None, 10)
-        .map(|t| t.trim().to_string())
-        .map_err(|e| format!("Failed to get auth token: {e}"))?;
+    let oauth_token = tokio::task::spawn_blocking(|| {
+        run_wrangler(&["auth", "token"], None, 10)
+            .map(|t| t.trim().to_string())
+            .map_err(|e| format!("Failed to get auth token: {e}"))
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))??;
 
     // Create a scoped API token via Cloudflare API
     let api_token = create_scoped_api_token(&oauth_token, &account_id).await?;
 
-    // Set secrets via wrangler
-    set_wrangler_secret("CLOUDFLARE_ACCOUNT_ID", &account_id)?;
-    set_wrangler_secret("CLOUDFLARE_API_TOKEN", &api_token)?;
+    // Set secrets in parallel
+    let account_id_clone = account_id.clone();
+    let api_token_clone = api_token.clone();
+    let (r1, r2) = tokio::join!(
+        tokio::task::spawn_blocking(move || {
+            set_wrangler_secret("CLOUDFLARE_ACCOUNT_ID", &account_id_clone)
+        }),
+        tokio::task::spawn_blocking(move || {
+            set_wrangler_secret("CLOUDFLARE_API_TOKEN", &api_token_clone)
+        }),
+    );
+    r1.map_err(|e| format!("Task error: {e}"))??;
+    r2.map_err(|e| format!("Task error: {e}"))??;
 
     Ok(())
 }

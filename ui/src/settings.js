@@ -101,6 +101,11 @@ async function startAutoSetup(progressContainer, urlInput, onComplete) {
     states[id] = state;
     renderSetupProgress(progressContainer, id, states);
   };
+  const fail = (id, message) => {
+    update(id, "error");
+    showSetupError(progressContainer, message);
+    onComplete(null, null);
+  };
 
   let accountId = null;
 
@@ -110,60 +115,42 @@ async function startAutoSetup(progressContainer, urlInput, onComplete) {
   try {
     status = await invoke("check_wrangler_status");
   } catch (e) {
-    update("wrangler", "error");
-    showSetupError(progressContainer, `Failed to check wrangler: ${e}`);
-    return;
+    return fail("wrangler", `Failed to check wrangler: ${e}`);
   }
 
   if (!status.installed) {
-    update("wrangler", "error");
-    showSetupError(
-      progressContainer,
-      "wrangler is not installed. Install it with:\nnpm install -g wrangler"
-    );
-    return;
+    return fail("wrangler", "wrangler is not installed. Install it with:\nnpm install -g wrangler");
   }
   update("wrangler", "done");
 
   // Step 2: Login
   if (status.logged_in && status.accounts.length > 0) {
     update("login", "skipped");
-    accountId = status.accounts.length === 1 ? status.accounts[0].id : null;
   } else {
     update("login", "running");
     try {
       await invoke("wrangler_login");
-      // Re-check to get account info
       status = await invoke("check_wrangler_status");
       if (!status.logged_in) {
-        update("login", "error");
-        showSetupError(progressContainer, "Login failed. Please try again.");
-        return;
+        return fail("login", "Login failed. Please try again.");
       }
       update("login", "done");
-      accountId = status.accounts.length === 1 ? status.accounts[0].id : null;
     } catch (e) {
-      update("login", "error");
-      showSetupError(progressContainer, `Login failed: ${e}`);
-      return;
+      return fail("login", `Login failed: ${e}`);
     }
   }
 
-  // Handle multiple accounts
+  // Pick account
+  accountId = status.accounts.length === 1 ? status.accounts[0].id : null;
   if (!accountId && status.accounts.length > 1) {
     accountId = await showAccountPicker(progressContainer, status.accounts);
     if (!accountId) {
-      update("login", "error");
-      showSetupError(progressContainer, "No account selected.");
-      return;
+      return fail("login", "No account selected.");
     }
     update("login", "done");
   }
-
-  if (!accountId && status.accounts.length === 0) {
-    update("login", "error");
-    showSetupError(progressContainer, "No Cloudflare accounts found.");
-    return;
+  if (!accountId) {
+    return fail("login", "No Cloudflare accounts found.");
   }
 
   // Step 3: Deploy
@@ -172,9 +159,7 @@ async function startAutoSetup(progressContainer, urlInput, onComplete) {
   try {
     workerUrl = await invoke("deploy_worker", { accountId });
   } catch (e) {
-    update("deploy", "error");
-    showSetupError(progressContainer, `Deploy failed: ${e}`);
-    return;
+    return fail("deploy", `Deploy failed: ${e}`);
   }
   update("deploy", "done");
 
@@ -184,12 +169,12 @@ async function startAutoSetup(progressContainer, urlInput, onComplete) {
     await invoke("setup_worker_secrets", { accountId });
   } catch (e) {
     update("secrets", "error");
-    // Save URL even if secrets fail — /convert still works
     urlInput.value = workerUrl;
     showSetupError(
       progressContainer,
       `Worker deployed at ${workerUrl} but secret setup failed: ${e}\nYou can set secrets manually or use Import without Render JS.`
     );
+    onComplete(workerUrl, null);
     return;
   }
   update("secrets", "done");
@@ -205,15 +190,11 @@ async function startAutoSetup(progressContainer, urlInput, onComplete) {
     if (testStatus.reachable) {
       update("verify", "done");
       showSetupSuccess(progressContainer, workerUrl);
-      onComplete(workerUrl, testStatus);
     } else {
       update("verify", "error");
-      showSetupError(
-        progressContainer,
-        `Worker deployed but health check failed. URL: ${workerUrl}`
-      );
-      onComplete(workerUrl, testStatus);
+      showSetupError(progressContainer, `Worker deployed but health check failed. URL: ${workerUrl}`);
     }
+    onComplete(workerUrl, testStatus);
   } catch (e) {
     update("verify", "error");
     showSetupError(progressContainer, `Health check error: ${e}`);
@@ -229,30 +210,40 @@ function showSetupError(container, message) {
 }
 
 function showSetupSuccess(container, url) {
-  const div = document.createElement("div");
+  const div = container.querySelector(".setup-success") || document.createElement("div");
   div.className = "setup-success";
   div.textContent = `Setup complete! Worker: ${url}`;
-  container.appendChild(div);
+  if (!div.parentNode) container.appendChild(div);
 }
 
 function showAccountPicker(container, accounts) {
   return new Promise((resolve) => {
     const pickerDiv = document.createElement("div");
     pickerDiv.className = "setup-account-picker";
-    pickerDiv.innerHTML = `
-      <div class="setup-account-label">Select your Cloudflare account:</div>
-      <select class="setup-account-select">
-        ${accounts.map((a) => `<option value="${a.id}">${a.name} (${a.id.slice(0, 8)}...)</option>`).join("")}
-      </select>
-      <button class="setup-account-confirm">Continue</button>
-    `;
-    container.appendChild(pickerDiv);
 
-    pickerDiv.querySelector(".setup-account-confirm").addEventListener("click", () => {
-      const selected = pickerDiv.querySelector(".setup-account-select").value;
+    const label = document.createElement("div");
+    label.className = "setup-account-label";
+    label.textContent = "Select your Cloudflare account:";
+
+    const select = document.createElement("select");
+    select.className = "setup-account-select";
+    for (const a of accounts) {
+      const opt = document.createElement("option");
+      opt.value = a.id;
+      opt.textContent = `${a.name} (${a.id.slice(0, 8)}...)`;
+      select.appendChild(opt);
+    }
+
+    const btn = document.createElement("button");
+    btn.className = "setup-account-confirm";
+    btn.textContent = "Continue";
+    btn.addEventListener("click", () => {
       pickerDiv.remove();
-      resolve(selected);
+      resolve(select.value);
     });
+
+    pickerDiv.append(label, select, btn);
+    container.appendChild(pickerDiv);
   });
 }
 
