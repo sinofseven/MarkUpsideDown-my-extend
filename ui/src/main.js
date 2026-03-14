@@ -11,6 +11,7 @@ import {
 import { search, searchKeymap } from "@codemirror/search";
 import { oneDark } from "./theme.js";
 import { editTableAtCursor } from "./table-editor.js";
+import { showSettings, ensureWorkerUrl, getWorkerUrl, checkFirstRun } from "./settings.js";
 import { marked } from "marked";
 
 let mermaidModule = null;
@@ -50,16 +51,6 @@ const { readTextFile, writeTextFile } = window.__TAURI__.fs;
 
 let currentFilePath = null;
 let previewTimeout = null;
-
-const STORAGE_KEY_WORKER_URL = "markupsidedown:workerUrl";
-
-function getWorkerUrl() {
-  return localStorage.getItem(STORAGE_KEY_WORKER_URL) || "";
-}
-
-function setWorkerUrl(url) {
-  localStorage.setItem(STORAGE_KEY_WORKER_URL, url);
-}
 
 const IMPORT_EXTENSIONS = [
   "pdf", "docx", "xlsx", "pptx", "html", "htm", "csv", "xml",
@@ -291,54 +282,6 @@ async function fetchUrl(url, renderJs) {
 
 // --- Import Document ---
 
-function showPromptDialog({ title, message, placeholder, value }) {
-  return new Promise((resolve) => {
-    document.getElementById("prompt-dialog")?.remove();
-
-    const overlay = document.createElement("div");
-    overlay.id = "prompt-dialog";
-    overlay.className = "dialog-overlay";
-    overlay.innerHTML = `
-      <div class="dialog-box">
-        <div class="dialog-title">${title}</div>
-        ${message ? `<div class="dialog-message">${message}</div>` : ""}
-        <input type="url" id="prompt-dialog-input" placeholder="${placeholder || ""}" value="${value || ""}" />
-        <div class="dialog-actions">
-          <button id="prompt-dialog-cancel">Cancel</button>
-          <button id="prompt-dialog-ok" class="primary">OK</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
-
-    const input = document.getElementById("prompt-dialog-input");
-    input.focus();
-    input.select();
-
-    const close = (result) => { overlay.remove(); resolve(result); };
-
-    document.getElementById("prompt-dialog-cancel").addEventListener("click", () => close(null));
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(null); });
-    document.getElementById("prompt-dialog-ok").addEventListener("click", () => close(input.value));
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") close(input.value); });
-    overlay.addEventListener("keydown", (e) => { if (e.key === "Escape") close(null); });
-  });
-}
-
-async function ensureWorkerUrl() {
-  let url = getWorkerUrl();
-  if (url) return url;
-  url = await showPromptDialog({
-    title: "Worker URL",
-    message: "Deploy the worker/ directory first. See docs/worker-deployment.md for details.",
-    placeholder: "https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev",
-  });
-  if (!url) return null;
-  url = url.replace(/\/+$/, "");
-  setWorkerUrl(url);
-  return url;
-}
-
 async function convertFile(filePath) {
   const workerUrl = await ensureWorkerUrl();
   if (!workerUrl) return;
@@ -480,22 +423,13 @@ document.addEventListener("keydown", (e) => {
 
 // --- Settings ---
 
-document.getElementById("btn-settings").addEventListener("click", async () => {
-  const current = getWorkerUrl();
-  const url = await showPromptDialog({
-    title: "Settings",
-    message: "Leave empty and press OK to clear.",
-    placeholder: "https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev",
-    value: current || "",
+document.getElementById("btn-settings").addEventListener("click", () => {
+  showSettings({
+    onSave: (url) => {
+      const statusEl = document.getElementById("status");
+      statusEl.textContent = url ? `Worker URL: ${url}` : "Worker URL cleared";
+    },
   });
-  if (url === null) return;
-  if (url === "") {
-    localStorage.removeItem(STORAGE_KEY_WORKER_URL);
-    document.getElementById("status").textContent = "Worker URL cleared";
-  } else {
-    setWorkerUrl(url.replace(/\/+$/, ""));
-    document.getElementById("status").textContent = `Worker URL set: ${url}`;
-  }
 });
 
 // --- Resizable divider ---
@@ -606,3 +540,6 @@ if (window.__TAURI__?.event) {
 
 // Initial sync
 syncEditorState();
+
+// First-run: show settings if Worker not configured
+checkFirstRun();

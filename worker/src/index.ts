@@ -35,6 +35,10 @@ export default {
 
     const url = new URL(request.url);
 
+    if (request.method === "GET" && url.pathname === "/health") {
+      return handleHealth(env);
+    }
+
     if (request.method === "GET" && url.pathname === "/render") {
       return handleRender(url, env, ctx);
     }
@@ -43,9 +47,19 @@ export default {
       return handleConvert(request, env);
     }
 
-    return jsonResponse({ error: "POST /convert or GET /render?url= only" }, 404);
+    return jsonResponse({ error: "GET /health, POST /convert, or GET /render?url=" }, 404);
   },
 } satisfies ExportedHandler<Env>;
+
+function handleHealth(env: Env): Response {
+  return jsonResponse({
+    status: "ok",
+    capabilities: {
+      convert: true,
+      render: Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN),
+    },
+  });
+}
 
 async function handleConvert(request: Request, env: Env): Promise<Response> {
   const contentType = request.headers.get("content-type") || "";

@@ -32,6 +32,7 @@ MCP Server (mcp-server/)
           ▼
 ┌───────────────────────────────────┐
 │  Cloudflare Worker                 │
+│  GET  /health   → capability check │
 │  POST /convert  → AI.toMarkdown() │
 │  GET  /render   → Browser Rendering /markdown API │
 └───────────────────────────────────┘
@@ -45,6 +46,7 @@ MCP Server (mcp-server/)
 |-------|------|----------|
 | Desktop shell | Tauri v2 (WebKit on macOS) | `src-tauri/` |
 | Editor | CodeMirror 6 (Markdown + nested code blocks) | `ui/src/main.js` |
+| Settings | Worker setup, first-run, feature status | `ui/src/settings.js` |
 | Table editor | Spreadsheet-like grid with keyboard navigation | `ui/src/table-editor.js` |
 | Preview | marked.js + Mermaid (Markdown → HTML + diagrams) | `ui/src/main.js` |
 | Theme | Custom dark theme (Catppuccin-inspired) | `ui/src/theme.js` |
@@ -53,10 +55,11 @@ MCP Server (mcp-server/)
 
 ### Cloudflare Worker (`worker/`)
 
-A lightweight Cloudflare Worker with two endpoints:
+A lightweight Cloudflare Worker with three endpoints:
 
 | Endpoint | Purpose | Cloudflare Service |
 |----------|---------|-------------------|
+| `GET /health` | Capability check | — |
 | `POST /convert` | Document → Markdown | Workers AI `AI.toMarkdown()` |
 | `GET /render?url=` | JS-rendered page → Markdown | Browser Rendering `/markdown` REST API |
 
@@ -94,6 +97,7 @@ See [mcp-server.md](mcp-server.md) for the full tool list and setup guide.
 | Command | Description |
 |---------|-------------|
 | `sync_editor_state` | Sync editor state to Rust (for MCP bridge) |
+| `test_worker_url` | Test Worker connection and report capabilities |
 | `fetch_url_as_markdown` | Fetch a URL with `Accept: text/markdown` header |
 | `fetch_rendered_url_as_markdown` | Fetch a JS-rendered page via Worker `/render` |
 | `convert_file_to_markdown` | Send a file to the Worker `/convert` |

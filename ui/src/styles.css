@@ -272,6 +272,241 @@ html, body {
   opacity: 0.9;
 }
 
+/* Settings Panel */
+.settings-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  width: 520px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.settings-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.settings-close-btn:hover {
+  color: var(--text);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settings-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.settings-deploy {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-deploy code {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text);
+}
+
+.settings-worker-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-worker-input-row input[type="url"] {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  outline: none;
+}
+
+.settings-worker-input-row input[type="url"]:focus {
+  border-color: var(--accent);
+}
+
+.settings-worker-input-row button {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settings-worker-input-row button:hover {
+  background: var(--border);
+}
+
+.settings-worker-input-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-test-result {
+  font-size: 12px;
+  min-height: 18px;
+}
+
+.settings-test-result.test-ok {
+  color: #a6e3a1;
+}
+
+.settings-test-result.test-warn {
+  color: #f9e2af;
+}
+
+.settings-test-result.test-error {
+  color: #f38ba8;
+}
+
+.settings-test-result.test-pending {
+  color: var(--text-muted);
+}
+
+.settings-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.feature-row.feature-ok .feature-icon {
+  color: #a6e3a1;
+}
+
+.feature-row.feature-needs .feature-icon {
+  color: #f9e2af;
+}
+
+.feature-name {
+  flex: 1;
+}
+
+.feature-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.settings-code {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0;
+}
+
+.settings-secrets-help .settings-description code {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-actions .spacer {
+  flex: 1;
+}
+
+.settings-actions button {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-actions button:hover {
+  background: var(--border);
+}
+
+.settings-actions button.primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+
+.settings-actions button.primary:hover {
+  opacity: 0.9;
+}
+
+.settings-clear-btn {
+  color: var(--text-muted) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.settings-clear-btn:hover {
+  color: var(--text) !important;
+  background: var(--bg) !important;
+}
+
 /* Table Editor */
 .table-editor-box {
   width: 640px;

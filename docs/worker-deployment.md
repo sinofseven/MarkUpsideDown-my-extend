@@ -64,9 +64,14 @@ Deployed markupsidedown-converter triggers
 
 ## Configure the App
 
-1. Launch MarkUpsideDown
-2. Click **Settings** in the toolbar
-3. Paste your Worker URL (e.g. `https://markupsidedown-converter.example.workers.dev`)
+On first launch, MarkUpsideDown automatically opens the **Settings panel**. If you've already set it up, click **Settings** in the toolbar to reopen it.
+
+1. Paste your Worker URL (e.g. `https://markupsidedown-converter.example.workers.dev`)
+2. Click **Test** to verify the connection
+3. The **Feature Status** section shows which capabilities are ready:
+   - **Import documents** — available once the Worker is reachable
+   - **Fetch URL (Render JS)** — requires Worker secrets (see above)
+4. Click **Save**
 
 The URL is saved in localStorage and persists across sessions.
 

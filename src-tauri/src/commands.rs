@@ -42,6 +42,85 @@ pub fn sync_editor_state(
     Ok(())
 }
 
+// --- Worker Health Check ---
+
+#[derive(Serialize)]
+pub struct WorkerStatus {
+    pub reachable: bool,
+    pub convert_available: bool,
+    pub render_available: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct HealthCapabilities {
+    convert: Option<bool>,
+    render: Option<bool>,
+}
+
+#[derive(Deserialize)]
+struct HealthResponse {
+    #[allow(dead_code)]
+    status: Option<String>,
+    capabilities: Option<HealthCapabilities>,
+}
+
+#[tauri::command]
+pub async fn test_worker_url(worker_url: String) -> WorkerStatus {
+    let client = match reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return WorkerStatus {
+                reachable: false,
+                convert_available: false,
+                render_available: false,
+                error: Some(e.to_string()),
+            }
+        }
+    };
+
+    let health_url = format!("{}/health", worker_url.trim_end_matches('/'));
+
+    match client.get(&health_url).send().await {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(body) = resp.json::<HealthResponse>().await {
+                let caps = body.capabilities.unwrap_or(HealthCapabilities {
+                    convert: None,
+                    render: None,
+                });
+                WorkerStatus {
+                    reachable: true,
+                    convert_available: caps.convert.unwrap_or(false),
+                    render_available: caps.render.unwrap_or(false),
+                    error: None,
+                }
+            } else {
+                WorkerStatus {
+                    reachable: true,
+                    convert_available: false,
+                    render_available: false,
+                    error: Some("Unexpected response format".to_string()),
+                }
+            }
+        }
+        Ok(resp) => WorkerStatus {
+            reachable: true,
+            convert_available: false,
+            render_available: false,
+            error: Some(format!("Worker returned status {}", resp.status())),
+        },
+        Err(e) => WorkerStatus {
+            reachable: false,
+            convert_available: false,
+            render_available: false,
+            error: Some(format!("Cannot reach worker: {e}")),
+        },
+    }
+}
+
 // --- Cloudflare Markdown for Agents ---
 
 #[derive(Serialize)]

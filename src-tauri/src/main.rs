@@ -20,6 +20,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::test_worker_url,
             commands::fetch_url_as_markdown,
             commands::fetch_rendered_url_as_markdown,
             commands::convert_file_to_markdown,
