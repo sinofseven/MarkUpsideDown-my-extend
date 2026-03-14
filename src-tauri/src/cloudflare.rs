@@ -268,34 +268,17 @@ pub async fn deploy_worker(account_id: Option<String>) -> Result<String, String>
 
 #[tauri::command]
 pub async fn setup_worker_secrets(account_id: String) -> Result<(), String> {
-    // Get OAuth token from wrangler
-    // `wrangler auth token` outputs a banner (⛅️ wrangler X.Y.Z ...) before the actual token,
-    // so we extract only the last non-empty line.
-    let oauth_token = tokio::task::spawn_blocking(|| {
-        run_wrangler(&["auth", "token"], None, 10, &[])
-            .map(|output| {
-                output
-                    .lines()
-                    .rev()
-                    .find(|line| {
-                        let trimmed = line.trim();
-                        !trimmed.is_empty() && !trimmed.starts_with('⛅') && !trimmed.starts_with('─')
-                    })
-                    .unwrap_or("")
-                    .trim()
-                    .to_string()
-            })
-            .map_err(|e| format!("Failed to get auth token: {e}"))
-    })
-    .await
-    .map_err(|e| format!("Task error: {e}"))??;
-
-    if oauth_token.is_empty() {
-        return Err("Could not extract OAuth token from wrangler output".to_string());
-    }
-
-    // Create a scoped API token via Cloudflare API
-    let api_token = create_scoped_api_token(&oauth_token, &account_id).await?;
+    // Prefer CLOUDFLARE_API_TOKEN env var (same token used for `wrangler deploy`).
+    // Fall back to creating a scoped token via the Cloudflare API using wrangler's OAuth token.
+    let api_token = if let Ok(env_token) = std::env::var("CLOUDFLARE_API_TOKEN") {
+        if !env_token.is_empty() {
+            env_token
+        } else {
+            create_api_token_via_oauth(&account_id).await?
+        }
+    } else {
+        create_api_token_via_oauth(&account_id).await?
+    };
 
     // Set secrets in parallel
     let account_id_clone = account_id.clone();
@@ -337,6 +320,35 @@ fn set_wrangler_secret(name: &str, value: &str) -> Result<(), String> {
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(format!("Failed to set secret {name}: {stderr}"))
     }
+}
+
+/// Extract the actual token from `wrangler auth token` output, skipping the banner lines.
+fn extract_wrangler_token(output: &str) -> Option<String> {
+    output
+        .lines()
+        .rev()
+        .find(|line| {
+            let trimmed = line.trim();
+            !trimmed.is_empty() && !trimmed.starts_with('⛅') && !trimmed.starts_with('─')
+        })
+        .map(|line| line.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Try to create a scoped API token using wrangler's OAuth token.
+async fn create_api_token_via_oauth(account_id: &str) -> Result<String, String> {
+    let oauth_token = tokio::task::spawn_blocking(|| {
+        run_wrangler(&["auth", "token"], None, 10, &[])
+            .map_err(|e| format!("Failed to get auth token: {e}"))
+            .and_then(|output| {
+                extract_wrangler_token(&output)
+                    .ok_or_else(|| "Could not extract OAuth token from wrangler output".to_string())
+            })
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))??;
+
+    create_scoped_api_token(&oauth_token, account_id).await
 }
 
 async fn create_scoped_api_token(oauth_token: &str, account_id: &str) -> Result<String, String> {
