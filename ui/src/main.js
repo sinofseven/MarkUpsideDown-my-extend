@@ -211,7 +211,7 @@ function syncPreviewToEditor() {
 
 // Sync preview to editor cursor/selection position
 function syncPreviewToCursor() {
-  if (performance.now() - previewClickedAt < 200) return;
+  if (performance.now() - previewClickedAt < 100) return;
   const pos = editor.state.selection.main.head;
   const line = editor.state.doc.lineAt(pos);
   const lineNum = line.number;
