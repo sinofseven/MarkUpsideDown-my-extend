@@ -9,7 +9,7 @@ import {
   bracketMatching,
 } from "@codemirror/language";
 import { search, searchKeymap } from "@codemirror/search";
-import { oneDark } from "./theme.js";
+import { editorTheme } from "./theme.js";
 import { editTableAtCursor } from "./table-editor.js";
 import { showSettings, ensureWorkerUrl, getWorkerUrl, isImageConversionAllowed, checkFirstRun } from "./settings.js";
 import { marked } from "marked";
@@ -110,6 +110,7 @@ const SCROLL_COOLDOWN = 50; // ms to ignore scroll events after programmatic scr
 function annotateSourceLines(previewEl, source) {
   const tokens = marked.lexer(source);
   let offset = 0;
+  let lineNum = 1;
   const lines = [];
   for (const token of tokens) {
     if (!token.raw) continue;
@@ -119,7 +120,9 @@ function annotateSourceLines(previewEl, source) {
     }
     const idx = source.indexOf(token.raw, offset);
     if (idx >= 0) {
-      const lineNum = source.substring(0, idx).split("\n").length;
+      for (let j = offset; j < idx; j++) {
+        if (source.charCodeAt(j) === 10) lineNum++;
+      }
       lines.push(lineNum);
       offset = idx + token.raw.length;
     }
@@ -254,6 +257,16 @@ function syncPreviewClickToEditor(event) {
   editor.focus();
 }
 
+function loadContent(content, filePath) {
+  editor.dispatch({
+    changes: { from: 0, to: editor.state.doc.length, insert: content },
+  });
+  if (filePath !== undefined) currentFilePath = filePath;
+  svgCache.clear();
+  renderPreview(content);
+  updateStatus(editor.state);
+}
+
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -294,7 +307,7 @@ const editor = new EditorView({
       history(),
       markdown({ base: markdownLanguage, codeLanguages: languages }),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      oneDark,
+      editorTheme,
       search(),
       keymap.of([...searchKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
       updatePreview,
@@ -398,11 +411,9 @@ async function renderPreview(source) {
     } catch (err) {
       console.error("Mermaid failed to load:", err);
     }
-    // Rebuild anchors after Mermaid changes element heights
-    buildScrollAnchors();
-  } else {
-    buildScrollAnchors();
   }
+
+  buildScrollAnchors();
 
   // Inline SVG images (runs after initial HTML is set)
   inlineSvgImages(preview).catch(() => {});
@@ -427,13 +438,7 @@ document.getElementById("btn-open").addEventListener("click", async () => {
   });
   if (path) {
     const content = await readTextFile(path);
-    editor.dispatch({
-      changes: { from: 0, to: editor.state.doc.length, insert: content },
-    });
-    currentFilePath = path;
-    svgCache.clear();
-    renderPreview(content);
-    updateStatus(editor.state);
+    loadContent(content, path);
   }
 });
 
@@ -472,11 +477,7 @@ async function fetchFromUrlBar() {
 
   try {
     const markdown = await invoke("fetch_rendered_url_as_markdown", { url, workerUrl });
-    editor.dispatch({
-      changes: { from: 0, to: editor.state.doc.length, insert: markdown },
-    });
-    svgCache.clear();
-    renderPreview(markdown);
+    loadContent(markdown);
     statusEl.textContent = "Fetched: " + url;
   } catch (e) {
     statusEl.textContent = `Render error: ${e}`;
@@ -517,11 +518,7 @@ async function convertFile(filePath) {
       filePath,
       workerUrl,
     });
-    editor.dispatch({
-      changes: { from: 0, to: editor.state.doc.length, insert: result.markdown },
-    });
-    svgCache.clear();
-    renderPreview(result.markdown);
+    loadContent(result.markdown);
     const tag = result.is_image ? " (image OCR)" : "";
     const fileName = filePath.split("/").pop();
     const mdSize = new Blob([result.markdown]).size;
@@ -588,13 +585,7 @@ if (window.__TAURI__?.event) {
       await convertFile(filePath);
     } else if (ext === "md" || ext === "markdown" || ext === "mdx") {
       const content = await readTextFile(filePath);
-      editor.dispatch({
-        changes: { from: 0, to: editor.state.doc.length, insert: content },
-      });
-      currentFilePath = filePath;
-      svgCache.clear();
-      renderPreview(content);
-      updateStatus(editor.state);
+      loadContent(content, filePath);
     } else {
       document.getElementById("status").textContent = `Unsupported file type: .${ext}`;
     }
@@ -702,13 +693,7 @@ if (window.__TAURI__?.event) {
   const { listen } = window.__TAURI__.event;
 
   listen("bridge:set-content", (event) => {
-    const content = event.payload;
-    editor.dispatch({
-      changes: { from: 0, to: editor.state.doc.length, insert: content },
-    });
-    svgCache.clear();
-    renderPreview(content);
-    updateStatus(editor.state);
+    loadContent(event.payload);
   });
 
   listen("bridge:insert-text", (event) => {
@@ -730,13 +715,7 @@ if (window.__TAURI__?.event) {
     const path = event.payload;
     try {
       const content = await readTextFile(path);
-      editor.dispatch({
-        changes: { from: 0, to: editor.state.doc.length, insert: content },
-      });
-      currentFilePath = path;
-      svgCache.clear();
-      renderPreview(content);
-      updateStatus(editor.state);
+      loadContent(content, path);
       syncEditorState();
     } catch (e) {
       document.getElementById("status").textContent = `Open failed: ${e}`;

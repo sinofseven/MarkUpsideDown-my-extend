@@ -118,7 +118,6 @@ fn wait_with_timeout(
     timeout: Duration,
 ) -> Result<std::process::Output, String> {
     let (tx, rx) = std::sync::mpsc::channel();
-    let child = child;
 
     std::thread::spawn(move || {
         let result = child.wait_with_output();

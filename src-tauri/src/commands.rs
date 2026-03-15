@@ -265,12 +265,8 @@ pub fn detect_file_is_image(file_path: String) -> Result<bool, String> {
     let ext = std::path::Path::new(&file_path)
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    Ok(matches!(
-        ext.as_str(),
-        "jpg" | "jpeg" | "png" | "gif" | "webp" | "bmp" | "tiff" | "tif"
-    ))
+        .unwrap_or("");
+    Ok(mime_from_extension(ext).map_or(false, |m| m.starts_with("image/")))
 }
 
 fn mime_from_extension(ext: &str) -> Option<&'static str> {
@@ -341,18 +337,18 @@ pub async fn fetch_svg(url: String) -> Result<String, String> {
 }
 
 fn sanitize_svg(svg: &str) -> String {
-    // Remove <script> tags and their content
-    let re_script = regex::Regex::new(r"(?is)<script[\s>].*?</script>").unwrap();
-    let result = re_script.replace_all(svg, "");
+    use std::sync::LazyLock;
 
-    // Remove on* event handler attributes
-    let re_events = regex::Regex::new(r#"(?i)\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)"#).unwrap();
-    let result = re_events.replace_all(&result, "");
+    static RE_SCRIPT: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r"(?is)<script[\s>].*?</script>").unwrap());
+    static RE_EVENTS: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r#"(?i)\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)"#).unwrap());
+    static RE_JS_HREF: LazyLock<regex::Regex> =
+        LazyLock::new(|| regex::Regex::new(r#"(?i)(href\s*=\s*["'])javascript:[^"']*"#).unwrap());
 
-    // Remove javascript: URLs in href/xlink:href
-    let re_js_href =
-        regex::Regex::new(r#"(?i)(href\s*=\s*["'])javascript:[^"']*"#).unwrap();
-    let result = re_js_href.replace_all(&result, "${1}#");
+    let result = RE_SCRIPT.replace_all(svg, "");
+    let result = RE_EVENTS.replace_all(&result, "");
+    let result = RE_JS_HREF.replace_all(&result, "${1}#");
 
     result.into_owned()
 }

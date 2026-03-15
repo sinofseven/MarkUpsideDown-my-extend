@@ -115,4 +115,4 @@ const highlighting = HighlightStyle.define([
   { tag: tags.processingInstruction, color: textMuted },
 ]);
 
-export const oneDark = [theme, syntaxHighlighting(highlighting)];
+export const editorTheme = [theme, syntaxHighlighting(highlighting)];
