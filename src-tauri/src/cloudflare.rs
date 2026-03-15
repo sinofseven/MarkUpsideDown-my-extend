@@ -21,29 +21,15 @@ pub struct WranglerStatus {
     pub accounts: Vec<WranglerAccount>,
 }
 
-fn run_wrangler(
-    args: &[&str],
-    cwd: Option<&Path>,
-    timeout_secs: u64,
-    env: &[(&str, &str)],
-) -> Result<String, String> {
-    let mut cmd = Command::new("wrangler");
-    cmd.args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    for &(key, val) in env {
-        cmd.env(key, val);
+/// Set HOME and augment PATH for macOS GUI apps that don't inherit shell env.
+/// Covers: Homebrew (Intel + ARM), nvm, nodebrew, fnm, Volta, asdf, mise, n, proto
+fn setup_gui_env(cmd: &mut Command) {
+    if let Some(home) = dirs::home_dir() {
+        cmd.env("HOME", &home);
     }
-    if let Some(dir) = cwd {
-        cmd.current_dir(dir);
-    }
-
-    // macOS GUI apps don't inherit shell PATH, so add common Node/npm bin dirs.
-    // Covers: Homebrew (Intel + ARM), nvm, nodebrew, fnm, Volta, asdf, mise, n, proto
     if let Ok(current_path) = std::env::var("PATH") {
         let mut extra_paths = Vec::new();
         if let Some(home) = dirs::home_dir() {
-            // Simple dirs: just check existence and add
             for dir in [
                 ".npm-packages/bin",
                 ".nodebrew/current/bin",
@@ -60,7 +46,6 @@ fn run_wrangler(
                     extra_paths.push(p.to_string_lossy().to_string());
                 }
             }
-            // nvm: find the latest installed version's bin dir
             let nvm_dir = home.join(".nvm/versions/node");
             if nvm_dir.exists() {
                 if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
@@ -74,7 +59,6 @@ fn run_wrangler(
                 }
             }
         }
-        // Homebrew: /opt/homebrew/bin (ARM), /usr/local/bin (Intel)
         for p in ["/opt/homebrew/bin", "/usr/local/bin"] {
             if !current_path.contains(p) {
                 extra_paths.push(p.to_string());
@@ -85,6 +69,25 @@ fn run_wrangler(
             cmd.env("PATH", new_path);
         }
     }
+}
+
+fn run_wrangler(
+    args: &[&str],
+    cwd: Option<&Path>,
+    timeout_secs: u64,
+    env: &[(&str, &str)],
+) -> Result<String, String> {
+    let mut cmd = Command::new("wrangler");
+    cmd.args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for &(key, val) in env {
+        cmd.env(key, val);
+    }
+    if let Some(dir) = cwd {
+        cmd.current_dir(dir);
+    }
+    setup_gui_env(&mut cmd);
 
     let child = cmd.spawn().map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -318,17 +321,16 @@ fn get_env_token() -> Option<String> {
 fn get_env_token_from_shell() -> Option<String> {
     let home = dirs::home_dir()?;
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    Command::new(&shell)
+    let child = Command::new(&shell)
         .args(["-lc", "printf '%s' \"$CLOUDFLARE_API_TOKEN\""])
         .env("HOME", &home)
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
-        .output()
-        .ok()
-        .and_then(|o| {
-            let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
-            if s.is_empty() { None } else { Some(s) }
-        })
+        .spawn()
+        .ok()?;
+    let output = wait_with_timeout(child, Duration::from_secs(10)).ok()?;
+    let s = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if s.is_empty() { None } else { Some(s) }
 }
 
 fn set_wrangler_secret(name: &str, value: &str) -> Result<(), String> {
@@ -337,10 +339,7 @@ fn set_wrangler_secret(name: &str, value: &str) -> Result<(), String> {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    // macOS GUI apps may lack HOME, causing wrangler to look for /.wrangler/cache
-    if let Some(home) = dirs::home_dir() {
-        cmd.env("HOME", home);
-    }
+    setup_gui_env(&mut cmd);
     let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to run wrangler secret put: {e}"))?;
 
