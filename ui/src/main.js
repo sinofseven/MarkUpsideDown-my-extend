@@ -27,7 +27,7 @@ async function getMermaid() {
       primaryColor: "#7aacf0",
       primaryTextColor: "#e0ddd5",
       primaryBorderColor: "#35354a",
-      lineColor: "#6a6a7e",
+      lineColor: "#7a7a8e",
       secondaryColor: "#24243a",
       tertiaryColor: "#1a1a2a",
       background: "#1a1a2a",
@@ -222,6 +222,7 @@ async function renderPreview(source) {
   const hasMermaid = /```mermaid\b/.test(source);
   const preview = document.getElementById("preview-pane");
 
+  let html;
   if (hasMermaid) {
     // Custom renderer to replace mermaid code blocks with placeholders
     const renderer = new marked.Renderer();
@@ -233,10 +234,14 @@ async function renderPreview(source) {
       }
       return originalCode.call(this, { text, lang });
     };
+    html = marked.parse(source, { renderer });
+  } else {
+    html = marked.parse(source);
+  }
 
-    const html = marked.parse(source, { renderer });
-    preview.innerHTML = `<div class="preview-page">${html}</div>`;
+  preview.innerHTML = `<div class="preview-page">${html}</div>`;
 
+  if (hasMermaid) {
     // Render mermaid diagrams
     try {
       const mermaid = await getMermaid();
@@ -260,9 +265,6 @@ async function renderPreview(source) {
     } catch (err) {
       // Mermaid failed to load — leave placeholders as-is
     }
-  } else {
-    const html = marked.parse(source);
-    preview.innerHTML = `<div class="preview-page">${html}</div>`;
   }
 
   // Annotate elements with source line numbers for scroll sync
@@ -295,6 +297,7 @@ document.getElementById("btn-open").addEventListener("click", async () => {
       changes: { from: 0, to: editor.state.doc.length, insert: content },
     });
     currentFilePath = path;
+    svgCache.clear();
     renderPreview(content);
     updateStatus(editor.state);
   }
@@ -338,6 +341,7 @@ async function fetchFromUrlBar() {
     editor.dispatch({
       changes: { from: 0, to: editor.state.doc.length, insert: markdown },
     });
+    svgCache.clear();
     renderPreview(markdown);
     statusEl.textContent = "Fetched: " + url;
   } catch (e) {
@@ -378,6 +382,7 @@ async function convertFile(filePath) {
     editor.dispatch({
       changes: { from: 0, to: editor.state.doc.length, insert: result.markdown },
     });
+    svgCache.clear();
     renderPreview(result.markdown);
     const tag = result.is_image ? " (image OCR)" : "";
     statusEl.textContent = `Converted${tag}: ${filePath.split("/").pop()}`;
@@ -442,6 +447,7 @@ if (window.__TAURI__?.event) {
         changes: { from: 0, to: editor.state.doc.length, insert: content },
       });
       currentFilePath = filePath;
+      svgCache.clear();
       renderPreview(content);
       updateStatus(editor.state);
     } else {
@@ -555,6 +561,7 @@ if (window.__TAURI__?.event) {
     editor.dispatch({
       changes: { from: 0, to: editor.state.doc.length, insert: content },
     });
+    svgCache.clear();
     renderPreview(content);
     updateStatus(editor.state);
   });
@@ -582,6 +589,7 @@ if (window.__TAURI__?.event) {
         changes: { from: 0, to: editor.state.doc.length, insert: content },
       });
       currentFilePath = path;
+      svgCache.clear();
       renderPreview(content);
       updateStatus(editor.state);
       syncEditorState();
