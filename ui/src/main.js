@@ -24,20 +24,20 @@ async function getMermaid() {
     startOnLoad: false,
     theme: "dark",
     themeVariables: {
-      primaryColor: "#89b4fa",
-      primaryTextColor: "#cdd6f4",
-      primaryBorderColor: "#3a3a4a",
-      lineColor: "#6c7086",
-      secondaryColor: "#252535",
-      tertiaryColor: "#1e1e2e",
-      background: "#1e1e2e",
-      mainBkg: "#252535",
-      nodeBorder: "#89b4fa",
-      clusterBkg: "#252535",
-      titleColor: "#cdd6f4",
-      edgeLabelBackground: "#252535",
+      primaryColor: "#7aacf0",
+      primaryTextColor: "#e0ddd5",
+      primaryBorderColor: "#35354a",
+      lineColor: "#6a6a7e",
+      secondaryColor: "#24243a",
+      tertiaryColor: "#1a1a2a",
+      background: "#1a1a2a",
+      mainBkg: "#24243a",
+      nodeBorder: "#7aacf0",
+      clusterBkg: "#24243a",
+      titleColor: "#e0ddd5",
+      edgeLabelBackground: "#24243a",
     },
-    fontFamily: '"SF Mono", "Fira Code", "JetBrains Mono", monospace',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
   });
   mermaidModule = mermaid;
   return mermaid;
@@ -81,7 +81,8 @@ function annotateSourceLines(previewEl, source) {
     }
   }
 
-  const children = previewEl.children;
+  const page = previewEl.querySelector(".preview-page") || previewEl;
+  const children = page.children;
   const len = Math.min(children.length, lines.length);
   for (let i = 0; i < len; i++) {
     children[i].setAttribute("data-source-line", lines[i]);
@@ -234,7 +235,7 @@ async function renderPreview(source) {
     };
 
     const html = marked.parse(source, { renderer });
-    preview.innerHTML = html;
+    preview.innerHTML = `<div class="preview-page">${html}</div>`;
 
     // Render mermaid diagrams
     try {
@@ -261,7 +262,7 @@ async function renderPreview(source) {
     }
   } else {
     const html = marked.parse(source);
-    preview.innerHTML = html;
+    preview.innerHTML = `<div class="preview-page">${html}</div>`;
   }
 
   // Annotate elements with source line numbers for scroll sync

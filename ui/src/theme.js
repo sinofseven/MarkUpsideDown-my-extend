@@ -2,12 +2,12 @@ import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 
-const bg = "#1e1e2e";
-const surface = "#252535";
-const border = "#3a3a4a";
-const text = "#cdd6f4";
-const textMuted = "#6c7086";
-const accent = "#89b4fa";
+const bg = "#1a1a2a";
+const surface = "#24243a";
+const border = "#35354a";
+const text = "#e0ddd5";
+const textMuted = "#6a6a7e";
+const accent = "#7aacf0";
 const green = "#a6e3a1";
 const red = "#f38ba8";
 const yellow = "#f9e2af";
@@ -29,23 +29,24 @@ const theme = EditorView.theme(
     },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       {
-        backgroundColor: "#3a3a5a",
+        backgroundColor: "#35355a",
       },
     ".cm-activeLine": {
-      backgroundColor: "#1e1e3a",
+      backgroundColor: "rgba(255, 255, 255, 0.03)",
     },
     ".cm-gutters": {
       backgroundColor: bg,
-      color: textMuted,
+      color: "#4a4a5e",
       border: "none",
       paddingRight: "8px",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "#1e1e3a",
-      color: text,
+      backgroundColor: "rgba(255, 255, 255, 0.03)",
+      color: textMuted,
     },
     ".cm-lineNumbers .cm-gutterElement": {
       padding: "0 8px",
+      fontSize: "12px",
     },
     ".cm-panels": {
       backgroundColor: surface,
