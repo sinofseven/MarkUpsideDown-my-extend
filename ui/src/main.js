@@ -50,6 +50,94 @@ const { readTextFile, writeTextFile } = window.__TAURI__.fs;
 let currentFilePath = null;
 let previewTimeout = null;
 
+// --- Scroll Sync ---
+
+let scrollSyncSource = null; // 'editor' | 'preview' | null
+let scrollSyncTimer = null;
+let editorScrollRAF = 0;
+let previewScrollRAF = 0;
+
+function setScrollSyncSource(source) {
+  scrollSyncSource = source;
+  clearTimeout(scrollSyncTimer);
+  scrollSyncTimer = setTimeout(() => { scrollSyncSource = null; }, 150);
+}
+
+function annotateSourceLines(previewEl, source) {
+  const tokens = marked.lexer(source);
+  let offset = 0;
+  const lines = [];
+  for (const token of tokens) {
+    if (!token.raw) continue;
+    if (token.type === "space") {
+      offset += token.raw.length;
+      continue;
+    }
+    const idx = source.indexOf(token.raw, offset);
+    if (idx >= 0) {
+      const lineNum = source.substring(0, idx).split("\n").length;
+      lines.push(lineNum);
+      offset = idx + token.raw.length;
+    }
+  }
+
+  const children = previewEl.children;
+  const len = Math.min(children.length, lines.length);
+  for (let i = 0; i < len; i++) {
+    children[i].setAttribute("data-source-line", lines[i]);
+  }
+}
+
+function syncEditorToPreview() {
+  if (scrollSyncSource === "preview") return;
+  setScrollSyncSource("editor");
+
+  const preview = document.getElementById("preview-pane");
+  const lineNum = editor.state.doc.lineAt(editor.viewport.from).number;
+
+  const elements = preview.querySelectorAll("[data-source-line]");
+  let target = null;
+  for (const el of elements) {
+    if (parseInt(el.dataset.sourceLine, 10) <= lineNum) {
+      target = el;
+    } else {
+      break;
+    }
+  }
+
+  if (target) {
+    const previewRect = preview.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const scrollOffset = targetRect.top - previewRect.top + preview.scrollTop;
+    preview.scrollTo({ top: scrollOffset, behavior: "smooth" });
+  }
+}
+
+function syncPreviewToEditor() {
+  if (scrollSyncSource === "editor") return;
+  setScrollSyncSource("preview");
+
+  const preview = document.getElementById("preview-pane");
+  const previewRect = preview.getBoundingClientRect();
+  const elements = preview.querySelectorAll("[data-source-line]");
+
+  let targetLine = 1;
+  for (const el of elements) {
+    const rect = el.getBoundingClientRect();
+    if (rect.top <= previewRect.top + 10) {
+      targetLine = parseInt(el.dataset.sourceLine, 10);
+    } else {
+      break;
+    }
+  }
+
+  const clampedLine = Math.min(targetLine, editor.state.doc.lines);
+  const line = editor.state.doc.line(clampedLine);
+  editor.dispatch({
+    effects: EditorView.scrollIntoView(line.from, { y: "start" }),
+  });
+}
+
 const IMPORT_EXTENSIONS = [
   "pdf", "docx", "xlsx", "pptx", "html", "htm", "csv", "xml",
   "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif",
@@ -175,6 +263,9 @@ async function renderPreview(source) {
     const html = marked.parse(source);
     preview.innerHTML = html;
   }
+
+  // Annotate elements with source line numbers for scroll sync
+  annotateSourceLines(preview, source);
 
   // Inline SVG images (runs after initial HTML is set)
   inlineSvgImages(preview).catch(() => {});
@@ -519,6 +610,19 @@ if (window.__TAURI__?.event) {
 
 // Initial sync
 syncEditorState();
+
+// --- Scroll Sync Event Listeners ---
+
+const cmScroller = editor.dom.querySelector(".cm-scroller");
+cmScroller.addEventListener("scroll", () => {
+  cancelAnimationFrame(editorScrollRAF);
+  editorScrollRAF = requestAnimationFrame(syncEditorToPreview);
+}, { passive: true });
+
+document.getElementById("preview-pane").addEventListener("scroll", () => {
+  cancelAnimationFrame(previewScrollRAF);
+  previewScrollRAF = requestAnimationFrame(syncPreviewToEditor);
+}, { passive: true });
 
 // First-run: show settings if Worker not configured
 checkFirstRun();
