@@ -215,6 +215,7 @@ struct ConvertWorkerResponse {
 pub struct ConvertResponse {
     pub markdown: String,
     pub is_image: bool,
+    pub original_size: usize,
 }
 
 #[tauri::command]
@@ -224,6 +225,7 @@ pub async fn convert_file_to_markdown(
 ) -> Result<ConvertResponse, String> {
     let path = std::path::Path::new(&file_path);
     let bytes = std::fs::read(path).map_err(|e| format!("Failed to read file: {e}"))?;
+    let original_size = bytes.len();
 
     let mime_type = mime_from_extension(
         path.extension()
@@ -254,6 +256,7 @@ pub async fn convert_file_to_markdown(
     Ok(ConvertResponse {
         markdown: body.markdown.unwrap_or_default(),
         is_image: body.is_image.unwrap_or(false),
+        original_size,
     })
 }
 

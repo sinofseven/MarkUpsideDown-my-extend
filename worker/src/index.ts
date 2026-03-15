@@ -72,10 +72,11 @@ async function handleConvert(request: Request, env: Env): Promise<Response> {
   try {
     const isImage = IMAGE_TYPES.has(mimeType);
     const body = await request.arrayBuffer();
+    const originalSize = body.byteLength;
     const blob = new Blob([body], { type: mimeType });
     const result = await env.AI.toMarkdown([blob]);
     const markdown = result.map((r: { data: string }) => r.data).join("\n\n");
-    return jsonResponse({ markdown, is_image: isImage });
+    return jsonResponse({ markdown, is_image: isImage, original_size: originalSize });
   } catch (e) {
     return jsonResponse({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
@@ -171,18 +172,38 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
 }
 
 async function stripBoilerplate(html: string): Promise<string> {
+  const remove = { element(el: Element) { el.remove(); } };
   const rewriter = new HTMLRewriter()
-    .on("nav", { element(el) { el.remove(); } })
-    .on("header", { element(el) { el.remove(); } })
-    .on("footer", { element(el) { el.remove(); } })
-    .on("aside", { element(el) { el.remove(); } })
-    .on("script", { element(el) { el.remove(); } })
-    .on("style", { element(el) { el.remove(); } })
-    .on("noscript", { element(el) { el.remove(); } })
-    .on("[role='navigation']", { element(el) { el.remove(); } })
-    .on("[role='banner']", { element(el) { el.remove(); } })
-    .on("[role='contentinfo']", { element(el) { el.remove(); } })
-    .on("[aria-hidden='true']", { element(el) { el.remove(); } });
+    // Structural boilerplate
+    .on("nav", remove)
+    .on("header", remove)
+    .on("footer", remove)
+    .on("aside", remove)
+    .on("script", remove)
+    .on("style", remove)
+    .on("noscript", remove)
+    // ARIA roles
+    .on("[role='navigation']", remove)
+    .on("[role='banner']", remove)
+    .on("[role='contentinfo']", remove)
+    .on("[role='complementary']", remove)
+    .on("[aria-hidden='true']", remove)
+    // Cookie consent / privacy banners
+    .on("[class*='cookie']", remove)
+    .on("[class*='consent']", remove)
+    .on("[id*='cookie']", remove)
+    .on("[id*='consent']", remove)
+    .on("[class*='gdpr']", remove)
+    // Ad containers
+    .on("[class*='adsbygoogle']", remove)
+    .on("[class*='ad-container']", remove)
+    .on("[class*='ad-wrapper']", remove)
+    .on("[id*='google_ads']", remove)
+    .on("ins.adsbygoogle", remove)
+    // Social sharing widgets
+    .on("[class*='share-buttons']", remove)
+    .on("[class*='social-share']", remove)
+    .on("[class*='sharing-buttons']", remove);
   return rewriter.transform(new Response(html)).text();
 }
 

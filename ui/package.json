@@ -19,6 +19,8 @@
     "@tauri-apps/api": "^2.3.0",
     "@tauri-apps/plugin-dialog": "^2.2.1",
     "@tauri-apps/plugin-fs": "^2.2.0",
+    "highlight.js": "^11.11.1",
+    "katex": "^0.16.38",
     "marked": "^17.0.4",
     "mermaid": "^11.13.0"
   },

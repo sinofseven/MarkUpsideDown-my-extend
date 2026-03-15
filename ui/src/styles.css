@@ -269,6 +269,60 @@ html, body {
 #preview-pane th { background: var(--code-bg); font-weight: 600; }
 #preview-pane hr { border: none; border-top: 1px solid var(--border); margin: 2em 0; }
 
+/* KaTeX math */
+.math-block {
+  margin: 1.2em 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.math-error {
+  color: var(--error);
+}
+
+/* Syntax highlighting (highlight.js) — warm paper theme */
+#preview-pane pre code.hljs {
+  background: none;
+  padding: 0;
+  display: block;
+  overflow-x: auto;
+  color: var(--text);
+}
+
+#preview-pane .hljs-keyword,
+#preview-pane .hljs-selector-tag,
+#preview-pane .hljs-built_in,
+#preview-pane .hljs-name { color: #8b5cf6; }
+
+#preview-pane .hljs-string,
+#preview-pane .hljs-attr,
+#preview-pane .hljs-symbol,
+#preview-pane .hljs-bullet,
+#preview-pane .hljs-addition { color: #16803c; }
+
+#preview-pane .hljs-number,
+#preview-pane .hljs-literal { color: #c2590a; }
+
+#preview-pane .hljs-comment,
+#preview-pane .hljs-quote,
+#preview-pane .hljs-deletion { color: #8a8578; font-style: italic; }
+
+#preview-pane .hljs-title,
+#preview-pane .hljs-section,
+#preview-pane .hljs-title.function_ { color: #2563eb; }
+
+#preview-pane .hljs-type,
+#preview-pane .hljs-template-variable { color: #b45309; }
+
+#preview-pane .hljs-meta { color: #64748b; }
+
+#preview-pane .hljs-attribute { color: #0e7490; }
+
+#preview-pane .hljs-regexp { color: #dc2626; }
+
+#preview-pane .hljs-emphasis { font-style: italic; }
+#preview-pane .hljs-strong { font-weight: 700; }
+
 /* Mermaid diagrams */
 .mermaid-container {
   margin: 0.8em 0;
@@ -757,6 +811,23 @@ html, body {
   line-height: 1.4;
 }
 
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.settings-toggle-row input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.settings-toggle-label {
+  color: var(--text);
+}
+
 .settings-divider {
   display: flex;
   align-items: center;
@@ -915,4 +986,11 @@ html, body {
   #preview-pane hr { border-top-color: #ccc; }
 
   .mermaid-container svg { max-width: 100%; }
+
+  /* Keep syntax highlighting colors in print */
+  #preview-pane .hljs-comment, #preview-pane .hljs-quote { color: #888; }
+  #preview-pane .hljs-keyword, #preview-pane .hljs-built_in { color: #6d28d9; }
+  #preview-pane .hljs-string { color: #166534; }
+  #preview-pane .hljs-number { color: #9a3412; }
+  #preview-pane .hljs-title, #preview-pane .hljs-title.function_ { color: #1d4ed8; }
 }

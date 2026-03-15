@@ -11,8 +11,55 @@ import {
 import { search, searchKeymap } from "@codemirror/search";
 import { oneDark } from "./theme.js";
 import { editTableAtCursor } from "./table-editor.js";
-import { showSettings, ensureWorkerUrl, getWorkerUrl, checkFirstRun } from "./settings.js";
+import { showSettings, ensureWorkerUrl, getWorkerUrl, isImageConversionAllowed, checkFirstRun } from "./settings.js";
 import { marked } from "marked";
+import hljs from "highlight.js";
+import katex from "katex";
+import "katex/dist/katex.min.css";
+
+// KaTeX math extension for marked
+const mathExtension = {
+  extensions: [
+    {
+      name: "mathBlock",
+      level: "block",
+      start(src) { return src.indexOf("$$"); },
+      tokenizer(src) {
+        const match = src.match(/^\$\$([\s\S]+?)\$\$/);
+        if (match) {
+          return { type: "mathBlock", raw: match[0], text: match[1].trim() };
+        }
+      },
+      renderer(token) {
+        try {
+          return `<div class="math-block">${katex.renderToString(token.text, { displayMode: true, throwOnError: false })}</div>`;
+        } catch {
+          return `<div class="math-block math-error"><code>${token.text}</code></div>`;
+        }
+      },
+    },
+    {
+      name: "mathInline",
+      level: "inline",
+      start(src) { return src.indexOf("$"); },
+      tokenizer(src) {
+        const match = src.match(/^\$([^\s$](?:[^$]*[^\s$])?)\$/);
+        if (match) {
+          return { type: "mathInline", raw: match[0], text: match[1] };
+        }
+      },
+      renderer(token) {
+        try {
+          return katex.renderToString(token.text, { displayMode: false, throwOnError: false });
+        } catch {
+          return `<code class="math-error">${token.text}</code>`;
+        }
+      },
+    },
+  ],
+};
+
+marked.use(mathExtension);
 
 let mermaidModule = null;
 let mermaidRenderCount = 0;
@@ -184,6 +231,12 @@ function syncPreviewToCursor() {
   }
 }
 
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 const IMPORT_EXTENSIONS = [
   "pdf", "docx", "xlsx", "pptx", "html", "htm", "csv", "xml",
   "jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif",
@@ -275,20 +328,19 @@ async function renderPreview(source) {
   // Reset render count each time so Mermaid IDs stay small and predictable
   mermaidRenderCount = 0;
 
-  let html;
-  if (hasMermaid) {
-    const renderer = new marked.Renderer();
-    const originalCode = renderer.code;
-    renderer.code = function ({ text, lang }) {
-      if (lang === "mermaid") {
-        return `<div class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
-      }
-      return originalCode.call(this, { text, lang });
-    };
-    html = marked.parse(source, { renderer });
-  } else {
-    html = marked.parse(source);
-  }
+  const renderer = new marked.Renderer();
+  renderer.code = function ({ text, lang }) {
+    if (lang === "mermaid") {
+      return `<div class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
+    }
+    const language = lang && hljs.getLanguage(lang) ? lang : null;
+    const highlighted = language
+      ? hljs.highlight(text, { language }).value
+      : hljs.highlightAuto(text).value;
+    const langClass = language ? ` class="hljs language-${lang}"` : ' class="hljs"';
+    return `<pre><code${langClass}>${highlighted}</code></pre>`;
+  };
+  const html = marked.parse(source, { renderer });
 
   preview.innerHTML = `<div class="preview-page">${html}</div>`;
 
@@ -417,6 +469,10 @@ async function convertFile(filePath) {
   const isImage = await invoke("detect_file_is_image", { filePath });
 
   if (isImage) {
+    if (!isImageConversionAllowed()) {
+      document.getElementById("status").textContent = "Image conversion is disabled in Settings";
+      return;
+    }
     const ok = await confirm(
       "Image conversion uses AI Neurons (costs apply). Continue?",
       { title: "Image Conversion Cost", kind: "warning" }
@@ -438,7 +494,14 @@ async function convertFile(filePath) {
     svgCache.clear();
     renderPreview(result.markdown);
     const tag = result.is_image ? " (image OCR)" : "";
-    statusEl.textContent = `Converted${tag}: ${filePath.split("/").pop()}`;
+    const fileName = filePath.split("/").pop();
+    const mdSize = new Blob([result.markdown]).size;
+    if (result.original_size && result.original_size > 0 && mdSize < result.original_size) {
+      const reduction = Math.round((1 - mdSize / result.original_size) * 100);
+      statusEl.textContent = `Converted${tag}: ${fileName} | ${formatBytes(result.original_size)} → ${formatBytes(mdSize)} (${reduction}% reduction)`;
+    } else {
+      statusEl.textContent = `Converted${tag}: ${fileName}`;
+    }
   } catch (e) {
     statusEl.textContent = `Convert error: ${e}`;
   }

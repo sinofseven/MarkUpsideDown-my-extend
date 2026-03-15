@@ -2,6 +2,7 @@ const { invoke } = window.__TAURI__.core;
 
 const STORAGE_KEY_WORKER_URL = "markupsidedown:workerUrl";
 const STORAGE_KEY_SETUP_DONE = "markupsidedown:setupDone";
+const STORAGE_KEY_ALLOW_IMAGE = "markupsidedown:allowImageConversion";
 
 export function getWorkerUrl() {
   return localStorage.getItem(STORAGE_KEY_WORKER_URL) || "";
@@ -17,6 +18,14 @@ export function setWorkerUrl(url) {
 
 export function isSetupDone() {
   return localStorage.getItem(STORAGE_KEY_SETUP_DONE) === "1";
+}
+
+export function isImageConversionAllowed() {
+  return localStorage.getItem(STORAGE_KEY_ALLOW_IMAGE) !== "0";
+}
+
+function setImageConversionAllowed(allowed) {
+  localStorage.setItem(STORAGE_KEY_ALLOW_IMAGE, allowed ? "1" : "0");
 }
 
 function markSetupDone() {
@@ -371,6 +380,14 @@ wrangler secret put CLOUDFLARE_ACCOUNT_ID
 wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       </div>
 
+      <div class="settings-section">
+        <div class="settings-section-title">Import Options</div>
+        <label class="settings-toggle-row">
+          <input type="checkbox" id="settings-allow-image" />
+          <span class="settings-toggle-label">Allow image conversion (uses AI Neurons — costs apply)</span>
+        </label>
+      </div>
+
       <div class="settings-actions">
         <button id="settings-clear" class="settings-clear-btn">Clear URL</button>
         <span class="spacer"></span>
@@ -395,6 +412,9 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   if (currentTestStatus?.reachable && !currentTestStatus?.render_available) {
     secretsHelp.style.display = "";
   }
+
+  const allowImageCheckbox = document.getElementById("settings-allow-image");
+  allowImageCheckbox.checked = isImageConversionAllowed();
 
   urlInput.focus();
 
@@ -471,6 +491,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   const saveAndClose = () => {
     const url = urlInput.value.trim();
     setWorkerUrl(url);
+    setImageConversionAllowed(allowImageCheckbox.checked);
     markSetupDone();
     close();
     if (onSave) onSave(url);
