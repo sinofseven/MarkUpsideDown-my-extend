@@ -163,6 +163,26 @@ function buildScrollAnchors() {
     const editorY = block.top;
     const previewY = el.getBoundingClientRect().top - previewRect.top + previewScrollTop;
     anchors.push({ editorY, previewY });
+
+    // Add sub-line anchors within code blocks for precise per-line sync
+    if (el.tagName === "PRE") {
+      const codeEl = el.querySelector("code") || el;
+      const codeLines = codeEl.textContent.split("\n");
+      if (codeLines.length > 0 && codeLines[codeLines.length - 1] === "") codeLines.pop();
+      if (codeLines.length > 1) {
+        const codeRect = codeEl.getBoundingClientRect();
+        const codeLineHeight = codeRect.height / codeLines.length;
+        // data-source-line points to the opening ```, code content starts at lineNum + 1
+        for (let i = 0; i < codeLines.length; i++) {
+          const srcLine = lineNum + 1 + i;
+          if (srcLine > editor.state.doc.lines) break;
+          const editorLine = editor.state.doc.line(srcLine);
+          const editorBlock = editor.lineBlockAt(editorLine.from);
+          const subPreviewY = codeRect.top - previewRect.top + previewScrollTop + i * codeLineHeight;
+          anchors.push({ editorY: editorBlock.top, previewY: subPreviewY });
+        }
+      }
+    }
   }
 
   const editorMax = cmScroller.scrollHeight - cmScroller.clientHeight;
@@ -171,6 +191,7 @@ function buildScrollAnchors() {
     anchors.push({ editorY: editorMax, previewY: previewMax });
   }
 
+  anchors.sort((a, b) => a.editorY - b.editorY);
   scrollAnchors = anchors;
 }
 
