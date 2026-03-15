@@ -15,13 +15,14 @@ import { showSettings, ensureWorkerUrl, getWorkerUrl, checkFirstRun } from "./se
 import { marked } from "marked";
 
 let mermaidModule = null;
-let mermaidIdCounter = 0;
+let mermaidRenderCount = 0;
 
 async function getMermaid() {
   if (mermaidModule) return mermaidModule;
   const { default: mermaid } = await import("mermaid");
   mermaid.initialize({
     startOnLoad: false,
+    securityLevel: "loose",
     theme: "dark",
     themeVariables: {
       primaryColor: "#7aacf0",
@@ -222,15 +223,16 @@ async function renderPreview(source) {
   const hasMermaid = /```mermaid\b/.test(source);
   const preview = document.getElementById("preview-pane");
 
+  // Reset render count each time so Mermaid IDs stay small and predictable
+  mermaidRenderCount = 0;
+
   let html;
   if (hasMermaid) {
-    // Custom renderer to replace mermaid code blocks with placeholders
     const renderer = new marked.Renderer();
     const originalCode = renderer.code;
     renderer.code = function ({ text, lang }) {
       if (lang === "mermaid") {
-        const id = `mermaid-${mermaidIdCounter++}`;
-        return `<div class="mermaid-container" data-mermaid-id="${id}" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
+        return `<div class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
       }
       return originalCode.call(this, { text, lang });
     };
@@ -242,13 +244,12 @@ async function renderPreview(source) {
   preview.innerHTML = `<div class="preview-page">${html}</div>`;
 
   if (hasMermaid) {
-    // Render mermaid diagrams
     try {
       const mermaid = await getMermaid();
-      const containers = document.querySelectorAll(".mermaid-container");
+      const containers = preview.querySelectorAll(".mermaid-container");
       for (const el of containers) {
         const src = decodeURIComponent(el.dataset.mermaidSource);
-        const id = el.dataset.mermaidId;
+        const id = `mmd-${Date.now()}-${mermaidRenderCount++}`;
         try {
           const { svg } = await mermaid.render(id, src);
           el.innerHTML = svg;
@@ -258,12 +259,11 @@ async function renderPreview(source) {
           pre.className = "mermaid-error";
           pre.textContent = err.message || String(err);
           el.replaceChildren(pre);
-          // mermaid.render creates a temp element on error; clean up
           document.getElementById(id)?.remove();
         }
       }
     } catch (err) {
-      // Mermaid failed to load — leave placeholders as-is
+      console.error("Mermaid failed to load:", err);
     }
   }
 
