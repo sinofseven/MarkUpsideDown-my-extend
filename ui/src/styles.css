@@ -197,6 +197,8 @@ html, body {
 #preview-pane ul, #preview-pane ol { padding-left: 24px; margin: 0.5em 0; }
 #preview-pane li { line-height: 1.7; }
 #preview-pane img { max-width: 100%; border-radius: 6px; }
+#preview-pane .inline-svg { display: inline-block; max-width: 100%; }
+#preview-pane .inline-svg svg { max-width: 100%; height: auto; }
 #preview-pane table { border-collapse: collapse; width: 100%; margin: 0.8em 0; }
 #preview-pane th, #preview-pane td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
 #preview-pane th { background: var(--surface); font-weight: 600; }

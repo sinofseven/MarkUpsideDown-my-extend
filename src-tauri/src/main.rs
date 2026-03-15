@@ -30,6 +30,7 @@ fn main() {
             commands::github_fetch_pr,
             commands::github_list_repos,
             commands::sync_editor_state,
+            commands::fetch_svg,
             cloudflare::check_wrangler_status,
             cloudflare::wrangler_login,
             cloudflare::deploy_worker,

@@ -91,8 +91,47 @@ const editor = new EditorView({
 
 // --- Preview ---
 
+// SVG cache: URL -> sanitized SVG string
+const svgCache = new Map();
+
+async function inlineSvgImages(container) {
+  const imgs = container.querySelectorAll('img[src$=".svg"]');
+  const tasks = Array.from(imgs).map(async (img) => {
+    const url = img.src;
+    if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) return;
+
+    try {
+      let svgText;
+      if (svgCache.has(url)) {
+        svgText = svgCache.get(url);
+      } else {
+        svgText = await invoke("fetch_svg", { url });
+        svgCache.set(url, svgText);
+      }
+
+      const wrapper = document.createElement("span");
+      wrapper.className = "inline-svg";
+      wrapper.innerHTML = svgText;
+
+      // Preserve alt text as aria-label
+      const alt = img.alt;
+      const svgEl = wrapper.querySelector("svg");
+      if (svgEl && alt) {
+        svgEl.setAttribute("aria-label", alt);
+        svgEl.setAttribute("role", "img");
+      }
+
+      img.replaceWith(wrapper);
+    } catch {
+      // Leave as <img> on failure — browser may still render it
+    }
+  });
+  await Promise.all(tasks);
+}
+
 async function renderPreview(source) {
   const hasMermaid = /```mermaid\b/.test(source);
+  const preview = document.getElementById("preview-pane");
 
   if (hasMermaid) {
     // Custom renderer to replace mermaid code blocks with placeholders
@@ -107,7 +146,7 @@ async function renderPreview(source) {
     };
 
     const html = marked.parse(source, { renderer });
-    document.getElementById("preview-pane").innerHTML = html;
+    preview.innerHTML = html;
 
     // Render mermaid diagrams
     try {
@@ -134,8 +173,11 @@ async function renderPreview(source) {
     }
   } else {
     const html = marked.parse(source);
-    document.getElementById("preview-pane").innerHTML = html;
+    preview.innerHTML = html;
   }
+
+  // Inline SVG images (runs after initial HTML is set)
+  inlineSvgImages(preview).catch(() => {});
 }
 
 function updateStatus(state) {

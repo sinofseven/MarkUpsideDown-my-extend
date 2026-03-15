@@ -289,6 +289,71 @@ fn mime_from_extension(ext: &str) -> Option<&'static str> {
     }
 }
 
+// --- SVG Fetch & Sanitize ---
+
+const MAX_SVG_SIZE: usize = 1_024 * 1_024; // 1 MB
+
+#[tauri::command]
+pub async fn fetch_svg(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch SVG: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    if !content_type.contains("svg") && !content_type.contains("xml") {
+        return Err(format!("Not an SVG (content-type: {content_type})"));
+    }
+
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+
+    if bytes.len() > MAX_SVG_SIZE {
+        return Err(format!(
+            "SVG too large ({} bytes, max {})",
+            bytes.len(),
+            MAX_SVG_SIZE
+        ));
+    }
+
+    let svg_text = String::from_utf8(bytes.to_vec())
+        .map_err(|_| "SVG contains invalid UTF-8".to_string())?;
+
+    Ok(sanitize_svg(&svg_text))
+}
+
+fn sanitize_svg(svg: &str) -> String {
+    // Remove <script> tags and their content
+    let re_script = regex::Regex::new(r"(?is)<script[\s>].*?</script>").unwrap();
+    let result = re_script.replace_all(svg, "");
+
+    // Remove on* event handler attributes
+    let re_events = regex::Regex::new(r#"(?i)\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)"#).unwrap();
+    let result = re_events.replace_all(&result, "");
+
+    // Remove javascript: URLs in href/xlink:href
+    let re_js_href =
+        regex::Regex::new(r#"(?i)(href\s*=\s*["'])javascript:[^"']*"#).unwrap();
+    let result = re_js_href.replace_all(&result, "${1}#");
+
+    result.into_owned()
+}
+
 // --- GitHub via gh CLI ---
 
 fn run_gh(args: &[&str]) -> Result<String, String> {
