@@ -2,16 +2,16 @@ import { EditorView } from "@codemirror/view";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 
-const bg = "#1a1a2a";
-const surface = "#24243a";
-const border = "#35354a";
-const text = "#e0ddd5";
-const textMuted = "#7a7a8e";
-const accent = "#7aacf0";
-const green = "#a6e3a1";
-const red = "#f38ba8";
-const yellow = "#f9e2af";
-const mauve = "#cba6f7";
+const bg = "#f5f1eb";
+const surface = "#ece8e2";
+const border = "#d4cfc6";
+const text = "#2c2c2c";
+const textMuted = "#8a8578";
+const accent = "#4a7ab5";
+const green = "#2e7d32";
+const red = "#b33a3a";
+const yellow = "#b8860b";
+const mauve = "#7b5ea7";
 
 const theme = EditorView.theme(
   {
@@ -29,19 +29,19 @@ const theme = EditorView.theme(
     },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       {
-        backgroundColor: "#35355a",
+        backgroundColor: "rgba(74, 122, 181, 0.18)",
       },
     ".cm-activeLine": {
-      backgroundColor: "rgba(255, 255, 255, 0.03)",
+      backgroundColor: "rgba(0, 0, 0, 0.03)",
     },
     ".cm-gutters": {
       backgroundColor: bg,
-      color: "#4a4a5e",
+      color: "#b0a99e",
       border: "none",
       paddingRight: "8px",
     },
     ".cm-activeLineGutter": {
-      backgroundColor: "rgba(255, 255, 255, 0.03)",
+      backgroundColor: "rgba(0, 0, 0, 0.03)",
       color: textMuted,
     },
     ".cm-lineNumbers .cm-gutterElement": {
@@ -65,7 +65,7 @@ const theme = EditorView.theme(
       fontSize: "12px",
     },
     ".cm-search input, .cm-search select": {
-      backgroundColor: bg,
+      backgroundColor: "#faf7f2",
       color: text,
       border: `1px solid ${border}`,
       borderRadius: "4px",
@@ -84,17 +84,17 @@ const theme = EditorView.theme(
       cursor: "pointer",
     },
     ".cm-search button:hover": {
-      backgroundColor: "#4a4a5a",
+      backgroundColor: "#c4bfb6",
     },
     ".cm-searchMatch": {
-      backgroundColor: "#89b4fa33",
-      outline: `1px solid #89b4fa55`,
+      backgroundColor: "rgba(74, 122, 181, 0.15)",
+      outline: `1px solid rgba(74, 122, 181, 0.3)`,
     },
     ".cm-searchMatch-selected": {
-      backgroundColor: "#89b4fa66",
+      backgroundColor: "rgba(74, 122, 181, 0.3)",
     },
   },
-  { dark: true }
+  { dark: false }
 );
 
 const highlighting = HighlightStyle.define([
@@ -102,7 +102,7 @@ const highlighting = HighlightStyle.define([
   { tag: tags.heading1, fontSize: "1.4em" },
   { tag: tags.heading2, fontSize: "1.2em" },
   { tag: tags.emphasis, fontStyle: "italic", color: yellow },
-  { tag: tags.strong, fontWeight: "bold", color: yellow },
+  { tag: tags.strong, fontWeight: "bold", color: "#5a4a2c" },
   { tag: tags.link, color: accent, textDecoration: "underline" },
   { tag: tags.url, color: accent },
   { tag: tags.monospace, color: green },
