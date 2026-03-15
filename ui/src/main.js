@@ -260,17 +260,19 @@ function syncPreviewToEditor() {
   cmScroller.scrollTop = target;
 }
 
-// Sync preview to editor cursor position using anchor interpolation
+// Sync preview to editor cursor position — align at exact same visual height
 function syncPreviewToCursor() {
   if (performance.now() - previewClickedAt < 100) return;
   if (scrollAnchors.length < 2) return;
 
   const pos = editor.state.selection.main.head;
   const block = editor.lineBlockAt(pos);
+  const cmScroller = editor.dom.querySelector(".cm-scroller");
+  const lineVisibleY = block.top - cmScroller.scrollTop;
   const previewTarget = Math.round(interpolate(scrollAnchors, "editorY", "previewY", block.top));
 
   const preview = document.getElementById("preview-pane");
-  const scrollTarget = previewTarget - preview.clientHeight / 3;
+  const scrollTarget = previewTarget - lineVisibleY;
 
   previewScrolledAt = performance.now();
   preview.scrollTo({ top: Math.max(0, scrollTarget), behavior: "instant" });
@@ -313,10 +315,12 @@ function syncPreviewClickToEditor(event) {
   const line = editor.state.doc.line(lineNum);
   editor.dispatch({ selection: { anchor: line.from } });
 
-  // Scroll editor to show the clicked line near the top third of the viewport
+  // Scroll editor so the target line aligns at the same visual height as the click
+  const preview = document.getElementById("preview-pane");
+  const clickVisibleY = event.clientY - preview.getBoundingClientRect().top;
   const cmScroller = editor.dom.querySelector(".cm-scroller");
   const block = editor.lineBlockAt(line.from);
-  const editorTarget = block.top - cmScroller.clientHeight / 3;
+  const editorTarget = block.top - clickVisibleY;
   editorScrolledAt = performance.now();
   cmScroller.scrollTo({ top: Math.max(0, editorTarget), behavior: "instant" });
 
