@@ -104,6 +104,7 @@ let scrollAnchors = []; // [{ editorY, previewY }]
 let editorScrolledAt = 0; // timestamp of last programmatic editor scroll
 let previewScrolledAt = 0; // timestamp of last programmatic preview scroll
 let cursorSyncRAF = 0;
+let previewClickedAt = 0; // timestamp of last preview click (suppress cursor→preview sync)
 const SCROLL_COOLDOWN = 50; // ms to ignore scroll events after programmatic scroll
 
 function annotateSourceLines(previewEl, source) {
@@ -210,6 +211,7 @@ function syncPreviewToEditor() {
 
 // Sync preview to editor cursor/selection position
 function syncPreviewToCursor() {
+  if (performance.now() - previewClickedAt < 200) return;
   const pos = editor.state.selection.main.head;
   const line = editor.state.doc.lineAt(pos);
   const lineNum = line.number;
@@ -229,6 +231,27 @@ function syncPreviewToCursor() {
     previewScrolledAt = performance.now();
     preview.scrollTo({ top: Math.max(0, target), behavior: "instant" });
   }
+}
+
+// Sync editor cursor to clicked preview element
+function syncPreviewClickToEditor(event) {
+  let el = event.target;
+  while (el && el !== event.currentTarget) {
+    if (el.dataset && el.dataset.sourceLine) break;
+    el = el.parentElement;
+  }
+  if (!el || !el.dataset || !el.dataset.sourceLine) return;
+
+  const lineNum = parseInt(el.dataset.sourceLine, 10);
+  if (lineNum < 1 || lineNum > editor.state.doc.lines) return;
+
+  previewClickedAt = performance.now();
+  const line = editor.state.doc.line(lineNum);
+  editor.dispatch({
+    selection: { anchor: line.from },
+    scrollIntoView: true,
+  });
+  editor.focus();
 }
 
 function formatBytes(bytes) {
@@ -756,6 +779,7 @@ document.getElementById("preview-pane").addEventListener("scroll", () => {
   previewScrollRAF = requestAnimationFrame(syncPreviewToEditor);
 }, { passive: true });
 window.addEventListener("resize", buildScrollAnchors);
+document.getElementById("preview-pane").addEventListener("click", syncPreviewClickToEditor);
 
 // First-run: show settings if Worker not configured
 checkFirstRun();
