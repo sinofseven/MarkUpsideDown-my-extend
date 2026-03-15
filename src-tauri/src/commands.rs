@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
 use std::sync::Mutex;
+use std::time::Duration;
 
 // --- Shared Editor State (for MCP bridge) ---
 
@@ -52,6 +53,17 @@ pub struct WorkerStatus {
     pub error: Option<String>,
 }
 
+impl WorkerStatus {
+    fn unreachable(error: String) -> Self {
+        Self {
+            reachable: false,
+            convert_available: false,
+            render_available: false,
+            error: Some(error),
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct HealthCapabilities {
     convert: Option<bool>,
@@ -66,25 +78,13 @@ struct HealthResponse {
 }
 
 #[tauri::command]
-pub async fn test_worker_url(worker_url: String) -> WorkerStatus {
-    let client = match reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            return WorkerStatus {
-                reachable: false,
-                convert_available: false,
-                render_available: false,
-                error: Some(e.to_string()),
-            }
-        }
-    };
-
+pub async fn test_worker_url(
+    worker_url: String,
+    client: tauri::State<'_, reqwest::Client>,
+) -> Result<WorkerStatus, String> {
     let health_url = format!("{}/health", worker_url.trim_end_matches('/'));
 
-    match client.get(&health_url).send().await {
+    Ok(match client.get(&health_url).timeout(Duration::from_secs(10)).send().await {
         Ok(resp) if resp.status().is_success() => {
             match resp.json::<HealthResponse>().await {
                 Ok(body) => {
@@ -104,7 +104,7 @@ pub async fn test_worker_url(worker_url: String) -> WorkerStatus {
                     convert_available: false,
                     render_available: false,
                     error: Some(format!("Unexpected response format: {e}")),
-                },
+                }
             }
         }
         Ok(resp) => WorkerStatus {
@@ -113,13 +113,8 @@ pub async fn test_worker_url(worker_url: String) -> WorkerStatus {
             render_available: false,
             error: Some(format!("Worker returned status {}", resp.status())),
         },
-        Err(e) => WorkerStatus {
-            reachable: false,
-            convert_available: false,
-            render_available: false,
-            error: Some(format!("Cannot reach worker: {e}")),
-        },
-    }
+        Err(e) => WorkerStatus::unreachable(format!("Cannot reach worker: {e}")),
+    })
 }
 
 // --- Cloudflare Markdown for Agents ---
@@ -132,13 +127,13 @@ pub struct MarkdownResponse {
 }
 
 #[tauri::command]
-pub async fn fetch_url_as_markdown(url: String) -> Result<MarkdownResponse, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
-        .build()
-        .map_err(|e| e.to_string())?;
+pub async fn fetch_url_as_markdown(
+    url: String,
+    client: tauri::State<'_, reqwest::Client>,
+) -> Result<MarkdownResponse, String> {
     let response = client
         .get(&url)
+        .timeout(Duration::from_secs(30))
         .header("Accept", "text/markdown")
         .send()
         .await
@@ -178,16 +173,13 @@ struct RenderWorkerResponse {
 pub async fn fetch_rendered_url_as_markdown(
     url: String,
     worker_url: String,
+    client: tauri::State<'_, reqwest::Client>,
 ) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| e.to_string())?;
-
     let render_url = format!("{worker_url}/render?url={}", urlencoding::encode(&url));
 
     let response = client
         .get(&render_url)
+        .timeout(Duration::from_secs(60))
         .send()
         .await
         .map_err(|e| format!("Request failed: {e}"))?;
@@ -225,6 +217,7 @@ pub struct ConvertResponse {
 pub async fn convert_file_to_markdown(
     file_path: String,
     worker_url: String,
+    client: tauri::State<'_, reqwest::Client>,
 ) -> Result<ConvertResponse, String> {
     let path = std::path::Path::new(&file_path);
     let bytes = tokio::fs::read(path).await.map_err(|e| format!("Failed to read file: {e}"))?;
@@ -237,12 +230,9 @@ pub async fn convert_file_to_markdown(
     )
     .ok_or_else(|| format!("Unsupported file extension: {}", file_path))?;
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
-        .map_err(|e| e.to_string())?;
     let response = client
         .post(format!("{worker_url}/convert"))
+        .timeout(Duration::from_secs(120))
         .header("Content-Type", mime_type)
         .body(bytes)
         .send()
@@ -299,14 +289,13 @@ fn mime_from_extension(ext: &str) -> Option<&'static str> {
 const MAX_SVG_SIZE: usize = 1_024 * 1_024; // 1 MB
 
 #[tauri::command]
-pub async fn fetch_svg(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(15))
-        .build()
-        .map_err(|e| e.to_string())?;
-
+pub async fn fetch_svg(
+    url: String,
+    client: tauri::State<'_, reqwest::Client>,
+) -> Result<String, String> {
     let response = client
         .get(&url)
+        .timeout(Duration::from_secs(15))
         .send()
         .await
         .map_err(|e| format!("Failed to fetch SVG: {e}"))?;

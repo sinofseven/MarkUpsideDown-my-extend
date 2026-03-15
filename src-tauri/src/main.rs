@@ -10,12 +10,16 @@ use std::sync::Arc;
 fn main() {
     let editor_state = Arc::new(commands::EditorState::default());
     let editor_state_managed = editor_state.clone();
+    let http_client = reqwest::Client::builder()
+        .build()
+        .expect("Failed to create HTTP client");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .manage(editor_state_managed)
+        .manage(http_client)
         .setup(move |app| {
             bridge::start(app.handle().clone(), editor_state.clone());
             Ok(())

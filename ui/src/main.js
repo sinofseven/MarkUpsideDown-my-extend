@@ -125,6 +125,24 @@ let renderingPreview = false; // suppress scroll sync during preview re-render
 const SCROLL_COOLDOWN = 80; // ms to ignore scroll events after programmatic scroll
 const PRECISE_SYNC_COOLDOWN = 300; // ms to suppress generic scroll sync after cursor/click sync
 
+function suppressScrollSync() {
+  const now = performance.now();
+  preciseSyncAt = now;
+  editorScrolledAt = now;
+  previewScrolledAt = now;
+  cancelAnimationFrame(editorScrollRAF);
+  cancelAnimationFrame(previewScrollRAF);
+}
+
+function getCodeBlockLineInfo(preEl) {
+  const codeEl = preEl.querySelector("code") || preEl;
+  const lines = codeEl.textContent.split("\n");
+  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  const rect = codeEl.getBoundingClientRect();
+  const lineHeight = lines.length > 0 ? rect.height / lines.length : 0;
+  return { codeEl, lines, rect, lineHeight };
+}
+
 function countNewlines(str, from, to) {
   let n = 0;
   for (let i = from; i < to; i++) {
@@ -170,20 +188,16 @@ function buildScrollAnchors() {
 
     // Add sub-line anchors within code blocks for precise per-line sync
     if (el.tagName === "PRE") {
-      const codeEl = el.querySelector("code") || el;
-      const codeLines = codeEl.textContent.split("\n");
-      if (codeLines.length > 0 && codeLines[codeLines.length - 1] === "") codeLines.pop();
-      if (codeLines.length > 1) {
-        const codeRect = codeEl.getBoundingClientRect();
-        const codeLineHeight = codeRect.height / codeLines.length;
+      const info = getCodeBlockLineInfo(el);
+      if (info.lines.length > 1) {
         // data-source-line points to the opening ```, code content starts at lineNum + 1
-        for (let i = 0; i < codeLines.length; i++) {
+        for (let i = 0; i < info.lines.length; i++) {
           const srcLine = lineNum + 1 + i;
           if (srcLine > editor.state.doc.lines) break;
           const editorLine = editor.state.doc.line(srcLine);
           const editorBlock = editor.lineBlockAt(editorLine.from);
           const subPreviewY =
-            codeRect.top - previewRect.top + previewScrollTop + i * codeLineHeight;
+            info.rect.top - previewRect.top + previewScrollTop + i * info.lineHeight;
           anchors.push({ editorY: editorBlock.top, previewY: subPreviewY });
         }
       }
@@ -270,13 +284,7 @@ function syncPreviewToCursor() {
   const preview = document.getElementById("preview-pane");
   const scrollTarget = previewTarget - lineVisibleY;
 
-  // Suppress competing scroll sync handlers
-  const now = performance.now();
-  preciseSyncAt = now;
-  editorScrolledAt = now;
-  previewScrolledAt = now;
-  cancelAnimationFrame(editorScrollRAF);
-  cancelAnimationFrame(previewScrollRAF);
+  suppressScrollSync();
   preview.scrollTo({ top: Math.max(0, scrollTarget), behavior: "instant" });
 }
 
@@ -294,16 +302,12 @@ function syncPreviewClickToEditor(event) {
 
   // For clicks inside code blocks, determine the specific line from click position
   if (el.tagName === "PRE") {
-    const codeEl = el.querySelector("code") || el;
-    const codeLines = codeEl.textContent.split("\n");
-    if (codeLines.length > 0 && codeLines[codeLines.length - 1] === "") codeLines.pop();
-    if (codeLines.length > 1) {
-      const codeRect = codeEl.getBoundingClientRect();
-      const codeLineHeight = codeRect.height / codeLines.length;
-      const clickY = event.clientY - codeRect.top;
+    const info = getCodeBlockLineInfo(el);
+    if (info.lines.length > 1) {
+      const clickY = event.clientY - info.rect.top;
       const lineIndex = Math.max(
         0,
-        Math.min(codeLines.length - 1, Math.floor(clickY / codeLineHeight)),
+        Math.min(info.lines.length - 1, Math.floor(clickY / info.lineHeight)),
       );
       // data-source-line points to the opening ```, code content starts at lineNum + 1
       const targetLine = lineNum + 1 + lineIndex;
@@ -324,13 +328,7 @@ function syncPreviewClickToEditor(event) {
   const block = editor.lineBlockAt(line.from);
   const editorTarget = block.top - clickVisibleY;
 
-  // Suppress competing scroll sync handlers
-  const now = performance.now();
-  preciseSyncAt = now;
-  editorScrolledAt = now;
-  previewScrolledAt = now;
-  cancelAnimationFrame(editorScrollRAF);
-  cancelAnimationFrame(previewScrollRAF);
+  suppressScrollSync();
   cmScroller.scrollTo({ top: Math.max(0, editorTarget), behavior: "instant" });
 
   editor.focus();
@@ -417,6 +415,8 @@ const svgCache = new Map();
 
 async function inlineSvgImages(container) {
   const imgs = container.querySelectorAll('img[src$=".svg"]');
+  if (imgs.length === 0) return false;
+  let changed = false;
   const tasks = Array.from(imgs).map(async (img) => {
     const url = img.src;
     if (!url || (!url.startsWith("http://") && !url.startsWith("https://"))) return;
@@ -443,12 +443,61 @@ async function inlineSvgImages(container) {
       }
 
       img.replaceWith(wrapper);
+      changed = true;
     } catch {
       // Leave as <img> on failure — browser may still render it
     }
   });
   await Promise.all(tasks);
+  return changed;
 }
+
+// Shared renderer — stateless, reused across renders
+const previewRenderer = new marked.Renderer();
+previewRenderer.code = function ({ text, lang, _sourceLine }) {
+  const sl = slAttr(_sourceLine);
+  if (lang === "mermaid") {
+    return `<div${sl} class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
+  }
+  const language = lang && hljs.getLanguage(lang) ? lang : null;
+  const highlighted = language
+    ? hljs.highlight(text, { language }).value
+    : hljs.highlightAuto(text).value;
+  const langClass = language ? ` class="hljs language-${lang}"` : ' class="hljs"';
+  return `<pre${sl}><code${langClass}>${highlighted}</code></pre>`;
+};
+previewRenderer.heading = function ({ text, depth, _sourceLine }) {
+  return `<h${depth}${slAttr(_sourceLine)}>${text}</h${depth}>\n`;
+};
+previewRenderer.paragraph = function ({ text, _sourceLine }) {
+  return `<p${slAttr(_sourceLine)}>${text}</p>\n`;
+};
+previewRenderer.blockquote = function ({ body, _sourceLine }) {
+  return `<blockquote${slAttr(_sourceLine)}>\n${body}</blockquote>\n`;
+};
+previewRenderer.list = function ({ items, ordered, start, _sourceLine }) {
+  const tag = ordered ? "ol" : "ul";
+  const startAttr = ordered && start !== 1 ? ` start="${start}"` : "";
+  const body = items.map((item) => this.listitem(item)).join("");
+  return `<${tag}${startAttr}${slAttr(_sourceLine)}>\n${body}</${tag}>\n`;
+};
+previewRenderer.table = function ({ header, rows, _sourceLine }) {
+  const headerRow = `<tr>${header.map((h) => `<th${h.align ? ` align="${h.align}"` : ""}>${h.text}</th>`).join("")}</tr>`;
+  const bodyRows = rows
+    .map(
+      (row) =>
+        `<tr>${row.map((c) => `<td${c.align ? ` align="${c.align}"` : ""}>${c.text}</td>`).join("")}</tr>`,
+    )
+    .join("\n");
+  const tbody = bodyRows ? `<tbody>${bodyRows}</tbody>` : "";
+  return `<table${slAttr(_sourceLine)}><thead>${headerRow}</thead>${tbody}</table>\n`;
+};
+previewRenderer.hr = function ({ _sourceLine }) {
+  return `<hr${slAttr(_sourceLine)}>\n`;
+};
+previewRenderer.html = function ({ text, _sourceLine }) {
+  return _sourceLine ? text.replace(/^<(\w+)/, `<$1${slAttr(_sourceLine)}`) : text;
+};
 
 async function renderPreview(source) {
   const hasMermaid = /```mermaid\b/.test(source);
@@ -469,53 +518,7 @@ async function renderPreview(source) {
   const tokens = marked.lexer(source);
   annotateTokensWithSourceLines(tokens);
 
-  const renderer = new marked.Renderer();
-  renderer.code = function ({ text, lang, _sourceLine }) {
-    const sl = slAttr(_sourceLine);
-    if (lang === "mermaid") {
-      return `<div${sl} class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
-    }
-    const language = lang && hljs.getLanguage(lang) ? lang : null;
-    const highlighted = language
-      ? hljs.highlight(text, { language }).value
-      : hljs.highlightAuto(text).value;
-    const langClass = language ? ` class="hljs language-${lang}"` : ' class="hljs"';
-    return `<pre${sl}><code${langClass}>${highlighted}</code></pre>`;
-  };
-  renderer.heading = function ({ text, depth, _sourceLine }) {
-    return `<h${depth}${slAttr(_sourceLine)}>${text}</h${depth}>\n`;
-  };
-  renderer.paragraph = function ({ text, _sourceLine }) {
-    return `<p${slAttr(_sourceLine)}>${text}</p>\n`;
-  };
-  renderer.blockquote = function ({ body, _sourceLine }) {
-    return `<blockquote${slAttr(_sourceLine)}>\n${body}</blockquote>\n`;
-  };
-  renderer.list = function ({ items, ordered, start, _sourceLine }) {
-    const tag = ordered ? "ol" : "ul";
-    const startAttr = ordered && start !== 1 ? ` start="${start}"` : "";
-    const body = items.map((item) => this.listitem(item)).join("");
-    return `<${tag}${startAttr}${slAttr(_sourceLine)}>\n${body}</${tag}>\n`;
-  };
-  renderer.table = function ({ header, rows, _sourceLine }) {
-    const headerRow = `<tr>${header.map((h) => `<th${h.align ? ` align="${h.align}"` : ""}>${h.text}</th>`).join("")}</tr>`;
-    const bodyRows = rows
-      .map(
-        (row) =>
-          `<tr>${row.map((c) => `<td${c.align ? ` align="${c.align}"` : ""}>${c.text}</td>`).join("")}</tr>`,
-      )
-      .join("\n");
-    const tbody = bodyRows ? `<tbody>${bodyRows}</tbody>` : "";
-    return `<table${slAttr(_sourceLine)}><thead>${headerRow}</thead>${tbody}</table>\n`;
-  };
-  renderer.hr = function ({ _sourceLine }) {
-    return `<hr${slAttr(_sourceLine)}>\n`;
-  };
-  renderer.html = function ({ text, _sourceLine }) {
-    return _sourceLine ? text.replace(/^<(\w+)/, `<$1${slAttr(_sourceLine)}`) : text;
-  };
-
-  const html = marked.parser(tokens, { renderer });
+  const html = marked.parser(tokens, { renderer: previewRenderer });
 
   preview.innerHTML = DOMPurify.sanitize(
     `<article class="preview-page" lang="en">${html}</article>`,
@@ -573,14 +576,15 @@ async function renderPreview(source) {
   buildScrollAnchors();
 
   // Mark timestamps to suppress echo-back from the scroll restore
-  const now = performance.now();
-  editorScrolledAt = now;
-  previewScrolledAt = now;
+  editorScrolledAt = performance.now();
+  previewScrolledAt = editorScrolledAt;
   renderingPreview = false;
 
-  // Inline SVG images — rebuild anchors after layout may shift
+  // Inline SVG images — rebuild anchors only if layout changed
   inlineSvgImages(preview)
-    .then(() => buildScrollAnchors())
+    .then((changed) => {
+      if (changed) buildScrollAnchors();
+    })
     .catch(() => {});
 }
 
