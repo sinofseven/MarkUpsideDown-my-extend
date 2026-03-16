@@ -26,14 +26,15 @@ import {
   setGitStatus,
   getGitPanelEl,
   getGitHubPanelEl,
+  updateGitChangeCount,
 } from "./sidebar.ts";
 import {
   initGitPanel,
   setRepoPath,
   refresh as refreshGit,
   getStatusMap,
+  getChangeCount,
   getBranch,
-  isRepo,
 } from "./git-panel.ts";
 import { initGitHubPanel } from "./github-panel.ts";
 import {
@@ -1133,11 +1134,8 @@ if (ghPanelEl) {
 async function refreshGitAndSync() {
   await refreshGit();
   setGitStatus(getStatusMap());
+  updateGitChangeCount(getChangeCount());
   updateStatus(editor.state);
-  // Show/hide GitHub panel based on git repo status
-  if (ghPanelEl) {
-    ghPanelEl.style.display = isRepo() ? "" : "none";
-  }
 }
 
 // Initialize git for restored sidebar root path

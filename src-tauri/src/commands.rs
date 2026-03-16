@@ -759,6 +759,8 @@ pub struct GitFileStatus {
     pub path: String,
     pub status: String,   // "M", "A", "D", "?", "R", etc.
     pub staged: bool,
+    pub added_lines: u32,
+    pub removed_lines: u32,
 }
 
 #[derive(Serialize)]
@@ -792,6 +794,27 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
             .map(|b| b.split("...").next().unwrap_or(b).to_string())
             .unwrap_or_default();
 
+        // Collect diff stats: unstaged and staged
+        let mut unstaged_stats: std::collections::HashMap<String, (u32, u32)> =
+            std::collections::HashMap::new();
+        let mut staged_stats: std::collections::HashMap<String, (u32, u32)> =
+            std::collections::HashMap::new();
+
+        if let Ok(numstat) = run_git(&rp, &["diff", "--numstat"]) {
+            for line in numstat.lines() {
+                if let Some((added, removed, path)) = parse_numstat_line(line) {
+                    unstaged_stats.insert(path, (added, removed));
+                }
+            }
+        }
+        if let Ok(numstat) = run_git(&rp, &["diff", "--cached", "--numstat"]) {
+            for line in numstat.lines() {
+                if let Some((added, removed, path)) = parse_numstat_line(line) {
+                    staged_stats.insert(path, (added, removed));
+                }
+            }
+        }
+
         let mut files = Vec::new();
         for line in lines {
             let bytes = line.as_bytes();
@@ -804,10 +827,16 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
 
             // Staged changes
             if index_status != ' ' && index_status != '?' {
+                let (added, removed) = staged_stats
+                    .get(&file_path)
+                    .copied()
+                    .unwrap_or((0, 0));
                 files.push(GitFileStatus {
                     path: file_path.clone(),
                     status: index_status.to_string(),
                     staged: true,
+                    added_lines: added,
+                    removed_lines: removed,
                 });
             }
 
@@ -818,10 +847,16 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
                 } else {
                     work_status.to_string()
                 };
+                let (added, removed) = unstaged_stats
+                    .get(&file_path)
+                    .copied()
+                    .unwrap_or((0, 0));
                 files.push(GitFileStatus {
                     path: file_path,
                     status,
                     staged: false,
+                    added_lines: added,
+                    removed_lines: removed,
                 });
             }
         }
@@ -831,6 +866,25 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
             files,
             is_repo: true,
         })
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+fn parse_numstat_line(line: &str) -> Option<(u32, u32, String)> {
+    let mut parts = line.split('\t');
+    let added = parts.next()?.parse::<u32>().ok()?;
+    let removed = parts.next()?.parse::<u32>().ok()?;
+    let path = parts.next()?.to_string();
+    Some((added, removed, path))
+}
+
+#[tauri::command]
+pub async fn git_stage_all(repo_path: String) -> Result<(), String> {
+    let rp = repo_path;
+    tokio::task::spawn_blocking(move || {
+        run_git(&rp, &["add", "-A"])?;
+        Ok(())
     })
     .await
     .map_err(|e| format!("Task error: {e}"))?

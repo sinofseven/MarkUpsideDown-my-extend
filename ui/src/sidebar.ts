@@ -27,12 +27,19 @@ let onFolderChange: ((rootPath: string) => void) | null = null;
 let gitStatusMap: Map<string, GitStatus> = new Map();
 let refreshGeneration = 0; // guards against concurrent refreshTree() races
 
+export type SidebarPanel = "files" | "git" | "github";
+let activePanel: SidebarPanel = "files";
+const PANEL_STORAGE_KEY = "markupsidedown:sidebarPanel";
+
 // --- DOM ---
 
 let sidebarEl: HTMLElement | null = null;
 let treeEl: HTMLElement | null = null;
 let gitPanelSlot: HTMLElement | null = null;
 let ghPanelSlot: HTMLElement | null = null;
+let filesContainer: HTMLElement | null = null;
+let navBar: HTMLElement | null = null;
+let gitChangeCount = 0;
 
 export function initSidebar(
   el: HTMLElement,
@@ -55,6 +62,12 @@ export function initSidebar(
     } catch {
       // ignore
     }
+  }
+
+  // Restore active panel
+  const savedPanel = localStorage.getItem(PANEL_STORAGE_KEY);
+  if (savedPanel === "files" || savedPanel === "git" || savedPanel === "github") {
+    activePanel = savedPanel;
   }
 
   render();
@@ -98,22 +111,27 @@ function render() {
 
   const title = document.createElement("span");
   title.className = "sidebar-title";
-  title.textContent = rootPath ? (rootPath.split("/").pop() ?? rootPath) : "Files";
+  title.textContent = panelTitle();
   header.appendChild(title);
 
   const actions = document.createElement("div");
   actions.className = "sidebar-header-actions";
 
-  const openBtn = document.createElement("button");
-  openBtn.title = "Open Folder";
-  openBtn.textContent = "Open";
-  openBtn.addEventListener("click", openFolder);
-  actions.appendChild(openBtn);
+  if (activePanel === "files") {
+    const openBtn = document.createElement("button");
+    openBtn.title = "Open Folder";
+    openBtn.textContent = "Open";
+    openBtn.addEventListener("click", openFolder);
+    actions.appendChild(openBtn);
+  }
 
   header.appendChild(actions);
   sidebarEl.appendChild(header);
 
-  // Tree container
+  // Files panel (tree container)
+  filesContainer = document.createElement("div");
+  filesContainer.className = "sidebar-panel-content";
+
   treeEl = document.createElement("div");
   treeEl.className = "sidebar-tree";
 
@@ -124,17 +142,122 @@ function render() {
     treeEl.appendChild(empty);
   }
 
-  sidebarEl.appendChild(treeEl);
+  filesContainer.appendChild(treeEl);
+  sidebarEl.appendChild(filesContainer);
 
-  // Git panel slot (populated by main.js)
-  gitPanelSlot = document.createElement("div");
-  gitPanelSlot.id = "git-panel";
+  // Git panel slot — reuse existing element to preserve panelEl references in git-panel.ts
+  if (!gitPanelSlot) {
+    gitPanelSlot = document.createElement("div");
+    gitPanelSlot.id = "git-panel";
+    gitPanelSlot.className = "sidebar-panel-content";
+  }
   sidebarEl.appendChild(gitPanelSlot);
 
-  // GitHub panel slot
-  ghPanelSlot = document.createElement("div");
-  ghPanelSlot.id = "github-panel";
+  // GitHub panel slot — reuse existing element
+  if (!ghPanelSlot) {
+    ghPanelSlot = document.createElement("div");
+    ghPanelSlot.id = "github-panel";
+    ghPanelSlot.className = "sidebar-panel-content";
+  }
   sidebarEl.appendChild(ghPanelSlot);
+
+  // Bottom nav bar
+  navBar = document.createElement("div");
+  navBar.className = "sidebar-nav";
+  navBar.appendChild(createNavButton("files", "Files", SVG_FILES));
+  navBar.appendChild(createNavButton("git", "Git", SVG_GIT));
+  navBar.appendChild(createNavButton("github", "GitHub", SVG_GITHUB));
+  sidebarEl.appendChild(navBar);
+
+  updatePanelVisibility();
+}
+
+function panelTitle(): string {
+  switch (activePanel) {
+    case "files":
+      return rootPath ? (rootPath.split("/").pop() ?? rootPath) : "Files";
+    case "git":
+      return "Source Control";
+    case "github":
+      return "GitHub";
+  }
+}
+
+// SVG icons (16x16, stroke-based for consistency)
+const SVG_FILES = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2h4l2 2h6v9H2V2z"/><path d="M2 5h12"/></svg>`;
+const SVG_GIT = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="3.5" r="1.5"/><circle cx="8" cy="12.5" r="1.5"/><circle cx="12" cy="8" r="1.5"/><path d="M8 5v6"/><path d="M9.4 4.2 11 6.5"/></svg>`;
+const SVG_GITHUB = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="1"/><circle cx="10.5" cy="5" r="1"/><path d="M5.5 10c0 1.5 1.5 2.5 2.5 2.5s2.5-1 2.5-2.5"/><rect x="2" y="1.5" width="12" height="10" rx="2"/><path d="M5 11.5V14"/><path d="M11 11.5V14"/></svg>`;
+
+function createNavButton(panel: SidebarPanel, label: string, svgIcon: string): HTMLButtonElement {
+  const btn = document.createElement("button");
+  btn.className = "sidebar-nav-btn";
+  if (panel === activePanel) btn.classList.add("active");
+  btn.title = label;
+  btn.innerHTML = svgIcon;
+
+  // Badge for git changes
+  if (panel === "git" && gitChangeCount > 0) {
+    const badge = document.createElement("span");
+    badge.className = "sidebar-nav-badge";
+    badge.textContent = String(gitChangeCount);
+    btn.appendChild(badge);
+  }
+
+  btn.addEventListener("click", () => switchPanel(panel));
+  return btn;
+}
+
+export function switchPanel(panel: SidebarPanel) {
+  activePanel = panel;
+  localStorage.setItem(PANEL_STORAGE_KEY, panel);
+  // Update header title
+  const titleEl = sidebarEl?.querySelector(".sidebar-title");
+  if (titleEl) titleEl.textContent = panelTitle();
+  // Update header actions
+  const actionsEl = sidebarEl?.querySelector(".sidebar-header-actions");
+  if (actionsEl) {
+    actionsEl.innerHTML = "";
+    if (panel === "files") {
+      const openBtn = document.createElement("button");
+      openBtn.title = "Open Folder";
+      openBtn.textContent = "Open";
+      openBtn.addEventListener("click", openFolder);
+      actionsEl.appendChild(openBtn);
+    }
+  }
+  updatePanelVisibility();
+  updateNavButtons();
+}
+
+function updatePanelVisibility() {
+  if (filesContainer) filesContainer.style.display = activePanel === "files" ? "" : "none";
+  if (gitPanelSlot) gitPanelSlot.style.display = activePanel === "git" ? "" : "none";
+  if (ghPanelSlot) ghPanelSlot.style.display = activePanel === "github" ? "" : "none";
+}
+
+function updateNavButtons() {
+  if (!navBar) return;
+  const buttons = navBar.querySelectorAll(".sidebar-nav-btn");
+  const panels: SidebarPanel[] = ["files", "git", "github"];
+  buttons.forEach((btn, i) => {
+    btn.classList.toggle("active", panels[i] === activePanel);
+  });
+}
+
+export function updateGitChangeCount(count: number) {
+  gitChangeCount = count;
+  // Update badge in nav bar
+  if (!navBar) return;
+  const gitBtn = navBar.querySelectorAll(".sidebar-nav-btn")[1];
+  if (!gitBtn) return;
+  const existing = gitBtn.querySelector(".sidebar-nav-badge");
+  if (existing) existing.remove();
+  if (count > 0) {
+    const badge = document.createElement("span");
+    badge.className = "sidebar-nav-badge";
+    badge.textContent = String(count);
+    gitBtn.appendChild(badge);
+  }
 }
 
 export function getGitPanelEl() {
