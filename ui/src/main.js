@@ -21,6 +21,14 @@ import {
   checkFirstRun,
 } from "./settings.js";
 import { initSidebar, setSelectedPath } from "./sidebar.js";
+import {
+  initTabs,
+  openTab,
+  closeActiveTab,
+  switchToPrevTab,
+  switchToNextTab,
+  updateActiveTab,
+} from "./tabs.js";
 import { marked } from "marked";
 import hljs from "highlight.js/lib/common";
 import katex from "katex";
@@ -385,6 +393,12 @@ function loadContent(content, filePath) {
   updateStatus(editor.state);
 }
 
+function loadContentAsTab(content, filePath) {
+  const name = filePath ? filePath.split("/").pop() : "Untitled";
+  openTab(filePath || null, name, content);
+  // openTab triggers onSwitch which calls loadContent
+}
+
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -420,6 +434,7 @@ const updatePreview = EditorView.updateListener.of((update) => {
       renderPreview(update.state.doc.toString());
       updateStatus(update.state);
     }, 100);
+    updateActiveTab({ content: update.state.doc.toString() });
     syncEditorState();
   }
   // Sync preview when cursor moves — skip if a render is pending (anchors stale)
@@ -657,7 +672,7 @@ document.getElementById("btn-open").addEventListener("click", async () => {
   });
   if (path) {
     const content = await readTextFile(path);
-    loadContent(content, path);
+    loadContentAsTab(content, path);
   }
 });
 
@@ -672,6 +687,7 @@ document.getElementById("btn-save").addEventListener("click", async () => {
     if (path) {
       await writeTextFile(path, content);
       currentFilePath = path;
+      updateActiveTab({ path, name: path.split("/").pop() });
       updateStatus(editor.state);
     }
   }
@@ -695,7 +711,7 @@ async function fetchFromUrlBar() {
 
   try {
     const markdown = await invoke("fetch_rendered_url_as_markdown", { url, workerUrl });
-    loadContent(markdown);
+    loadContentAsTab(markdown);
     statusEl.textContent = "Fetched: " + url;
   } catch (e) {
     statusEl.textContent = `Render error: ${e}`;
@@ -737,7 +753,7 @@ async function convertFile(filePath) {
       filePath,
       workerUrl,
     });
-    loadContent(result.markdown);
+    loadContentAsTab(result.markdown, filePath);
     const tag = result.is_image ? " (image OCR)" : "";
     const fileName = filePath.split("/").pop();
     const mdSize = new Blob([result.markdown]).size;
@@ -806,7 +822,7 @@ if (window.__TAURI__?.event) {
       await convertFile(filePath);
     } else if (ext === "md" || ext === "markdown" || ext === "mdx") {
       const content = await readTextFile(filePath);
-      loadContent(content, filePath);
+      loadContentAsTab(content, filePath);
     } else {
       statusEl.textContent = `Unsupported file type: .${ext}`;
     }
@@ -915,7 +931,7 @@ if (window.__TAURI__?.event) {
   const { listen } = window.__TAURI__.event;
 
   listen("bridge:set-content", (event) => {
-    loadContent(event.payload);
+    loadContentAsTab(event.payload);
   });
 
   listen("bridge:insert-text", (event) => {
@@ -937,7 +953,7 @@ if (window.__TAURI__?.event) {
     const path = event.payload;
     try {
       const content = await readTextFile(path);
-      loadContent(content, path);
+      loadContentAsTab(content, path);
       syncEditorState();
     } catch (e) {
       statusEl.textContent = `Open failed: ${e}`;
@@ -1008,7 +1024,7 @@ if (sidebarCollapsed) {
 
 initSidebar(sidebarEl, {
   onOpen: (content, filePath) => {
-    loadContent(content, filePath);
+    loadContentAsTab(content, filePath);
   },
 });
 
@@ -1044,6 +1060,39 @@ document.addEventListener("mouseup", () => {
   if (isSidebarDragging) {
     isSidebarDragging = false;
     localStorage.setItem("markupsidedown:sidebarCollapsed", "false");
+  }
+});
+
+// --- Tabs ---
+
+const tabBarEl = document.getElementById("tab-bar");
+
+initTabs(tabBarEl, {
+  onSwitch: (tab) => {
+    loadContent(tab.content, tab.path);
+  },
+  onEmpty: () => {
+    loadContent("# Welcome to MarkUpsideDown\n\nStart typing your Markdown here…\n");
+  },
+});
+
+// Cmd+W: close tab
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "w") {
+    e.preventDefault();
+    closeActiveTab();
+  }
+});
+
+// Cmd+Shift+[ / ]: switch tabs
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "[") {
+    e.preventDefault();
+    switchToPrevTab();
+  }
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "]") {
+    e.preventDefault();
+    switchToNextTab();
   }
 });
 
