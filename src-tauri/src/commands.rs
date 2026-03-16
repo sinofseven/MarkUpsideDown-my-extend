@@ -361,10 +361,6 @@ pub struct FileEntry {
 #[tauri::command]
 pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
     let path = std::path::Path::new(&path);
-    if !path.is_dir() {
-        return Err(format!("Not a directory: {}", path.display()));
-    }
-
     let mut entries = Vec::new();
     let mut read_dir = tokio::fs::read_dir(path)
         .await

@@ -30,7 +30,7 @@ const RENDER_CACHE_TTL = 3600; // 1 hour
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders() });
+      return new Response(null, { headers: CORS_HEADERS });
     }
 
     const url = new URL(request.url);
@@ -160,7 +160,7 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
       cache.put(
         cacheKey,
         new Response(JSON.stringify({ markdown: data.result }), {
-          headers: { ...corsHeaders(), "content-type": "application/json", "cache-control": `public, max-age=${RENDER_CACHE_TTL}` },
+          headers: { ...CORS_HEADERS, "content-type": "application/json", "cache-control": `public, max-age=${RENDER_CACHE_TTL}` },
         })
       )
     );
@@ -210,14 +210,12 @@ async function stripBoilerplate(html: string): Promise<string> {
 function jsonResponse(body: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(), "content-type": "application/json", ...extraHeaders },
+    headers: { ...CORS_HEADERS, "content-type": "application/json", ...extraHeaders },
   });
 }
 
-function corsHeaders(): Record<string, string> {
-  return {
-    "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET, POST, OPTIONS",
-    "access-control-allow-headers": "content-type",
-  };
-}
+const CORS_HEADERS: Record<string, string> = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "content-type",
+};

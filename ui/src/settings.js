@@ -454,7 +454,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     testResult.textContent = "Connecting\u2026";
 
     try {
-      const status = await invoke("test_worker_url", { workerUrl: url.replace(/\/+$/, "") });
+      const status = await invoke("test_worker_url", { workerUrl: url });
       currentTestStatus = status;
 
       if (!status.reachable) {

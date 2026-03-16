@@ -120,6 +120,7 @@ let previewTimeout = null;
 //   pendingRender = true while a debounced re-render is queued (anchors stale)
 
 let scrollAnchors = [];
+let cachedSourceLineEls = [];
 let syncRAF = 0;
 let renderingPreview = false;
 let pendingRender = false;
@@ -263,8 +264,7 @@ function syncPreviewToCursor() {
   const cursorLine = editor.state.doc.lineAt(pos).number;
   const block = editor.lineBlockAt(pos);
 
-  // Query DOM directly for data-source-line elements (avoids stale anchors)
-  const elements = previewPane.querySelectorAll("[data-source-line]");
+  const elements = cachedSourceLineEls;
   if (elements.length === 0) return;
 
   // Find the two elements bracketing the cursor line
@@ -455,6 +455,7 @@ const editor = new EditorView({
 
 const previewPane = document.getElementById("preview-pane");
 const cmScroller = editor.dom.querySelector(".cm-scroller");
+const statusEl = document.getElementById("status");
 
 // --- Preview ---
 
@@ -598,7 +599,7 @@ async function renderPreview(source) {
       const containers = previewPane.querySelectorAll(".mermaid-container");
       for (const el of containers) {
         const src = decodeURIComponent(el.dataset.mermaidSource);
-        const id = `mmd-${Date.now()}-${mermaidRenderCount++}`;
+        const id = `mmd-${mermaidRenderCount++}`;
         try {
           const { svg } = await mermaid.render(id, src);
           el.innerHTML = svg;
@@ -619,6 +620,7 @@ async function renderPreview(source) {
   // Restore scroll approximately (prevents flash), then build fresh anchors
   previewPane.scrollTop = savedScrollTop;
   buildScrollAnchors();
+  cachedSourceLineEls = Array.from(previewPane.querySelectorAll("[data-source-line]"));
   pendingRender = false;
   renderingPreview = false;
 
@@ -640,7 +642,7 @@ function updateStatus(state) {
   const lines = state.doc.lines;
   const chars = state.doc.length;
   const pathInfo = currentFilePath ? ` | ${currentFilePath}` : "";
-  document.getElementById("status").textContent = `${lines} lines | ${chars} chars${pathInfo}`;
+  statusEl.textContent = `${lines} lines | ${chars} chars${pathInfo}`;
 }
 
 // Initial render
@@ -687,7 +689,6 @@ async function fetchFromUrlBar() {
   const workerUrl = await ensureWorkerUrl();
   if (!workerUrl) return;
 
-  const statusEl = document.getElementById("status");
   urlBar.classList.add("loading");
   urlInput.disabled = true;
   statusEl.textContent = "Rendering page (this may take a moment)…";
@@ -719,7 +720,7 @@ async function convertFile(filePath) {
 
   if (isImage) {
     if (!isImageConversionAllowed()) {
-      document.getElementById("status").textContent = "Image conversion is disabled in Settings";
+      statusEl.textContent = "Image conversion is disabled in Settings";
       return;
     }
     const ok = await confirm("Image conversion uses AI Neurons (costs apply). Continue?", {
@@ -729,7 +730,6 @@ async function convertFile(filePath) {
     if (!ok) return;
   }
 
-  const statusEl = document.getElementById("status");
   statusEl.textContent = "Converting…";
 
   try {
@@ -789,7 +789,7 @@ appEl.addEventListener("drop", async (e) => {
   // Tauri exposes dropped file paths via the event
   // For web drag-and-drop, we need to use Tauri's drag-drop event instead
   // Fall back to prompting the user to use the Import button
-  document.getElementById("status").textContent =
+  statusEl.textContent =
     "Drop detected — use the Import button to select files (Tauri security restriction)";
 });
 
@@ -808,7 +808,7 @@ if (window.__TAURI__?.event) {
       const content = await readTextFile(filePath);
       loadContent(content, filePath);
     } else {
-      document.getElementById("status").textContent = `Unsupported file type: .${ext}`;
+      statusEl.textContent = `Unsupported file type: .${ext}`;
     }
   });
 }
@@ -830,8 +830,6 @@ document.getElementById("btn-export-pdf").addEventListener("click", () => {
 async function copyRichText() {
   const html = previewPane.innerHTML;
   const text = previewPane.innerText;
-  const statusEl = document.getElementById("status");
-
   try {
     await navigator.clipboard.write([
       new ClipboardItem({
@@ -859,7 +857,6 @@ document.addEventListener("keydown", (e) => {
 document.getElementById("btn-settings").addEventListener("click", () => {
   showSettings({
     onSave: (url) => {
-      const statusEl = document.getElementById("status");
       statusEl.textContent = url ? `Worker URL: ${url}` : "Worker URL cleared";
     },
   });
@@ -943,7 +940,7 @@ if (window.__TAURI__?.event) {
       loadContent(content, path);
       syncEditorState();
     } catch (e) {
-      document.getElementById("status").textContent = `Open failed: ${e}`;
+      statusEl.textContent = `Open failed: ${e}`;
     }
   });
 
@@ -957,7 +954,7 @@ if (window.__TAURI__?.event) {
         updateStatus(editor.state);
       }
     } catch (e) {
-      document.getElementById("status").textContent = `Save failed: ${e}`;
+      statusEl.textContent = `Save failed: ${e}`;
     }
   });
 
