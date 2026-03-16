@@ -756,11 +756,12 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
 
         let mut files = Vec::new();
         for line in lines {
-            if line.len() < 4 {
+            let bytes = line.as_bytes();
+            if bytes.len() < 4 {
                 continue;
             }
-            let index_status = line.chars().nth(0).unwrap_or(' ');
-            let work_status = line.chars().nth(1).unwrap_or(' ');
+            let index_status = bytes[0] as char;
+            let work_status = bytes[1] as char;
             let file_path = line[3..].to_string();
 
             // Staged changes
