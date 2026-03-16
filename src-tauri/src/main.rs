@@ -41,6 +41,8 @@ fn main() {
             commands::create_directory,
             commands::rename_entry,
             commands::delete_entry,
+            commands::duplicate_entry,
+            commands::reveal_in_finder,
             commands::git_status,
             commands::git_stage,
             commands::git_unstage,

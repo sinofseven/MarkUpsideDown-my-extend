@@ -329,12 +329,30 @@ function showContextMenu(event: MouseEvent, entry: DirEntry) {
 
   const items: ({ label: string; action: () => void; danger?: boolean } | null)[] = [];
 
+  const parentDir = entry.path.substring(0, entry.path.lastIndexOf("/"));
+
   if (entry.is_dir) {
     items.push({ label: "New File…", action: () => promptNewFile(entry.path) });
     items.push({ label: "New Folder…", action: () => promptNewFolder(entry.path) });
-    items.push(null); // separator
+  } else {
+    items.push({ label: "New File…", action: () => promptNewFile(parentDir) });
+    items.push({ label: "New Folder…", action: () => promptNewFolder(parentDir) });
   }
+  items.push(null);
 
+  items.push({ label: "Reveal in Finder", action: () => revealInFinder(entry.path) });
+  items.push(null);
+
+  items.push({ label: "Copy Path", action: () => copyToClipboard(entry.path) });
+  if (rootPath) {
+    const relPath = entry.path.startsWith(rootPath + "/")
+      ? entry.path.substring(rootPath.length + 1)
+      : entry.name;
+    items.push({ label: "Copy Relative Path", action: () => copyToClipboard(relPath) });
+  }
+  items.push(null);
+
+  items.push({ label: "Duplicate", action: () => duplicateEntry(entry) });
   items.push({ label: "Rename…", action: () => promptRename(entry) });
   items.push({
     label: "Delete",
@@ -380,6 +398,41 @@ function showContextMenu(event: MouseEvent, entry: DirEntry) {
     }
   };
   setTimeout(() => document.addEventListener("click", close, true), 0);
+}
+
+async function copyToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // Fallback for older WebKit
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+}
+
+async function revealInFinder(path: string) {
+  try {
+    await invoke("reveal_in_finder", { path });
+  } catch (e) {
+    alert(`Failed to reveal in Finder: ${e}`);
+  }
+}
+
+async function duplicateEntry(entry: DirEntry) {
+  try {
+    const newPath = await invoke<string>("duplicate_entry", { path: entry.path });
+    await refreshTree();
+    // Select the new duplicate
+    setSelectedPath(newPath);
+  } catch (e) {
+    alert(`Failed to duplicate: ${e}`);
+  }
 }
 
 async function promptNewFile(dirPath: string) {

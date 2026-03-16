@@ -588,6 +588,102 @@ pub async fn delete_entry(path: String, is_dir: bool) -> Result<(), String> {
     }
 }
 
+#[tauri::command]
+pub async fn duplicate_entry(path: String) -> Result<String, String> {
+    let src = std::path::Path::new(&path);
+    let parent = src.parent().ok_or("No parent directory")?;
+    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    let ext = src.extension().and_then(|s| s.to_str());
+
+    // Find a unique name: "file copy.md", "file copy 2.md", ...
+    let mut n = 0u32;
+    let dest = loop {
+        let suffix = if n == 0 {
+            " copy".to_string()
+        } else {
+            format!(" copy {}", n + 1)
+        };
+        let name = match ext {
+            Some(e) => format!("{stem}{suffix}.{e}"),
+            None => format!("{stem}{suffix}"),
+        };
+        let candidate = parent.join(&name);
+        if !candidate.exists() {
+            break candidate;
+        }
+        n += 1;
+        if n > 100 {
+            return Err("Too many copies exist".to_string());
+        }
+    };
+
+    if src.is_dir() {
+        copy_dir_recursive(src, &dest).await?;
+    } else {
+        tokio::fs::copy(src, &dest)
+            .await
+            .map_err(|e| format!("Failed to duplicate: {e}"))?;
+    }
+    Ok(dest.to_string_lossy().to_string())
+}
+
+async fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> Result<(), String> {
+    tokio::fs::create_dir(dest)
+        .await
+        .map_err(|e| format!("Failed to create directory: {e}"))?;
+    let mut entries = tokio::fs::read_dir(src)
+        .await
+        .map_err(|e| format!("Failed to read directory: {e}"))?;
+    while let Some(entry) = entries
+        .next_entry()
+        .await
+        .map_err(|e| format!("Failed to read entry: {e}"))?
+    {
+        let entry_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        if entry_path.is_dir() {
+            Box::pin(copy_dir_recursive(&entry_path, &dest_path)).await?;
+        } else {
+            tokio::fs::copy(&entry_path, &dest_path)
+                .await
+                .map_err(|e| format!("Failed to copy file: {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn reveal_in_finder(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to reveal in Finder: {e}"))?;
+    }
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", &path))
+            .spawn()
+            .map_err(|e| format!("Failed to reveal in Explorer: {e}"))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Try xdg-open on the parent directory
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or(path);
+        std::process::Command::new("xdg-open")
+            .arg(&parent)
+            .spawn()
+            .map_err(|e| format!("Failed to open file manager: {e}"))?;
+    }
+    Ok(())
+}
+
 // --- Git Operations ---
 
 fn run_git(repo_path: &str, args: &[&str]) -> Result<String, String> {
