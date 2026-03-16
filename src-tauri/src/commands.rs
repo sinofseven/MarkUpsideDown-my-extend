@@ -494,7 +494,10 @@ pub struct FileEntry {
 }
 
 #[tauri::command]
-pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
+pub async fn list_directory(
+    path: String,
+    repo_root: Option<String>,
+) -> Result<Vec<FileEntry>, String> {
     let path = std::path::Path::new(&path);
     let mut entries = Vec::new();
     let mut read_dir = tokio::fs::read_dir(path)
@@ -522,6 +525,15 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
         });
     }
 
+    // Filter out git-ignored entries when inside a git repo
+    if let Some(ref root) = repo_root {
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        if !paths.is_empty() {
+            let ignored = git_check_ignore(root, &paths);
+            entries.retain(|e| !ignored.contains(&e.path));
+        }
+    }
+
     // Sort: directories first, then alphabetically (case-insensitive)
     entries.sort_by(|a, b| {
         b.is_dir
@@ -530,6 +542,25 @@ pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
     });
 
     Ok(entries)
+}
+
+fn git_check_ignore(repo_path: &str, paths: &[&str]) -> std::collections::HashSet<String> {
+    let mut ignored = std::collections::HashSet::new();
+    let output = Command::new("git")
+        .args(["-C", repo_path, "check-ignore"])
+        .args(paths)
+        .output();
+    if let Ok(output) = output {
+        // git check-ignore outputs one ignored path per line (exit 0 = some ignored, 1 = none)
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        for line in stdout.lines() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                ignored.insert(trimmed.to_string());
+            }
+        }
+    }
+    ignored
 }
 
 #[tauri::command]

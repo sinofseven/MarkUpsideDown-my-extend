@@ -27,7 +27,14 @@ import {
   getGitPanelEl,
   getGitHubPanelEl,
 } from "./sidebar.ts";
-import { initGitPanel, setRepoPath, refresh as refreshGit, getStatusMap } from "./git-panel.ts";
+import {
+  initGitPanel,
+  setRepoPath,
+  refresh as refreshGit,
+  getStatusMap,
+  getBranch,
+  isRepo,
+} from "./git-panel.ts";
 import { initGitHubPanel } from "./github-panel.ts";
 import {
   initTabs,
@@ -693,7 +700,9 @@ function updateStatus(state: EditorState) {
   const lines = state.doc.lines;
   const chars = state.doc.length;
   const pathInfo = currentFilePath ? ` | ${currentFilePath}` : "";
-  statusEl.textContent = `${lines} lines | ${chars} chars${pathInfo}`;
+  const branch = getBranch();
+  const branchInfo = branch ? ` | \u{e0a0} ${branch}` : "";
+  statusEl.textContent = `${lines} lines | ${chars} chars${pathInfo}${branchInfo}`;
 }
 
 // Initial render
@@ -1122,6 +1131,11 @@ if (ghPanelEl) {
 async function refreshGitAndSync() {
   await refreshGit();
   setGitStatus(getStatusMap());
+  updateStatus(editor.state);
+  // Show/hide GitHub panel based on git repo status
+  if (ghPanelEl) {
+    ghPanelEl.style.display = isRepo() ? "" : "none";
+  }
 }
 
 // Initialize git for restored sidebar root path

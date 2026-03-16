@@ -179,7 +179,10 @@ async function renderDirectory(
   depth: number,
   gen: number,
 ) {
-  const entries = await invoke<DirEntry[]>("list_directory", { path: dirPath });
+  const entries = await invoke<DirEntry[]>("list_directory", {
+    path: dirPath,
+    repoRoot: rootPath,
+  });
   if (gen !== refreshGeneration) return;
 
   // Deduplicate by path (safety net)

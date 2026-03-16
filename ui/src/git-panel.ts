@@ -45,6 +45,14 @@ export async function refresh() {
   render();
 }
 
+export function getBranch(): string | null {
+  return gitData?.is_repo ? gitData.branch || null : null;
+}
+
+export function isRepo(): boolean {
+  return gitData?.is_repo ?? false;
+}
+
 export function getStatusMap(): Map<string, GitFile> {
   if (!gitData || !gitData.is_repo) return new Map();
   const map = new Map<string, GitFile>();
@@ -158,12 +166,11 @@ function render() {
   panelEl.innerHTML = "";
 
   if (!repoPath || !gitData || !gitData.is_repo) {
-    const empty = document.createElement("div");
-    empty.className = "git-panel-empty";
-    empty.textContent = repoPath ? "Not a git repository" : "Open a folder to see git status";
-    panelEl.appendChild(empty);
+    // Hide panel entirely when not in a git repo (Zed-like behavior)
+    panelEl.style.display = "none";
     return;
   }
+  panelEl.style.display = "";
 
   // Branch
   const branchRow = document.createElement("div");
