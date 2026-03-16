@@ -5,7 +5,7 @@
 ```
 AI Agent (Claude Desktop, Claude Code, etc.)
     ↕ stdio (JSON-RPC)
-MCP Server (mcp-server/)
+MCP Server (mcp-server-rs/)
     ↕ HTTP (localhost:31415)
 ┌──────────────────────────────────────────────────────────┐
 │                    MarkUpsideDown                         │
@@ -67,14 +67,15 @@ The `/render` endpoint uses a two-step pipeline:
 3. **Markdown conversion** — `POST /markdown` converts cleaned HTML to Markdown
 4. **Caching** — Responses cached for 1 hour via `caches.default`
 
-### MCP Server (`mcp-server/`)
+### MCP Server (`mcp-server-rs/`)
 
 | Component | Role |
 |-----------|------|
-| `index.ts` | 9 MCP tools (editor, conversion, file operations) |
-| `bridge.ts` | HTTP client to Tauri bridge (auto-discovers port) |
+| `main.rs` | Entry point, stdio transport |
+| `tools.rs` | 9 MCP tools (editor, conversion, file operations) |
+| `bridge.rs` | HTTP client to Tauri bridge (auto-discovers port) |
 
-Communication: MCP server reads the bridge port from `~/.markupsidedown-bridge-port` and sends HTTP requests to the Tauri backend's axum server.
+Communication: MCP server (Rust sidecar binary) reads the bridge port from `~/.markupsidedown-bridge-port` and sends HTTP requests to the Tauri backend's axum server.
 
 See [mcp-server.md](mcp-server.md) for the full tool list.
 

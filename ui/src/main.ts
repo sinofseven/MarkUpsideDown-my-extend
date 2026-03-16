@@ -46,8 +46,57 @@ import {
   updateActiveTab,
 } from "./tabs.ts";
 import { marked } from "marked";
-import hljs from "highlight.js/lib/common";
-import katex from "katex";
+import hljs from "highlight.js/lib/core";
+// Register language subset (dropping rarely-used: apache, less, lua, makefile,
+// objectivec, php, php-template, python-repl, r, scss, vbnet, wasm)
+import hljsBash from "highlight.js/lib/languages/bash";
+import hljsC from "highlight.js/lib/languages/c";
+import hljsCpp from "highlight.js/lib/languages/cpp";
+import hljsCsharp from "highlight.js/lib/languages/csharp";
+import hljsCss from "highlight.js/lib/languages/css";
+import hljsDiff from "highlight.js/lib/languages/diff";
+import hljsGo from "highlight.js/lib/languages/go";
+import hljsGraphql from "highlight.js/lib/languages/graphql";
+import hljsIni from "highlight.js/lib/languages/ini";
+import hljsJava from "highlight.js/lib/languages/java";
+import hljsJavascript from "highlight.js/lib/languages/javascript";
+import hljsJson from "highlight.js/lib/languages/json";
+import hljsKotlin from "highlight.js/lib/languages/kotlin";
+import hljsMarkdown from "highlight.js/lib/languages/markdown";
+import hljsPerl from "highlight.js/lib/languages/perl";
+import hljsPython from "highlight.js/lib/languages/python";
+import hljsRuby from "highlight.js/lib/languages/ruby";
+import hljsRust from "highlight.js/lib/languages/rust";
+import hljsShell from "highlight.js/lib/languages/shell";
+import hljsSql from "highlight.js/lib/languages/sql";
+import hljsSwift from "highlight.js/lib/languages/swift";
+import hljsTypescript from "highlight.js/lib/languages/typescript";
+import hljsXml from "highlight.js/lib/languages/xml";
+import hljsYaml from "highlight.js/lib/languages/yaml";
+hljs.registerLanguage("bash", hljsBash);
+hljs.registerLanguage("c", hljsC);
+hljs.registerLanguage("cpp", hljsCpp);
+hljs.registerLanguage("csharp", hljsCsharp);
+hljs.registerLanguage("css", hljsCss);
+hljs.registerLanguage("diff", hljsDiff);
+hljs.registerLanguage("go", hljsGo);
+hljs.registerLanguage("graphql", hljsGraphql);
+hljs.registerLanguage("ini", hljsIni);
+hljs.registerLanguage("java", hljsJava);
+hljs.registerLanguage("javascript", hljsJavascript);
+hljs.registerLanguage("json", hljsJson);
+hljs.registerLanguage("kotlin", hljsKotlin);
+hljs.registerLanguage("markdown", hljsMarkdown);
+hljs.registerLanguage("perl", hljsPerl);
+hljs.registerLanguage("python", hljsPython);
+hljs.registerLanguage("ruby", hljsRuby);
+hljs.registerLanguage("rust", hljsRust);
+hljs.registerLanguage("shell", hljsShell);
+hljs.registerLanguage("sql", hljsSql);
+hljs.registerLanguage("swift", hljsSwift);
+hljs.registerLanguage("typescript", hljsTypescript);
+hljs.registerLanguage("xml", hljsXml);
+hljs.registerLanguage("yaml", hljsYaml);
 import "katex/dist/katex.min.css";
 import DOMPurify from "dompurify";
 
@@ -69,7 +118,7 @@ interface ConvertResult {
   original_size: number;
 }
 
-// KaTeX math extension for marked
+// KaTeX math extension for marked — renders placeholders, resolved async in renderPreview
 const mathExtension = {
   extensions: [
     {
@@ -85,11 +134,7 @@ const mathExtension = {
         }
       },
       renderer(token: { text: string }) {
-        try {
-          return `<div class="math-block">${katex.renderToString(token.text, { displayMode: true, throwOnError: false })}</div>`;
-        } catch {
-          return `<div class="math-block math-error"><code>${token.text}</code></div>`;
-        }
+        return `<div class="math-block" data-math-source="${encodeURIComponent(token.text)}" data-math-display="true"></div>`;
       },
     },
     {
@@ -105,17 +150,22 @@ const mathExtension = {
         }
       },
       renderer(token: { text: string }) {
-        try {
-          return katex.renderToString(token.text, { displayMode: false, throwOnError: false });
-        } catch {
-          return `<code class="math-error">${token.text}</code>`;
-        }
+        return `<span data-math-source="${encodeURIComponent(token.text)}" data-math-display="false"></span>`;
       },
     },
   ],
 };
 
 marked.use(mathExtension);
+
+let katexModule: any = null;
+
+async function getKaTeX() {
+  if (katexModule) return katexModule;
+  const { default: katex } = await import("katex");
+  katexModule = katex;
+  return katex;
+}
 
 let mermaidModule: any = null;
 
@@ -623,7 +673,7 @@ async function renderPreview(source: string) {
     `<article class="preview-page" lang="en">${html}</article>`,
     {
       ADD_TAGS: ["foreignObject"],
-      ADD_ATTR: ["data-mermaid-source", "data-source-line"],
+      ADD_ATTR: ["data-mermaid-source", "data-source-line", "data-math-source", "data-math-display"],
     },
   );
 
@@ -671,6 +721,25 @@ async function renderPreview(source: string) {
       }
     } catch (err) {
       console.error("Mermaid failed to load:", err);
+    }
+  }
+
+  // Render math placeholders (lazy-load KaTeX on first use)
+  const mathEls = previewPane.querySelectorAll("[data-math-source]");
+  if (mathEls.length > 0) {
+    try {
+      const katex = await getKaTeX();
+      for (const el of mathEls) {
+        const src = decodeURIComponent((el as HTMLElement).dataset.mathSource!);
+        const display = (el as HTMLElement).dataset.mathDisplay === "true";
+        try {
+          el.innerHTML = katex.renderToString(src, { displayMode: display, throwOnError: false });
+        } catch {
+          el.innerHTML = `<code class="math-error">${src}</code>`;
+        }
+      }
+    } catch (err) {
+      console.error("KaTeX failed to load:", err);
     }
   }
 

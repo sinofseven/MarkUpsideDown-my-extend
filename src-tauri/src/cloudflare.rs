@@ -48,15 +48,15 @@ fn setup_gui_env(cmd: &mut Command) {
                 }
             }
             let nvm_dir = home.join(".nvm/versions/node");
-            if nvm_dir.exists() {
-                if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
-                    let mut versions: Vec<_> = entries.filter_map(|e| e.ok()).collect();
-                    versions.sort_by(|a, b| b.file_name().cmp(&a.file_name()));
-                    if let Some(latest) = versions.first() {
-                        extra_paths.push(
-                            latest.path().join("bin").to_string_lossy().to_string(),
-                        );
-                    }
+            if nvm_dir.exists()
+                && let Ok(entries) = std::fs::read_dir(&nvm_dir)
+            {
+                let mut versions: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+                versions.sort_by_key(|e| std::cmp::Reverse(e.file_name()));
+                if let Some(latest) = versions.first() {
+                    extra_paths.push(
+                        latest.path().join("bin").to_string_lossy().to_string(),
+                    );
                 }
             }
         }
@@ -292,14 +292,12 @@ pub async fn setup_worker_secrets_with_token(
 }
 
 async fn set_secrets_with_token(account_id: String, api_token: String) -> Result<(), String> {
-    let account_id_clone = account_id.clone();
-    let api_token_clone = api_token.clone();
     let (r1, r2) = tokio::join!(
         tokio::task::spawn_blocking(move || {
-            set_wrangler_secret("CLOUDFLARE_ACCOUNT_ID", &account_id_clone)
+            set_wrangler_secret("CLOUDFLARE_ACCOUNT_ID", &account_id)
         }),
         tokio::task::spawn_blocking(move || {
-            set_wrangler_secret("CLOUDFLARE_API_TOKEN", &api_token_clone)
+            set_wrangler_secret("CLOUDFLARE_API_TOKEN", &api_token)
         }),
     );
     r1.map_err(|e| format!("Task error: {e}"))??;

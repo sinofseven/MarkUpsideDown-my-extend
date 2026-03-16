@@ -65,8 +65,7 @@ struct HealthCapabilities {
 
 #[derive(Deserialize)]
 struct HealthResponse {
-    #[allow(dead_code)]
-    status: Option<String>,
+    _status: Option<String>,
     capabilities: Option<HealthCapabilities>,
 }
 
@@ -255,7 +254,7 @@ pub fn detect_file_is_image(file_path: String) -> Result<bool, String> {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
-    Ok(mime_from_extension(ext).map_or(false, |m| m.starts_with("image/")))
+    Ok(mime_from_extension(ext).is_some_and(|m| m.starts_with("image/")))
 }
 
 fn mime_from_extension(ext: &str) -> Option<&'static str> {
@@ -325,28 +324,35 @@ pub async fn fetch_svg(
 }
 
 fn sanitize_svg(svg: &str) -> String {
-    let lower = svg.to_ascii_lowercase();
-    let result = strip_script_tags(svg, &lower);
+    let result = strip_script_tags(svg);
     let result = strip_event_handlers(&result);
-    let lower2 = result.to_ascii_lowercase();
-    strip_js_hrefs(&result, &lower2)
+    let lower = result.to_ascii_lowercase();
+    strip_js_hrefs(&result, &lower)
+}
+
+/// Case-insensitive byte sequence search.
+fn find_ascii_ci(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|w| w.iter().zip(needle).all(|(a, b)| a.eq_ignore_ascii_case(b)))
 }
 
 /// Remove `<script>...</script>` blocks (case-insensitive).
-fn strip_script_tags(input: &str, lower: &str) -> String {
+fn strip_script_tags(input: &str) -> String {
+    let bytes = input.as_bytes();
     let mut out = String::with_capacity(input.len());
     let mut pos = 0;
 
-    while pos < input.len() {
-        let Some(tag_offset) = lower[pos..].find("<script") else {
+    while pos < bytes.len() {
+        let Some(tag_offset) = find_ascii_ci(&bytes[pos..], b"<script") else {
             out.push_str(&input[pos..]);
             break;
         };
         let abs = pos + tag_offset;
-        let after = abs + 7; // "<script".len()
+        let after = abs + 7; // b"<script".len()
 
         // Must be followed by whitespace or '>'
-        match lower.as_bytes().get(after) {
+        match bytes.get(after) {
             Some(b' ' | b'\t' | b'\n' | b'\r' | b'>') => {}
             _ => {
                 out.push_str(&input[pos..after]);
@@ -357,8 +363,8 @@ fn strip_script_tags(input: &str, lower: &str) -> String {
 
         out.push_str(&input[pos..abs]);
 
-        if let Some(end_offset) = lower[abs..].find("</script>") {
-            pos = abs + end_offset + 9; // "</script>".len()
+        if let Some(end_offset) = find_ascii_ci(&bytes[abs..], b"</script>") {
+            pos = abs + end_offset + 9; // b"</script>".len()
         } else {
             break; // no closing tag — drop the rest
         }
@@ -376,8 +382,8 @@ fn strip_event_handlers(input: &str) -> String {
     while i < bytes.len() {
         if bytes[i].is_ascii_whitespace()
             && i + 3 < bytes.len()
-            && bytes[i + 1].to_ascii_lowercase() == b'o'
-            && bytes[i + 2].to_ascii_lowercase() == b'n'
+            && bytes[i + 1].eq_ignore_ascii_case(&b'o')
+            && bytes[i + 2].eq_ignore_ascii_case(&b'n')
         {
             let start = i;
             let mut j = i + 3;
@@ -542,11 +548,7 @@ pub async fn list_directory(
     }
 
     // Sort: directories first, then alphabetically (case-insensitive)
-    entries.sort_by(|a, b| {
-        b.is_dir
-            .cmp(&a.is_dir)
-            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-    });
+    entries.sort_by_cached_key(|e| (!e.is_dir, e.name.to_lowercase()));
 
     Ok(entries)
 }
