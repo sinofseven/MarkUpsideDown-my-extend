@@ -171,13 +171,11 @@ function slAttr(sourceLine) {
 }
 
 function buildScrollAnchors() {
-  const preview = document.getElementById("preview-pane");
-  const cmScroller = editor.dom.querySelector(".cm-scroller");
-  const elements = preview.querySelectorAll("[data-source-line]");
+  const elements = previewPane.querySelectorAll("[data-source-line]");
 
   const anchors = [{ editorY: 0, previewY: 0 }];
-  const previewRect = preview.getBoundingClientRect();
-  const previewScrollTop = preview.scrollTop;
+  const previewRect = previewPane.getBoundingClientRect();
+  const previewScrollTop = previewPane.scrollTop;
 
   for (const el of elements) {
     const lineNum = parseInt(el.dataset.sourceLine, 10);
@@ -207,7 +205,7 @@ function buildScrollAnchors() {
   }
 
   const editorMax = cmScroller.scrollHeight - cmScroller.clientHeight;
-  const previewMax = preview.scrollHeight - preview.clientHeight;
+  const previewMax = previewPane.scrollHeight - previewPane.clientHeight;
   if (editorMax > 0 && previewMax > 0) {
     anchors.push({ editorY: editorMax, previewY: previewMax });
   }
@@ -238,21 +236,19 @@ function interpolate(anchors, fromKey, toKey, value) {
 
 function syncToPreview() {
   if (renderingPreview || scrollAnchors.length < 2) return;
-  const cmScroller = editor.dom.querySelector(".cm-scroller");
-  const preview = document.getElementById("preview-pane");
   const target = Math.round(
     interpolate(scrollAnchors, "editorY", "previewY", cmScroller.scrollTop),
   );
-  if (Math.abs(preview.scrollTop - target) < 1) return;
+  if (Math.abs(previewPane.scrollTop - target) < 1) return;
   markProgrammaticScroll();
-  preview.scrollTop = target;
+  previewPane.scrollTop = target;
 }
 
 function syncToEditor() {
   if (renderingPreview || scrollAnchors.length < 2) return;
-  const cmScroller = editor.dom.querySelector(".cm-scroller");
-  const preview = document.getElementById("preview-pane");
-  const target = Math.round(interpolate(scrollAnchors, "previewY", "editorY", preview.scrollTop));
+  const target = Math.round(
+    interpolate(scrollAnchors, "previewY", "editorY", previewPane.scrollTop),
+  );
   if (Math.abs(cmScroller.scrollTop - target) < 1) return;
   markProgrammaticScroll();
   cmScroller.scrollTop = target;
@@ -265,11 +261,9 @@ function syncPreviewToCursor() {
   const pos = editor.state.selection.main.head;
   const cursorLine = editor.state.doc.lineAt(pos).number;
   const block = editor.lineBlockAt(pos);
-  const cmScroller = editor.dom.querySelector(".cm-scroller");
-  const preview = document.getElementById("preview-pane");
 
   // Query DOM directly for data-source-line elements (avoids stale anchors)
-  const elements = preview.querySelectorAll("[data-source-line]");
+  const elements = previewPane.querySelectorAll("[data-source-line]");
   if (elements.length === 0) return;
 
   // Find the two elements bracketing the cursor line
@@ -301,8 +295,8 @@ function syncPreviewToCursor() {
     afterLine = beforeLine;
   }
 
-  const previewRect = preview.getBoundingClientRect();
-  const previewScrollTop = preview.scrollTop;
+  const previewRect = previewPane.getBoundingClientRect();
+  const previewScrollTop = previewPane.scrollTop;
 
   let previewTargetY;
 
@@ -333,9 +327,9 @@ function syncPreviewToCursor() {
   // Align: same visual offset from viewport top in both panes
   const lineVisibleY = block.top - cmScroller.scrollTop;
   const scrollTarget = Math.max(0, Math.round(previewTargetY - lineVisibleY));
-  if (Math.abs(preview.scrollTop - scrollTarget) < 1) return;
+  if (Math.abs(previewPane.scrollTop - scrollTarget) < 1) return;
   markProgrammaticScroll();
-  preview.scrollTop = scrollTarget;
+  previewPane.scrollTop = scrollTarget;
 }
 
 function syncPreviewClickToEditor(event) {
@@ -369,9 +363,7 @@ function syncPreviewClickToEditor(event) {
   const line = editor.state.doc.line(lineNum);
   editor.dispatch({ selection: { anchor: line.from } });
 
-  const preview = document.getElementById("preview-pane");
-  const clickVisibleY = event.clientY - preview.getBoundingClientRect().top;
-  const cmScroller = editor.dom.querySelector(".cm-scroller");
+  const clickVisibleY = event.clientY - previewPane.getBoundingClientRect().top;
   const block = editor.lineBlockAt(line.from);
   const editorTarget = block.top - clickVisibleY;
   markProgrammaticScroll();
@@ -454,6 +446,11 @@ const editor = new EditorView({
   }),
   parent: document.getElementById("editor-pane"),
 });
+
+// --- Cached DOM references (used by scroll sync & preview) ---
+
+const previewPane = document.getElementById("preview-pane");
+const cmScroller = editor.dom.querySelector(".cm-scroller");
 
 // --- Preview ---
 
@@ -548,13 +545,12 @@ previewRenderer.html = function ({ text, _sourceLine }) {
 
 async function renderPreview(source) {
   const hasMermaid = /```mermaid\b/.test(source);
-  const preview = document.getElementById("preview-pane");
 
   renderingPreview = true;
   cancelAnimationFrame(syncRAF);
 
   // Save scroll position to prevent visual flash during innerHTML replacement
-  const savedScrollTop = preview.scrollTop;
+  const savedScrollTop = previewPane.scrollTop;
 
   // Reset render count each time so Mermaid IDs stay small and predictable
   mermaidRenderCount = 0;
@@ -565,7 +561,7 @@ async function renderPreview(source) {
 
   const html = marked.parser(tokens, { renderer: previewRenderer });
 
-  preview.innerHTML = DOMPurify.sanitize(
+  previewPane.innerHTML = DOMPurify.sanitize(
     `<article class="preview-page" lang="en">${html}</article>`,
     {
       ADD_TAGS: ["foreignObject"],
@@ -574,13 +570,13 @@ async function renderPreview(source) {
   );
 
   // Optimize image loading (Safari Reader-style)
-  for (const img of preview.querySelectorAll(".preview-page img")) {
+  for (const img of previewPane.querySelectorAll(".preview-page img")) {
     img.loading = "lazy";
     img.decoding = "async";
   }
 
   // Wrap tables in scrollable containers for overflow handling
-  for (const table of preview.querySelectorAll(".preview-page > table")) {
+  for (const table of previewPane.querySelectorAll(".preview-page > table")) {
     const wrapper = document.createElement("div");
     wrapper.className = "table-wrapper";
     // Transfer data-source-line to wrapper so scroll sync finds it
@@ -595,7 +591,7 @@ async function renderPreview(source) {
   if (hasMermaid) {
     try {
       const mermaid = await getMermaid();
-      const containers = preview.querySelectorAll(".mermaid-container");
+      const containers = previewPane.querySelectorAll(".mermaid-container");
       for (const el of containers) {
         const src = decodeURIComponent(el.dataset.mermaidSource);
         const id = `mmd-${Date.now()}-${mermaidRenderCount++}`;
@@ -617,7 +613,7 @@ async function renderPreview(source) {
   }
 
   // Restore scroll approximately (prevents flash), then build fresh anchors
-  preview.scrollTop = savedScrollTop;
+  previewPane.scrollTop = savedScrollTop;
   buildScrollAnchors();
   pendingRender = false;
   renderingPreview = false;
@@ -629,7 +625,7 @@ async function renderPreview(source) {
   }
 
   // Inline SVG images — rebuild anchors only if layout changed
-  inlineSvgImages(preview)
+  inlineSvgImages(previewPane)
     .then((changed) => {
       if (changed) buildScrollAnchors();
     })
@@ -828,9 +824,8 @@ document.getElementById("btn-export-pdf").addEventListener("click", () => {
 // --- Copy as Rich Text ---
 
 async function copyRichText() {
-  const preview = document.getElementById("preview-pane");
-  const html = preview.innerHTML;
-  const text = preview.innerText;
+  const html = previewPane.innerHTML;
+  const text = previewPane.innerText;
   const statusEl = document.getElementById("status");
 
   try {
@@ -870,7 +865,6 @@ document.getElementById("btn-settings").addEventListener("click", () => {
 
 const divider = document.getElementById("divider");
 const editorPane = document.getElementById("editor-pane");
-const previewPane = document.getElementById("preview-pane");
 
 let isDragging = false;
 
@@ -971,7 +965,6 @@ syncEditorState();
 
 // --- Scroll Sync Event Listeners ---
 
-const cmScroller = editor.dom.querySelector(".cm-scroller");
 cmScroller.addEventListener(
   "scroll",
   () => {
@@ -982,7 +975,7 @@ cmScroller.addEventListener(
   },
   { passive: true },
 );
-document.getElementById("preview-pane").addEventListener(
+previewPane.addEventListener(
   "scroll",
   () => {
     if (isProgrammaticScroll()) return;
@@ -993,7 +986,7 @@ document.getElementById("preview-pane").addEventListener(
   { passive: true },
 );
 window.addEventListener("resize", buildScrollAnchors);
-document.getElementById("preview-pane").addEventListener("click", (e) => {
+previewPane.addEventListener("click", (e) => {
   const sel = window.getSelection();
   if (sel && !sel.isCollapsed) return;
   syncPreviewClickToEditor(e);
