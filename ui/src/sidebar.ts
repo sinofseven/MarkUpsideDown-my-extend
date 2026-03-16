@@ -146,38 +146,31 @@ export function getGitHubPanelEl() {
   return ghPanelSlot;
 }
 
-let refreshLock = false;
-
 async function refreshTree() {
   if (!rootPath || !treeEl) return;
 
   const gen = ++refreshGeneration;
 
-  // Wait for any in-flight refresh to yield, then take the lock
-  if (refreshLock) return; // previous refresh will be cancelled by gen guard
-  refreshLock = true;
+  // Build a completely new tree element off-DOM
+  const newTree = document.createElement("div");
+  newTree.className = "sidebar-tree";
 
   try {
-    // Build into a detached fragment so clear+append is atomic
-    const fragment = document.createDocumentFragment();
-    await renderDirectory(rootPath, fragment, 0, gen);
-    if (gen !== refreshGeneration) return;
-    treeEl.innerHTML = "";
-    treeEl.appendChild(fragment);
+    await renderDirectory(rootPath, newTree, 0, gen);
   } catch (e) {
     if (gen !== refreshGeneration) return;
-    treeEl.innerHTML = "";
     const err = document.createElement("div");
     err.className = "sidebar-error";
     err.textContent = `Error: ${e}`;
-    treeEl.appendChild(err);
-  } finally {
-    refreshLock = false;
-    // If a newer generation was requested while locked, re-run
-    if (gen !== refreshGeneration) {
-      refreshTree();
-    }
+    newTree.appendChild(err);
   }
+
+  // Stale render — discard
+  if (gen !== refreshGeneration) return;
+
+  // Atomic swap: replace old tree element with new one
+  treeEl.replaceWith(newTree);
+  treeEl = newTree;
 }
 
 async function renderDirectory(
@@ -189,9 +182,15 @@ async function renderDirectory(
   const entries = await invoke<DirEntry[]>("list_directory", { path: dirPath });
   if (gen !== refreshGeneration) return;
 
+  // Deduplicate by path (safety net)
+  const seen = new Set<string>();
+
   // Render items and collect expanded subdirectories for parallel fetch
   const expandedChildren = [];
   for (const entry of entries) {
+    if (seen.has(entry.path)) continue;
+    seen.add(entry.path);
+
     const item = createTreeItem(entry, depth);
     container.appendChild(item);
 
