@@ -15,10 +15,7 @@ interface TauriFs {
 }
 
 interface TauriEvent {
-  listen<T = unknown>(
-    event: string,
-    handler: (event: { payload: T }) => void,
-  ): Promise<() => void>;
+  listen<T = unknown>(event: string, handler: (event: { payload: T }) => void): Promise<() => void>;
 }
 
 interface TauriGlobal {

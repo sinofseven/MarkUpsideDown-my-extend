@@ -45,17 +45,6 @@ export async function refresh() {
   render();
 }
 
-export function getFileStatus(filePath: string): GitFile | null {
-  if (!gitData || !gitData.is_repo) return null;
-  // Match by relative path suffix
-  for (const f of gitData.files) {
-    if (filePath.endsWith(f.path) || f.path.endsWith(filePath.split("/").pop() ?? "")) {
-      return f;
-    }
-  }
-  return null;
-}
-
 export function getStatusMap(): Map<string, GitFile> {
   if (!gitData || !gitData.is_repo) return new Map();
   const map = new Map<string, GitFile>();
@@ -104,33 +93,13 @@ async function commitChanges() {
   }
 }
 
-async function gitPush() {
+async function gitRemoteAction(command: string, label: string) {
   if (!repoPath) return;
   try {
-    await invoke("git_push", { repoPath });
+    await invoke(command, { repoPath });
     await refresh();
   } catch (e) {
-    alert(`Push failed: ${e}`);
-  }
-}
-
-async function gitPull() {
-  if (!repoPath) return;
-  try {
-    await invoke("git_pull", { repoPath });
-    await refresh();
-  } catch (e) {
-    alert(`Pull failed: ${e}`);
-  }
-}
-
-async function gitFetch() {
-  if (!repoPath) return;
-  try {
-    await invoke("git_fetch", { repoPath });
-    await refresh();
-  } catch (e) {
-    alert(`Fetch failed: ${e}`);
+    alert(`${label} failed: ${e}`);
   }
 }
 
@@ -236,15 +205,15 @@ function render() {
   const actions = document.createElement("div");
   actions.className = "git-actions-row";
 
-  for (const [label, fn] of [
-    ["Fetch", gitFetch],
-    ["Pull", gitPull],
-    ["Push", gitPush],
+  for (const [label, command] of [
+    ["Fetch", "git_fetch"],
+    ["Pull", "git_pull"],
+    ["Push", "git_push"],
   ] as const) {
     const btn = document.createElement("button");
     btn.className = "git-action-btn";
     btn.textContent = label;
-    btn.addEventListener("click", fn);
+    btn.addEventListener("click", () => gitRemoteAction(command, label));
     actions.appendChild(btn);
   }
 

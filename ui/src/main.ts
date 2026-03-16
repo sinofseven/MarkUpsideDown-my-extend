@@ -110,7 +110,6 @@ const mathExtension = {
 marked.use(mathExtension);
 
 let mermaidModule: any = null;
-let mermaidRenderCount = 0;
 
 async function getMermaid() {
   if (mermaidModule) return mermaidModule;
@@ -604,8 +603,7 @@ async function renderPreview(source: string) {
   // Save scroll position to prevent visual flash during innerHTML replacement
   const savedScrollTop = previewPane.scrollTop;
 
-  // Reset render count each time so Mermaid IDs stay small and predictable
-  mermaidRenderCount = 0;
+  let mermaidRenderCount = 0;
 
   // Lex source and annotate top-level tokens with source line numbers
   const tokens = marked.lexer(source);
@@ -1178,6 +1176,16 @@ initTabs(tabBarEl, {
   },
   onEmpty: () => {
     loadContent("# Welcome to MarkUpsideDown\n\nStart typing your Markdown here…\n");
+  },
+  onReload: async (tab: { content: string; path: string | null }) => {
+    if (!tab.path) return;
+    try {
+      const content = await readTextFile(tab.path);
+      updateActiveTab({ content });
+      loadContent(content, tab.path);
+    } catch {
+      loadContent("", tab.path);
+    }
   },
 });
 

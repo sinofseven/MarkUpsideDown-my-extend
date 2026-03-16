@@ -94,7 +94,11 @@ const SETUP_STEPS = [
   { id: "verify", label: "Verify" },
 ];
 
-function renderSetupProgress(container: HTMLElement, _currentStep: string, stepStates: Record<string, string>) {
+function renderSetupProgress(
+  container: HTMLElement,
+  _currentStep: string,
+  stepStates: Record<string, string>,
+) {
   container.innerHTML = SETUP_STEPS.map((step) => {
     const state = stepStates[step.id] || "pending";
     let icon, cls;
@@ -259,7 +263,10 @@ function showSetupSuccess(container: HTMLElement, url: string) {
   if (!div.parentNode) container.appendChild(div);
 }
 
-function showAccountPicker(container: HTMLElement, accounts: { id: string; name: string }[]): Promise<string> {
+function showAccountPicker(
+  container: HTMLElement,
+  accounts: { id: string; name: string }[],
+): Promise<string> {
   return new Promise((resolve) => {
     const pickerDiv = document.createElement("div");
     pickerDiv.className = "setup-account-picker";
@@ -339,7 +346,10 @@ function showApiTokenInput(container: HTMLElement): Promise<string> {
 
 // --- Settings Panel ---
 
-export function showSettings({ onSave, onClose: onCloseCallback }: { onSave?: (url: string) => void; onClose?: () => void } = {}) {
+export function showSettings({
+  onSave,
+  onClose: onCloseCallback,
+}: { onSave?: (url: string) => void; onClose?: () => void } = {}) {
   document.getElementById("settings-panel")?.remove();
 
   const overlay = document.createElement("div");
@@ -490,7 +500,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       }
 
       renderFeatureList(featureList, status);
-      secretsHelp.style.display = (status.reachable && !status.render_available) ? "" : "none";
+      secretsHelp.style.display = status.reachable && !status.render_available ? "" : "none";
     } catch (e) {
       testResult.className = "settings-test-result test-error";
       testResult.textContent = `Error: ${e}`;

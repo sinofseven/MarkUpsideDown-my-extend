@@ -10,7 +10,7 @@ interface DirEntry {
   name: string;
   path: string;
   is_dir: boolean;
-  extension: string;
+  extension: string | null;
 }
 
 interface GitStatus {
@@ -37,7 +37,10 @@ let ghPanelSlot: HTMLElement | null = null;
 
 export function initSidebar(
   el: HTMLElement,
-  { onOpen, onFolder }: { onOpen: (content: string, filePath: string) => void; onFolder: (rootPath: string) => void },
+  {
+    onOpen,
+    onFolder,
+  }: { onOpen: (content: string, filePath: string) => void; onFolder: (rootPath: string) => void },
 ) {
   sidebarEl = el;
   onFileOpen = onOpen;
@@ -96,7 +99,7 @@ function render() {
 
   const title = document.createElement("span");
   title.className = "sidebar-title";
-  title.textContent = rootPath ? rootPath.split("/").pop() ?? rootPath : "Files";
+  title.textContent = rootPath ? (rootPath.split("/").pop() ?? rootPath) : "Files";
   header.appendChild(title);
 
   const actions = document.createElement("div");
@@ -159,7 +162,12 @@ async function refreshTree() {
   }
 }
 
-async function renderDirectory(dirPath: string, container: HTMLElement, depth: number, gen: number) {
+async function renderDirectory(
+  dirPath: string,
+  container: HTMLElement,
+  depth: number,
+  gen: number,
+) {
   const entries = await invoke<DirEntry[]>("list_directory", { path: dirPath });
   if (gen !== refreshGeneration) return;
 
@@ -205,7 +213,7 @@ function createTreeItem(entry: DirEntry, depth: number) {
   // Icon
   const icon = document.createElement("span");
   icon.className = "sidebar-tree-icon";
-  icon.textContent = entry.is_dir ? "📁" : fileIcon(entry.extension);
+  icon.textContent = entry.is_dir ? "📁" : fileIcon(entry.extension ?? "");
   item.appendChild(icon);
 
   // Name
@@ -473,18 +481,41 @@ export function setSelectedPath(path: string | null) {
   }
 }
 
-export function getSidebarState() {
-  return {
-    rootPath,
-    visible: sidebarEl ? sidebarEl.style.display !== "none" : true,
-  };
-}
-
 export function getRootPath() {
   return rootPath;
 }
 
 export function setGitStatus(statusMap: Map<string, GitStatus>) {
   gitStatusMap = statusMap;
-  if (treeEl && rootPath) refreshTree();
+  if (!treeEl || !rootPath) return;
+  // Update git badges in-place without re-fetching the entire file tree
+  for (const item of treeEl.querySelectorAll(".sidebar-tree-item") as NodeListOf<HTMLElement>) {
+    const itemPath = item.dataset.path;
+    if (!itemPath) continue;
+    const relPath = itemPath.replace(rootPath + "/", "");
+    const status = statusMap.get(relPath);
+
+    // Remove existing badge and name styling
+    const oldBadge = item.querySelector(".sidebar-git-badge");
+    if (oldBadge) oldBadge.remove();
+    const nameEl = item.querySelector(".sidebar-tree-name");
+    if (nameEl) {
+      for (const cls of nameEl.classList) {
+        if (cls.startsWith("sidebar-name-")) nameEl.classList.remove(cls);
+      }
+    }
+
+    if (status) {
+      const badge = document.createElement("span");
+      badge.className = "sidebar-git-badge";
+      badge.textContent = status.status;
+      badge.classList.add(statusClass(status.status));
+      item.appendChild(badge);
+      if (nameEl) {
+        const cls = statusClass(status.status);
+        const suffix = cls.replace("git-", "");
+        nameEl.classList.add(`sidebar-name-${suffix}`);
+      }
+    }
+  }
 }

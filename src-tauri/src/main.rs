@@ -4,6 +4,7 @@
 mod bridge;
 mod cloudflare;
 mod commands;
+mod util;
 
 use std::sync::Arc;
 

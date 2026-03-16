@@ -24,7 +24,18 @@ function genId(): string {
   return `tab-${nextId++}`;
 }
 
-export function initTabs(el: HTMLElement, { onSwitch, onEmpty }: { onSwitch: (tab: Tab) => void; onEmpty: () => void }): void {
+export function initTabs(
+  el: HTMLElement,
+  {
+    onSwitch,
+    onEmpty,
+    onReload,
+  }: {
+    onSwitch: (tab: Tab) => void;
+    onEmpty: () => void;
+    onReload?: (tab: Tab) => void;
+  },
+): void {
   tabBarEl = el;
   onTabSwitch = onSwitch;
   onTabEmpty = onEmpty;
@@ -51,7 +62,12 @@ export function initTabs(el: HTMLElement, { onSwitch, onEmpty }: { onSwitch: (ta
   // If we have tabs, activate the active one
   const activeTab = tabs.find((t) => t.id === activeTabId);
   if (activeTab) {
-    onTabSwitch?.(activeTab);
+    // File-backed tabs with empty content need to be reloaded from disk
+    if (activeTab.path && !activeTab.content && onReload) {
+      onReload(activeTab);
+    } else {
+      onTabSwitch?.(activeTab);
+    }
   }
 }
 
@@ -63,7 +79,8 @@ function saveState(): void {
         id: t.id,
         path: t.path,
         name: t.name,
-        content: t.content,
+        // Skip content for file-backed tabs to avoid hitting localStorage limits
+        content: t.path ? "" : t.content,
         scrollTop: t.scrollTop || 0,
       })),
       activeTabId,
@@ -150,7 +167,17 @@ export function switchToNextTab(): void {
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
-export function updateActiveTab({ content, path, name, scrollTop }: { content?: string; path?: string; name?: string; scrollTop?: number }): void {
+export function updateActiveTab({
+  content,
+  path,
+  name,
+  scrollTop,
+}: {
+  content?: string;
+  path?: string;
+  name?: string;
+  scrollTop?: number;
+}): void {
   const tab = tabs.find((t) => t.id === activeTabId);
   if (!tab) return;
   if (content !== undefined) tab.content = content;

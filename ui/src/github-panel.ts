@@ -58,6 +58,12 @@ function render() {
   panelEl.appendChild(statusEl);
 }
 
+function setStatus(text: string, cls: string) {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  statusEl.className = `gh-status ${cls}`;
+}
+
 async function fetchRef(input: HTMLInputElement) {
   const raw = input.value.trim();
   if (!raw) return;
@@ -65,37 +71,24 @@ async function fetchRef(input: HTMLInputElement) {
   const parsed = parseRef(raw);
 
   if (!parsed) {
-    if (statusEl) statusEl.textContent = "Format: owner/repo#123 or GitHub URL";
-    if (statusEl) statusEl.className = "gh-status gh-status-error";
+    setStatus("Format: owner/repo#123 or GitHub URL", "gh-status-error");
     return;
   }
 
-  if (statusEl) statusEl.textContent = "Fetching…";
-  if (statusEl) statusEl.className = "gh-status gh-status-pending";
+  setStatus("Fetching…", "gh-status-pending");
 
   try {
-    let body: string;
-    if (parsed.type === "pull") {
-      body = await invoke<string>("github_fetch_pr", {
-        owner: parsed.owner,
-        repo: parsed.repo,
-        number: parsed.number,
-      });
-    } else {
-      body = await invoke<string>("github_fetch_issue", {
-        owner: parsed.owner,
-        repo: parsed.repo,
-        number: parsed.number,
-      });
-    }
+    const command = parsed.type === "pull" ? "github_fetch_pr" : "github_fetch_issue";
+    const body = await invoke<string>(command, {
+      owner: parsed.owner,
+      repo: parsed.repo,
+      number: parsed.number,
+    });
 
-    if (statusEl) statusEl.textContent = `Fetched ${parsed.type} #${parsed.number}`;
-    if (statusEl) statusEl.className = "gh-status gh-status-ok";
-
+    setStatus(`Fetched ${parsed.type} #${parsed.number}`, "gh-status-ok");
     onInsert?.(body, `${parsed.owner}/${parsed.repo}#${parsed.number}`);
   } catch (e: unknown) {
-    if (statusEl) statusEl.textContent = `Error: ${e}`;
-    if (statusEl) statusEl.className = "gh-status gh-status-error";
+    setStatus(`Error: ${e}`, "gh-status-error");
   }
 }
 
