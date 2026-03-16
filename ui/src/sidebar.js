@@ -18,6 +18,7 @@ let gitStatusMap = new Map(); // path -> { status, staged }
 let sidebarEl = null;
 let treeEl = null;
 let gitPanelSlot = null;
+let ghPanelSlot = null;
 
 export function initSidebar(el, { onOpen, onFolder }) {
   sidebarEl = el;
@@ -108,10 +109,19 @@ function render() {
   gitPanelSlot = document.createElement("div");
   gitPanelSlot.id = "git-panel";
   sidebarEl.appendChild(gitPanelSlot);
+
+  // GitHub panel slot
+  ghPanelSlot = document.createElement("div");
+  ghPanelSlot.id = "github-panel";
+  sidebarEl.appendChild(ghPanelSlot);
 }
 
 export function getGitPanelEl() {
   return gitPanelSlot;
+}
+
+export function getGitHubPanelEl() {
+  return ghPanelSlot;
 }
 
 async function refreshTree() {

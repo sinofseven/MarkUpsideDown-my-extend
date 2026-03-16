@@ -26,8 +26,10 @@ import {
   getRootPath,
   setGitStatus,
   getGitPanelEl,
+  getGitHubPanelEl,
 } from "./sidebar.js";
 import { initGitPanel, setRepoPath, refresh as refreshGit, getStatusMap } from "./git-panel.js";
+import { initGitHubPanel } from "./github-panel.js";
 import {
   initTabs,
   openTab,
@@ -1053,6 +1055,17 @@ if (gitPanelEl) {
       } catch (e) {
         statusEl.textContent = `Open failed: ${e}`;
       }
+    },
+  });
+}
+
+// Initialize GitHub panel
+const ghPanelEl = getGitHubPanelEl();
+if (ghPanelEl) {
+  initGitHubPanel(ghPanelEl, {
+    onContent: (body, ref_) => {
+      loadContentAsTab(body);
+      statusEl.textContent = `Fetched: ${ref_}`;
     },
   });
 }

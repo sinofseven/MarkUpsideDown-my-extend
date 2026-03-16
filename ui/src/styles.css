@@ -640,6 +640,77 @@ body {
   background: var(--border);
 }
 
+/* GitHub Panel */
+#github-panel {
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.gh-panel-header {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.gh-input-row {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px 6px;
+}
+
+.gh-input {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  outline: none;
+  min-width: 0;
+}
+
+.gh-input:focus {
+  border-color: var(--accent);
+}
+
+.gh-fetch-btn {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.gh-fetch-btn:hover {
+  background: var(--border);
+}
+
+.gh-status {
+  padding: 0 10px 6px;
+  font-size: 10px;
+  min-height: 14px;
+}
+
+.gh-status-ok {
+  color: var(--success);
+}
+
+.gh-status-error {
+  color: var(--error);
+}
+
+.gh-status-pending {
+  color: var(--text-muted);
+}
+
 /* CodeMirror overrides */
 .cm-editor {
   height: 100%;
