@@ -755,6 +755,49 @@ fn run_cli(cmd: &str, args: &[&str]) -> Result<String, String> {
 
 // --- Git Operations ---
 
+/// Unquote a git-quoted path (e.g. `"path with spaces"` → `path with spaces`).
+/// Handles backslash escapes: `\\`, `\"`, `\t`, `\n`, and octal (`\303\251` etc.).
+fn unquote_git_path(s: &str) -> String {
+    let inner = &s[1..s.len() - 1]; // strip surrounding quotes
+    let bytes = inner.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\\' && i + 1 < bytes.len() {
+            match bytes[i + 1] {
+                b'\\' => { out.push(b'\\'); i += 2; }
+                b'"' => { out.push(b'"'); i += 2; }
+                b't' => { out.push(b'\t'); i += 2; }
+                b'n' => { out.push(b'\n'); i += 2; }
+                b'r' => { out.push(b'\r'); i += 2; }
+                b'a' => { out.push(b'\x07'); i += 2; }
+                b'b' => { out.push(b'\x08'); i += 2; }
+                c if c.is_ascii_digit() => {
+                    // Octal escape (up to 3 digits)
+                    let mut val: u8 = c - b'0';
+                    let mut j = i + 2;
+                    let end = (i + 4).min(bytes.len());
+                    while j < end {
+                        if bytes[j].is_ascii_digit() && bytes[j] <= b'7' {
+                            val = val * 8 + (bytes[j] - b'0');
+                            j += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    out.push(val);
+                    i = j;
+                }
+                _ => { out.push(bytes[i]); i += 1; }
+            }
+        } else {
+            out.push(bytes[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+}
+
 fn run_git(repo_path: &str, args: &[&str]) -> Result<String, String> {
     let mut full_args = vec!["-C", repo_path];
     full_args.extend_from_slice(args);
@@ -837,7 +880,12 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
             }
             let index_status = bytes[0] as char;
             let work_status = bytes[1] as char;
-            let file_path = line[3..].to_string();
+            let raw_path = &line[3..];
+            let file_path = if raw_path.starts_with('"') && raw_path.ends_with('"') {
+                unquote_git_path(raw_path)
+            } else {
+                raw_path.to_string()
+            };
 
             // Staged changes
             if index_status != ' ' && index_status != '?' {
