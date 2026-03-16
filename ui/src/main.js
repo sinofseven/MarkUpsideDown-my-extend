@@ -259,16 +259,80 @@ function syncToEditor() {
 }
 
 function syncPreviewToCursor() {
-  if (renderingPreview || scrollAnchors.length < 2) return;
+  if (renderingPreview || pendingRender) return;
   if (performance.now() - lastPreviewClickAt < CLICK_SUPPRESS_MS) return;
 
   const pos = editor.state.selection.main.head;
+  const cursorLine = editor.state.doc.lineAt(pos).number;
   const block = editor.lineBlockAt(pos);
   const cmScroller = editor.dom.querySelector(".cm-scroller");
   const preview = document.getElementById("preview-pane");
+
+  // Query DOM directly for data-source-line elements (avoids stale anchors)
+  const elements = preview.querySelectorAll("[data-source-line]");
+  if (elements.length === 0) return;
+
+  // Find the two elements bracketing the cursor line
+  let before = null;
+  let after = null;
+  let beforeLine = -1;
+  let afterLine = Infinity;
+
+  for (const el of elements) {
+    const sl = parseInt(el.dataset.sourceLine, 10);
+    if (isNaN(sl)) continue;
+    if (sl <= cursorLine && sl > beforeLine) {
+      before = el;
+      beforeLine = sl;
+    }
+    if (sl >= cursorLine && sl < afterLine) {
+      after = el;
+      afterLine = sl;
+    }
+  }
+
+  if (!before && !after) return;
+  if (!before) {
+    before = after;
+    beforeLine = afterLine;
+  }
+  if (!after) {
+    after = before;
+    afterLine = beforeLine;
+  }
+
+  const previewRect = preview.getBoundingClientRect();
+  const previewScrollTop = preview.scrollTop;
+
+  let previewTargetY;
+
+  // Check if cursor is inside a code block represented by 'before' PRE element
+  if (before.tagName === "PRE" && cursorLine > beforeLine) {
+    const info = getCodeBlockLineInfo(before);
+    if (info.lines.length > 1) {
+      const lineIndex = cursorLine - beforeLine - 1;
+      if (lineIndex >= 0 && lineIndex < info.lines.length) {
+        previewTargetY =
+          info.rect.top - previewRect.top + previewScrollTop + lineIndex * info.lineHeight;
+      }
+    }
+  }
+
+  // If not resolved by code block, interpolate between bracketing elements
+  if (previewTargetY === undefined) {
+    const beforeY = before.getBoundingClientRect().top - previewRect.top + previewScrollTop;
+    if (before === after || beforeLine === afterLine) {
+      previewTargetY = beforeY;
+    } else {
+      const afterY = after.getBoundingClientRect().top - previewRect.top + previewScrollTop;
+      const t = (cursorLine - beforeLine) / (afterLine - beforeLine);
+      previewTargetY = beforeY + t * (afterY - beforeY);
+    }
+  }
+
+  // Align: same visual offset from viewport top in both panes
   const lineVisibleY = block.top - cmScroller.scrollTop;
-  const previewTarget = interpolate(scrollAnchors, "editorY", "previewY", block.top);
-  const scrollTarget = Math.max(0, Math.round(previewTarget - lineVisibleY));
+  const scrollTarget = Math.max(0, Math.round(previewTargetY - lineVisibleY));
   if (Math.abs(preview.scrollTop - scrollTarget) < 1) return;
   markProgrammaticScroll();
   preview.scrollTop = scrollTarget;
