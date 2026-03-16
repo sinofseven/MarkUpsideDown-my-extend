@@ -23,8 +23,12 @@ pub struct WranglerStatus {
 
 /// Set HOME and augment PATH for macOS GUI apps that don't inherit shell env.
 /// Covers: Homebrew (Intel + ARM), nvm, nodebrew, fnm, Volta, asdf, mise, n, proto
+fn home_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME").map(std::path::PathBuf::from)
+}
+
 fn setup_gui_env(cmd: &mut Command) {
-    let home = dirs::home_dir();
+    let home = home_dir();
     if let Some(ref home) = home {
         cmd.env("HOME", home);
     }
@@ -60,7 +64,7 @@ fn setup_gui_env(cmd: &mut Command) {
                 }
             }
         }
-        for p in ["/opt/homebrew/bin", "/usr/local/bin"] {
+        for p in ["/opt/homebrew/bin"] {
             if !current_path.contains(p) {
                 extra_paths.push(p.to_string());
             }
@@ -319,7 +323,7 @@ fn get_env_token() -> Option<String> {
 /// shell which sources ~/.zshenv (zsh) or ~/.profile (bash) to pick up exports.
 /// We avoid `-i` (interactive) because it hangs without a TTY.
 fn get_env_token_from_shell() -> Option<String> {
-    let home = dirs::home_dir()?;
+    let home = home_dir()?;
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     let child = Command::new(&shell)
         .args(["-lc", "printf '%s' \"$CLOUDFLARE_API_TOKEN\""])

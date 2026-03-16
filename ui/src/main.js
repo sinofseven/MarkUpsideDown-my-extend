@@ -7,7 +7,6 @@ import {
 } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { languages } from "@codemirror/language-data";
 import { defaultKeymap, indentWithTab, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { search, searchKeymap } from "@codemirror/search";
@@ -464,7 +463,7 @@ const editor = new EditorView({
       drawSelection(),
       bracketMatching(),
       history(),
-      markdown({ base: markdownLanguage, codeLanguages: languages }),
+      markdown({ base: markdownLanguage }),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       editorTheme,
       search(),

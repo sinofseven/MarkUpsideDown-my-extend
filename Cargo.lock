@@ -1968,12 +1968,10 @@ dependencies = [
 
 [[package]]
 name = "markupsidedown"
-version = "0.1.32"
+version = "0.1.33"
 dependencies = [
  "axum",
- "dirs",
  "log",
- "regex",
  "reqwest",
  "serde",
  "serde_json",

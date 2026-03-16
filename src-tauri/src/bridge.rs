@@ -20,9 +20,13 @@ struct BridgeState {
 }
 
 fn port_file_path() -> PathBuf {
-    dirs::home_dir()
+    home_dir()
         .unwrap_or_else(|| PathBuf::from("/tmp"))
         .join(".markupsidedown-bridge-port")
+}
+
+fn home_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(PathBuf::from)
 }
 
 pub fn start(app: AppHandle, editor_state: Arc<EditorState>) {

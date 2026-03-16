@@ -27,7 +27,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: aarch64-apple-darwin
 
       - name: Install frontend dependencies
         run: cd ui && npm ci
@@ -74,7 +74,7 @@ jobs:
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Build Tauri app (universal)
+      - name: Build Tauri app (Apple Silicon)
         uses: tauri-apps/tauri-action@73fb865345c54760d875b94642314f8c0c894afa # v0.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,14 +84,14 @@ jobs:
           releaseBody: ${{ steps.release_notes.outputs.body }}
           releaseDraft: false
           prerelease: false
-          args: --target universal-apple-darwin
+          args: --target aarch64-apple-darwin
 
       - name: Extract checksums
         id: checksums
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          DMG="target/universal-apple-darwin/release/bundle/dmg/MarkUpsideDown_${VERSION}_universal.dmg"
+          DMG="target/aarch64-apple-darwin/release/bundle/dmg/MarkUpsideDown_${VERSION}_aarch64.dmg"
           echo "dmg_sha256=$(shasum -a 256 "$DMG" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
   update-homebrew:

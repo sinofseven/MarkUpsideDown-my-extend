@@ -332,20 +332,162 @@ pub async fn fetch_svg(
 }
 
 fn sanitize_svg(svg: &str) -> String {
-    use std::sync::LazyLock;
+    let result = strip_script_tags(svg);
+    let result = strip_event_handlers(&result);
+    strip_js_hrefs(&result)
+}
 
-    static RE_SCRIPT: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r"(?is)<script[\s>].*?</script>").unwrap());
-    static RE_EVENTS: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r#"(?i)\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)"#).unwrap());
-    static RE_JS_HREF: LazyLock<regex::Regex> =
-        LazyLock::new(|| regex::Regex::new(r#"(?i)(href\s*=\s*["'])javascript:[^"']*"#).unwrap());
+/// Remove `<script>...</script>` blocks (case-insensitive).
+fn strip_script_tags(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let lower = input.to_ascii_lowercase();
+    let mut pos = 0;
 
-    let result = RE_SCRIPT.replace_all(svg, "");
-    let result = RE_EVENTS.replace_all(&result, "");
-    let result = RE_JS_HREF.replace_all(&result, "${1}#");
+    while pos < input.len() {
+        let Some(tag_offset) = lower[pos..].find("<script") else {
+            out.push_str(&input[pos..]);
+            break;
+        };
+        let abs = pos + tag_offset;
+        let after = abs + 7; // "<script".len()
 
-    result.into_owned()
+        // Must be followed by whitespace or '>'
+        match lower.as_bytes().get(after) {
+            Some(b' ' | b'\t' | b'\n' | b'\r' | b'>') => {}
+            _ => {
+                out.push_str(&input[pos..after]);
+                pos = after;
+                continue;
+            }
+        }
+
+        out.push_str(&input[pos..abs]);
+
+        if let Some(end_offset) = lower[abs..].find("</script>") {
+            pos = abs + end_offset + 9; // "</script>".len()
+        } else {
+            break; // no closing tag — drop the rest
+        }
+    }
+    out
+}
+
+/// Remove event-handler attributes (`on*="..."`) from tags.
+fn strip_event_handlers(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let mut last = 0;
+    let mut i = 0;
+
+    while i < bytes.len() {
+        if bytes[i].is_ascii_whitespace()
+            && i + 3 < bytes.len()
+            && bytes[i + 1].to_ascii_lowercase() == b'o'
+            && bytes[i + 2].to_ascii_lowercase() == b'n'
+        {
+            let start = i;
+            let mut j = i + 3;
+            while j < bytes.len() && bytes[j].is_ascii_alphanumeric() {
+                j += 1;
+            }
+            if j == i + 3 {
+                i += 1;
+                continue;
+            }
+            let mut k = j;
+            while k < bytes.len() && bytes[k].is_ascii_whitespace() {
+                k += 1;
+            }
+            if k < bytes.len() && bytes[k] == b'=' {
+                k += 1;
+                while k < bytes.len() && bytes[k].is_ascii_whitespace() {
+                    k += 1;
+                }
+                if k < bytes.len() {
+                    match bytes[k] {
+                        b'"' => {
+                            k += 1;
+                            while k < bytes.len() && bytes[k] != b'"' {
+                                k += 1;
+                            }
+                            if k < bytes.len() {
+                                k += 1;
+                            }
+                        }
+                        b'\'' => {
+                            k += 1;
+                            while k < bytes.len() && bytes[k] != b'\'' {
+                                k += 1;
+                            }
+                            if k < bytes.len() {
+                                k += 1;
+                            }
+                        }
+                        _ => {
+                            while k < bytes.len()
+                                && !bytes[k].is_ascii_whitespace()
+                                && bytes[k] != b'>'
+                            {
+                                k += 1;
+                            }
+                        }
+                    }
+                }
+                out.push_str(&input[last..start]);
+                last = k;
+                i = k;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out.push_str(&input[last..]);
+    out
+}
+
+/// Replace `javascript:` URLs in href attributes with `#`.
+fn strip_js_hrefs(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let lower = input.to_ascii_lowercase();
+    let mut pos = 0;
+
+    while pos < input.len() {
+        let Some(href_offset) = lower[pos..].find("href") else {
+            out.push_str(&input[pos..]);
+            break;
+        };
+        let abs = pos + href_offset;
+        let mut k = abs + 4; // "href".len()
+
+        // Skip whitespace + '='
+        while k < input.len() && input.as_bytes()[k].is_ascii_whitespace() {
+            k += 1;
+        }
+        if k < input.len() && input.as_bytes()[k] == b'=' {
+            k += 1;
+            while k < input.len() && input.as_bytes()[k].is_ascii_whitespace() {
+                k += 1;
+            }
+            if k < input.len() && matches!(input.as_bytes()[k], b'"' | b'\'') {
+                let quote = input.as_bytes()[k];
+                let val_start = k + 1;
+                if lower[val_start..].starts_with("javascript:") {
+                    let mut end = val_start;
+                    while end < input.len() && input.as_bytes()[end] != quote {
+                        end += 1;
+                    }
+                    // Keep everything up to and including the opening quote, replace value with '#'
+                    out.push_str(&input[pos..=k]);
+                    out.push('#');
+                    pos = end;
+                    continue;
+                }
+            }
+        }
+        out.push_str(&input[pos..abs + 4]);
+        pos = abs + 4;
+    }
+    out
 }
 
 // --- File Tree ---

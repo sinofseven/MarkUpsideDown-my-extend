@@ -1,6 +1,6 @@
 [package]
 name = "markupsidedown"
-version = "0.1.32"
+version = "0.1.33"
 edition = "2024"
 description = "AI-era Markdown editor with live preview, Cloudflare Markdown for Agents, GitHub, and Claude Code integration"
 license = "AGPL-3.0-or-later"
@@ -20,6 +20,4 @@ reqwest = { version = "0.13", features = ["json"] }
 tokio = { version = "1", features = ["net", "rt", "fs", "macros"] }
 urlencoding = "2"
 axum = "0.8"
-dirs = "6"
 log = "0.4"
-regex = "1"
