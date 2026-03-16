@@ -146,19 +146,37 @@ export function getGitHubPanelEl() {
   return ghPanelSlot;
 }
 
+let refreshLock = false;
+
 async function refreshTree() {
   if (!rootPath || !treeEl) return;
 
   const gen = ++refreshGeneration;
-  treeEl.innerHTML = "";
+
+  // Wait for any in-flight refresh to yield, then take the lock
+  if (refreshLock) return; // previous refresh will be cancelled by gen guard
+  refreshLock = true;
+
   try {
-    await renderDirectory(rootPath, treeEl, 0, gen);
+    // Build into a detached fragment so clear+append is atomic
+    const fragment = document.createDocumentFragment();
+    await renderDirectory(rootPath, fragment, 0, gen);
+    if (gen !== refreshGeneration) return;
+    treeEl.innerHTML = "";
+    treeEl.appendChild(fragment);
   } catch (e) {
     if (gen !== refreshGeneration) return;
+    treeEl.innerHTML = "";
     const err = document.createElement("div");
     err.className = "sidebar-error";
     err.textContent = `Error: ${e}`;
     treeEl.appendChild(err);
+  } finally {
+    refreshLock = false;
+    // If a newer generation was requested while locked, re-run
+    if (gen !== refreshGeneration) {
+      refreshTree();
+    }
   }
 }
 
