@@ -709,7 +709,29 @@ document.getElementById("btn-save").addEventListener("click", async () => {
 const urlBar = document.getElementById("url-bar");
 const urlInput = document.getElementById("url-input");
 
-async function fetchFromUrlBar() {
+async function fetchUrl() {
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  urlBar.classList.add("loading");
+  urlInput.disabled = true;
+  statusEl.textContent = "Fetching page…";
+
+  try {
+    const result = await invoke("fetch_url_as_markdown", { url });
+    loadContentAsTab(result.body);
+    statusEl.textContent = result.is_markdown
+      ? `Fetched (Markdown): ${url}`
+      : `Fetched (HTML→Markdown): ${url}`;
+  } catch (e) {
+    statusEl.textContent = `Fetch error: ${e}`;
+  } finally {
+    urlBar.classList.remove("loading");
+    urlInput.disabled = false;
+  }
+}
+
+async function renderUrl() {
   const url = urlInput.value.trim();
   if (!url) return;
 
@@ -723,7 +745,7 @@ async function fetchFromUrlBar() {
   try {
     const markdown = await invoke("fetch_rendered_url_as_markdown", { url, workerUrl });
     loadContentAsTab(markdown);
-    statusEl.textContent = "Fetched: " + url;
+    statusEl.textContent = "Rendered: " + url;
   } catch (e) {
     statusEl.textContent = `Render error: ${e}`;
   } finally {
@@ -732,9 +754,10 @@ async function fetchFromUrlBar() {
   }
 }
 
-document.getElementById("btn-fetch").addEventListener("click", fetchFromUrlBar);
+document.getElementById("btn-fetch").addEventListener("click", fetchUrl);
+document.getElementById("btn-render").addEventListener("click", renderUrl);
 urlInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") fetchFromUrlBar();
+  if (e.key === "Enter") fetchUrl();
 });
 
 // --- Import Document ---
