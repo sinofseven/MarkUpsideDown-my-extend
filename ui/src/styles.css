@@ -248,6 +248,9 @@ body {
   width: 1px;
   background: var(--border);
   cursor: col-resize;
+  flex-shrink: 0;
+  padding: 0 3px;
+  background-clip: content-box;
 }
 
 #preview-pane {
