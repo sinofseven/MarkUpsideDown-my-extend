@@ -893,7 +893,7 @@ document.getElementById("btn-settings").addEventListener("click", () => {
 // --- Resizable divider ---
 
 const divider = document.getElementById("divider");
-const editorPane = document.getElementById("editor-pane");
+const editorContainer = document.getElementById("editor-container");
 
 let isDragging = false;
 
@@ -903,12 +903,12 @@ divider.addEventListener("mousedown", () => {
 document.addEventListener("mousemove", (e) => {
   if (!isDragging) return;
   // Calculate ratio within the editor+preview area (excluding sidebar)
-  const editorLeft = editorPane.getBoundingClientRect().left;
+  const editorLeft = editorContainer.getBoundingClientRect().left;
   const previewRight = previewPane.getBoundingClientRect().right;
   const availableWidth = previewRight - editorLeft;
   const ratio = (e.clientX - editorLeft) / availableWidth;
   const clamped = Math.max(0.2, Math.min(0.8, ratio));
-  editorPane.style.flex = `${clamped}`;
+  editorContainer.style.flex = `${clamped}`;
   previewPane.style.flex = `${1 - clamped}`;
 });
 document.addEventListener("mouseup", () => {
