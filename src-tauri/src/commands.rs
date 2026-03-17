@@ -632,33 +632,39 @@ pub async fn delete_entry(path: String, is_dir: bool) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn duplicate_entry(path: String) -> Result<String, String> {
+    let path_clone = path.clone();
+    let dest = tokio::task::spawn_blocking(move || {
+        let src = std::path::Path::new(&path_clone);
+        let parent = src.parent().ok_or("No parent directory")?;
+        let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+        let ext = src.extension().and_then(|s| s.to_str());
+
+        // Find a unique name: "file copy.md", "file copy 2.md", ...
+        let mut n = 0u32;
+        loop {
+            let suffix = if n == 0 {
+                " copy".to_string()
+            } else {
+                format!(" copy {}", n + 1)
+            };
+            let name = match ext {
+                Some(e) => format!("{stem}{suffix}.{e}"),
+                None => format!("{stem}{suffix}"),
+            };
+            let candidate = parent.join(&name);
+            if !candidate.exists() {
+                break Ok::<_, String>(candidate);
+            }
+            n += 1;
+            if n > 100 {
+                break Err("Too many copies exist".to_string());
+            }
+        }
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))??;
+
     let src = std::path::Path::new(&path);
-    let parent = src.parent().ok_or("No parent directory")?;
-    let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-    let ext = src.extension().and_then(|s| s.to_str());
-
-    // Find a unique name: "file copy.md", "file copy 2.md", ...
-    let mut n = 0u32;
-    let dest = loop {
-        let suffix = if n == 0 {
-            " copy".to_string()
-        } else {
-            format!(" copy {}", n + 1)
-        };
-        let name = match ext {
-            Some(e) => format!("{stem}{suffix}.{e}"),
-            None => format!("{stem}{suffix}"),
-        };
-        let candidate = parent.join(&name);
-        if !candidate.exists() {
-            break candidate;
-        }
-        n += 1;
-        if n > 100 {
-            return Err("Too many copies exist".to_string());
-        }
-    };
-
     if src.is_dir() {
         copy_dir_recursive(src, &dest).await?;
     } else {
@@ -835,10 +841,23 @@ pub struct GitStatus {
 pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
     let rp = repo_path;
     tokio::task::spawn_blocking(move || {
-        // Single command: -b gives branch info, --porcelain=v1 gives file statuses
-        let output = match run_git(&rp, &["status", "-b", "--porcelain=v1"]) {
-            Ok(o) => o,
-            Err(_) => {
+        // Run all three git commands in parallel
+        let rp2 = rp.clone();
+        let rp3 = rp.clone();
+        let (status_result, unstaged_raw, staged_raw) = std::thread::scope(|s| {
+            let h0 = s.spawn(|| run_git(&rp, &["status", "-b", "--porcelain=v1"]));
+            let h1 = s.spawn(|| run_git(&rp2, &["diff", "--numstat"]));
+            let h2 = s.spawn(|| run_git(&rp3, &["diff", "--cached", "--numstat"]));
+            (
+                h0.join().ok().and_then(|r| r.ok()),
+                h1.join().ok().and_then(|r| r.ok()),
+                h2.join().ok().and_then(|r| r.ok()),
+            )
+        });
+
+        let output = match status_result {
+            Some(o) => o,
+            None => {
                 return Ok(GitStatus {
                     branch: String::new(),
                     files: Vec::new(),
@@ -854,14 +873,6 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
             .and_then(|line| line.strip_prefix("## "))
             .map(|b| b.split("...").next().unwrap_or(b).to_string())
             .unwrap_or_default();
-
-        // Collect diff stats: unstaged and staged (in parallel)
-        let rp2 = rp.clone();
-        let (unstaged_raw, staged_raw) = std::thread::scope(|s| {
-            let h1 = s.spawn(|| run_git(&rp2, &["diff", "--numstat"]));
-            let h2 = s.spawn(|| run_git(&rp2, &["diff", "--cached", "--numstat"]));
-            (h1.join().ok().and_then(|r| r.ok()), h2.join().ok().and_then(|r| r.ok()))
-        });
 
         let mut unstaged_stats: std::collections::HashMap<String, (u32, u32)> =
             std::collections::HashMap::new();

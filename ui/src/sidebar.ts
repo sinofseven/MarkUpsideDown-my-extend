@@ -135,6 +135,16 @@ export async function openFolder() {
 
 // --- Render ---
 
+function populateHeaderActions(container: Element) {
+  if (activePanel === "files") {
+    const openBtn = document.createElement("button");
+    openBtn.title = "Open Folder";
+    openBtn.textContent = "Open";
+    openBtn.addEventListener("click", openFolder);
+    container.appendChild(openBtn);
+  }
+}
+
 function render() {
   if (!sidebarEl) return;
   sidebarEl.innerHTML = "";
@@ -151,13 +161,7 @@ function render() {
   const actions = document.createElement("div");
   actions.className = "sidebar-header-actions";
 
-  if (activePanel === "files") {
-    const openBtn = document.createElement("button");
-    openBtn.title = "Open Folder";
-    openBtn.textContent = "Open";
-    openBtn.addEventListener("click", openFolder);
-    actions.appendChild(openBtn);
-  }
+  populateHeaderActions(actions);
 
   header.appendChild(actions);
   sidebarEl.appendChild(header);
@@ -252,13 +256,7 @@ export function switchPanel(panel: SidebarPanel) {
   const actionsEl = sidebarEl?.querySelector(".sidebar-header-actions");
   if (actionsEl) {
     actionsEl.innerHTML = "";
-    if (panel === "files") {
-      const openBtn = document.createElement("button");
-      openBtn.title = "Open Folder";
-      openBtn.textContent = "Open";
-      openBtn.addEventListener("click", openFolder);
-      actionsEl.appendChild(openBtn);
-    }
+    populateHeaderActions(actionsEl);
   }
   updatePanelVisibility();
   updateNavButtons();

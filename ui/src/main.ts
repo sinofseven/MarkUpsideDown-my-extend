@@ -466,6 +466,12 @@ function loadContent(content: string, filePath?: string | null) {
   }
   svgCache.clear();
   renderPreview(content);
+  // Cancel the debounced render scheduled by the doc change listener to avoid a duplicate render
+  if (previewTimeout) {
+    clearTimeout(previewTimeout);
+    previewTimeout = null;
+  }
+  pendingRender = false;
   updateStatus(editor.state);
 }
 
