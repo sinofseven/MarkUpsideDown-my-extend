@@ -1305,6 +1305,7 @@ body {
 }
 
 #preview-pane pre {
+  position: relative;
   background: var(--code-bg);
   border-radius: 8px;
   padding: 18px 20px;
@@ -1312,6 +1313,31 @@ body {
   margin: 1.2em 0;
   border: 1px solid var(--border);
   tab-size: 4;
+}
+
+#preview-pane pre .code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 10px;
+  font-size: 0.75em;
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+#preview-pane pre:hover .code-copy-btn {
+  opacity: 1;
+}
+
+#preview-pane pre .code-copy-btn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
 }
 
 #preview-pane pre code {

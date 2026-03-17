@@ -368,6 +368,23 @@ export async function renderPreview(source: string) {
     }
   }
 
+  // Add copy buttons to code blocks
+  for (const pre of previewPane.querySelectorAll("pre:not([data-copy-btn])")) {
+    (pre as HTMLElement).dataset.copyBtn = "true";
+    const btn = document.createElement("button");
+    btn.className = "code-copy-btn";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", () => {
+      const code = pre.querySelector("code");
+      const text = code ? code.textContent! : pre.textContent!;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = "Copied!";
+        setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+      });
+    });
+    pre.appendChild(btn);
+  }
+
   if (hasMermaid) {
     try {
       const mermaid = await getMermaid();
