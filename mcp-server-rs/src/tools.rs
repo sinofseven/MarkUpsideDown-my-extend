@@ -111,7 +111,7 @@ impl McpTools {
 
     // --- Editor Tools (require running app) ---
 
-    #[tool(name = "get_editor_content", description = "Get current Markdown content from the editor")]
+    #[tool(name = "get_editor_content", description = "Get current Markdown content from the editor", annotations(read_only_hint = true, open_world_hint = false))]
     async fn get_editor_content(&self) -> Result<CallToolResult, rmcp::ErrorData> {
         match self.bridge.get_editor_content().await {
             Ok(content) => Ok(CallToolResult::success(vec![Content::text(content)])),
@@ -119,7 +119,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "set_editor_content", description = "Replace the editor content with the provided Markdown")]
+    #[tool(name = "set_editor_content", description = "Replace the editor content with the provided Markdown", annotations(read_only_hint = false, open_world_hint = false))]
     async fn set_editor_content(
         &self,
         Parameters(params): Parameters<SetContentParams>,
@@ -130,7 +130,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "insert_text", description = "Insert text at cursor position, start, or end of the editor")]
+    #[tool(name = "insert_text", description = "Insert text at cursor position, start, or end of the editor", annotations(read_only_hint = false, open_world_hint = false))]
     async fn insert_text(
         &self,
         Parameters(params): Parameters<InsertTextParams>,
@@ -143,7 +143,7 @@ impl McpTools {
 
     // --- Conversion Tools (use Worker, no app needed) ---
 
-    #[tool(name = "fetch_markdown", description = "Fetch a URL and return its content as Markdown using Cloudflare Markdown for Agents")]
+    #[tool(name = "fetch_markdown", description = "Fetch a URL and return its content as Markdown using Cloudflare Markdown for Agents", annotations(read_only_hint = true, open_world_hint = true))]
     async fn fetch_markdown(
         &self,
         Parameters(params): Parameters<UrlParams>,
@@ -190,7 +190,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "render_markdown", description = "Fetch a JavaScript-rendered page as Markdown via Browser Rendering")]
+    #[tool(name = "render_markdown", description = "Fetch a JavaScript-rendered page as Markdown via Browser Rendering", annotations(read_only_hint = true, open_world_hint = true))]
     async fn render_markdown(
         &self,
         Parameters(params): Parameters<UrlParams>,
@@ -220,7 +220,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "convert_to_markdown", description = "Convert a local document (PDF, DOCX, XLSX, PPTX, HTML, CSV, XML, images) to Markdown via Workers AI")]
+    #[tool(name = "convert_to_markdown", description = "Convert a local document (PDF, DOCX, XLSX, PPTX, HTML, CSV, XML, images) to Markdown via Workers AI", annotations(read_only_hint = true, open_world_hint = false))]
     async fn convert_to_markdown(
         &self,
         Parameters(params): Parameters<FilePathParams>,
@@ -275,7 +275,7 @@ impl McpTools {
 
     // --- File Tools (require running app) ---
 
-    #[tool(name = "open_file", description = "Open a Markdown file in the editor")]
+    #[tool(name = "open_file", description = "Open a Markdown file in the editor", annotations(read_only_hint = false, open_world_hint = false))]
     async fn open_file(
         &self,
         Parameters(params): Parameters<OpenFileParams>,
@@ -286,7 +286,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "save_file", description = "Save the current editor content to a file")]
+    #[tool(name = "save_file", description = "Save the current editor content to a file", annotations(read_only_hint = false, open_world_hint = false))]
     async fn save_file(
         &self,
         Parameters(params): Parameters<SaveFileParams>,
@@ -303,7 +303,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "export_pdf", description = "Export the current editor content as PDF (opens print dialog in the app)")]
+    #[tool(name = "export_pdf", description = "Export the current editor content as PDF (opens print dialog in the app)", annotations(read_only_hint = false, open_world_hint = false))]
     async fn export_pdf(&self) -> Result<CallToolResult, rmcp::ErrorData> {
         match self.bridge.export_pdf().await {
             Ok(()) => Ok(CallToolResult::success(vec![Content::text("PDF export triggered")])),
