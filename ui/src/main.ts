@@ -1078,6 +1078,22 @@ async function copyRichText() {
 
 document.getElementById("btn-copy-rich")!.addEventListener("click", copyRichText);
 
+// --- Copy as Markdown ---
+
+async function copyMarkdown() {
+  const state = editor.state;
+  const sel = state.selection.main;
+  const hasSelection = !sel.empty;
+  const text = hasSelection ? state.sliceDoc(sel.from, sel.to) : state.doc.toString();
+
+  try {
+    await navigator.clipboard.writeText(text);
+    statusEl.textContent = hasSelection ? "Copied selection as Markdown" : "Copied as Markdown";
+  } catch (e) {
+    statusEl.textContent = `Copy failed: ${e}`;
+  }
+}
+
 // --- Settings ---
 
 document.getElementById("btn-settings")!.addEventListener("click", () => {
@@ -1363,6 +1379,9 @@ document.addEventListener("keydown", (e) => {
     if (e.key === "C") {
       e.preventDefault();
       copyRichText();
+    } else if (e.key === "M") {
+      e.preventDefault();
+      copyMarkdown();
     } else if (e.key === "[") {
       e.preventDefault();
       switchToPrevTab();
