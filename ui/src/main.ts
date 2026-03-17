@@ -1003,8 +1003,22 @@ document.getElementById("btn-export-pdf")!.addEventListener("click", () => {
 // --- Copy as Rich Text ---
 
 async function copyRichText() {
-  const html = previewPane.innerHTML;
-  const text = (previewPane as HTMLElement).innerText;
+  const sel = window.getSelection();
+  const hasSelection = sel && !sel.isCollapsed && previewPane.contains(sel.anchorNode);
+
+  let html: string;
+  let text: string;
+  if (hasSelection) {
+    const range = sel.getRangeAt(0);
+    const container = document.createElement("div");
+    container.appendChild(range.cloneContents());
+    html = container.innerHTML;
+    text = sel.toString();
+  } else {
+    html = previewPane.innerHTML;
+    text = (previewPane as HTMLElement).innerText;
+  }
+
   try {
     await navigator.clipboard.write([
       new ClipboardItem({
@@ -1012,7 +1026,7 @@ async function copyRichText() {
         "text/plain": new Blob([text], { type: "text/plain" }),
       }),
     ]);
-    statusEl.textContent = "Copied as rich text";
+    statusEl.textContent = hasSelection ? "Copied selection as rich text" : "Copied as rich text";
   } catch (e) {
     statusEl.textContent = `Copy failed: ${e}`;
   }
