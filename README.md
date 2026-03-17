@@ -9,7 +9,7 @@ A desktop Markdown editor that bridges the web and AI, powered by [Tauri v2](htt
 
 ## Features
 
-### Markup → Markdown
+### Markup to Markdown
 
 | Feature | How it works |
 |---------|-------------|
@@ -22,13 +22,20 @@ A desktop Markdown editor that bridges the web and AI, powered by [Tauri v2](htt
 ### Editor
 
 - **Live preview** — Split-pane with real-time rendering and bidirectional scroll sync
+- **Multi-tab editing** — Open multiple files in tabs, switch with <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd>
 - **CodeMirror 6** — Syntax highlighting, line numbers, bracket matching, search & replace
-- **KaTeX math** — Inline `$...$` and display `$$...$$` math rendering
-- **Syntax highlighting** — Code blocks with language detection (highlight.js)
-- **Mermaid diagrams** — Live rendering of flowcharts, sequence diagrams, etc.
+- **Code highlighting** — 23 languages via highlight.js (lazy-loaded)
+- **KaTeX math** — Inline `$...$` and display `$$...$$` rendering
+- **Mermaid diagrams** — Flowcharts, sequence diagrams, etc.
 - **Table editor** — Spreadsheet-like editing with Tab/Enter navigation, undo/redo, paste from TSV/CSV
 - **SVG inlining** — Remote SVG images rendered inline with sanitization
-- **Paper-like preview** — Warm, serif-accented reading experience inspired by Safari Reader
+- **Safari Reader-inspired preview** — Clean sans-serif typography with CJK text spacing support
+
+### File Browser & Git
+
+- **File tree sidebar** — Browse, create, rename, duplicate, delete files and folders
+- **Git panel** — View changes, stage/unstage files, commit, push, pull, fetch
+- **GitHub panel** — Fetch issue and PR bodies by reference (`owner/repo#123` or URL)
 
 ### Export
 
@@ -38,7 +45,17 @@ A desktop Markdown editor that bridges the web and AI, powered by [Tauri v2](htt
 ### Integration
 
 - **MCP Server** — AI agents (Claude Desktop, Claude Code, etc.) can read/write editor content via [Model Context Protocol](https://modelcontextprotocol.io/)
-- **GitHub** — Fetch issue and PR bodies via `gh` CLI
+
+### Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| <kbd>Cmd</kbd>+<kbd>S</kbd> | Save file |
+| <kbd>Cmd</kbd>+<kbd>W</kbd> | Close tab |
+| <kbd>Cmd</kbd>+<kbd>B</kbd> | Toggle sidebar |
+| <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd> | Copy rich text |
+| <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> | Previous tab |
+| <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>]</kbd> | Next tab |
 
 ## Requirements
 
@@ -116,19 +133,25 @@ See [docs/mcp-server.md](docs/mcp-server.md) for the full tool list and troubles
 src-tauri/               # Rust backend (Tauri v2)
 ├── src/
 │   ├── main.rs          # App entry, plugin setup
-│   ├── commands.rs      # IPC commands (URL fetch, conversion, SVG, GitHub)
+│   ├── commands.rs      # IPC commands (fetch, convert, file ops, git, GitHub)
 │   ├── bridge.rs        # MCP HTTP bridge (axum, localhost:31415)
-│   └── cloudflare.rs    # Wrangler CLI integration, auto-setup wizard
+│   ├── cloudflare.rs    # Wrangler CLI integration, auto-setup wizard
+│   └── util.rs          # Shared utilities
 ├── Cargo.toml
 └── tauri.conf.json
 
-ui/                      # Frontend (Vite+ + vanilla JS)
+ui/                      # Frontend (Vite+ + TypeScript)
 ├── src/
-│   ├── main.js          # Editor, preview, scroll sync, toolbar, bridge events
-│   ├── settings.js      # Settings panel, auto-setup UI, feature status
-│   ├── table-editor.js  # Spreadsheet-like table editor with undo/redo
-│   ├── theme.js         # Light theme (warm paper palette)
-│   └── styles.css       # All styling (editor, preview, dialogs, print)
+│   ├── main.ts          # Editor, preview, scroll sync, toolbar, bridge events
+│   ├── settings.ts      # Settings panel, auto-setup UI, MCP config
+│   ├── sidebar.ts       # File tree browser with context menu
+│   ├── tabs.ts          # Multi-tab management with state persistence
+│   ├── git-panel.ts     # Git status, stage/unstage, commit, push/pull
+│   ├── github-panel.ts  # GitHub issue/PR fetcher
+│   ├── table-editor.ts  # Spreadsheet-like table editor with undo/redo
+│   ├── theme.ts         # CodeMirror editor theme
+│   ├── global.d.ts      # Tauri type declarations
+│   └── styles.css       # All styling (editor, preview, sidebar, dialogs, print)
 ├── index.html
 └── package.json
 

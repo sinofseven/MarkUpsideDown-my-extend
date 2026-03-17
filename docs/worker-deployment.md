@@ -148,4 +148,4 @@ No app-side changes needed — the URL stays the same. Secrets persist across de
 
 ### CORS
 
-The Worker includes permissive CORS headers (`*`). To restrict origins, edit `corsHeaders()` in `worker/src/index.ts`.
+The Worker includes permissive CORS headers (`*`). To restrict origins, edit `CORS_HEADERS` in `worker/src/index.ts`.
