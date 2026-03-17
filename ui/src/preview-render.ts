@@ -203,6 +203,7 @@ previewRenderer.html = function ({ text, _sourceLine }: any) {
 
 // --- SVG inlining ---
 
+const SVG_CACHE_MAX = 50;
 const svgCache = new Map<string, string>();
 
 export function clearSvgCache() {
@@ -223,6 +224,10 @@ async function inlineSvgImages(container: HTMLElement) {
         svgText = svgCache.get(url);
       } else {
         svgText = await invoke<string>("fetch_svg", { url });
+        if (svgCache.size >= SVG_CACHE_MAX) {
+          const oldest = svgCache.keys().next().value!;
+          svgCache.delete(oldest);
+        }
         svgCache.set(url, svgText);
       }
 

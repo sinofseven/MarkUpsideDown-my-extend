@@ -55,6 +55,7 @@ function markSetupDone() {
 }
 
 let currentTestStatus: WorkerStatus | null = null; // cached last test result
+let lastTestedUrl: string | null = null; // URL that produced currentTestStatus
 
 function featureRows(status: WorkerStatus | null) {
   const hasWorker = Boolean(status && status.reachable);
@@ -545,6 +546,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     try {
       const status = await invoke<WorkerStatus>("test_worker_url", { workerUrl: url });
       currentTestStatus = status;
+      lastTestedUrl = url;
 
       if (!status.reachable) {
         testResult.className = "settings-test-result test-error";
@@ -599,6 +601,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   document.getElementById("settings-clear")!.addEventListener("click", () => {
     urlInput.value = "";
     currentTestStatus = null;
+    lastTestedUrl = null;
     testResult.className = "settings-test-result";
     testResult.textContent = "";
     renderFeatureList(featureList, null);
@@ -612,8 +615,8 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     if (e.key === "Escape") close();
   });
 
-  // Auto-test if URL already exists
-  if (workerUrl) {
+  // Auto-test if URL exists and hasn't been tested yet
+  if (workerUrl && workerUrl !== lastTestedUrl) {
     testBtn.click();
   }
 }

@@ -171,7 +171,21 @@ function updateStatus(state: EditorState) {
   statusEl.textContent = `${lines} lines | ${chars} chars${pathInfo}${branchInfo}`;
 }
 
-async function refreshGitAndSync() {
+let gitRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
+const GIT_REFRESH_DEBOUNCE = 2000;
+
+function refreshGitAndSync() {
+  if (gitRefreshTimeout) clearTimeout(gitRefreshTimeout);
+  gitRefreshTimeout = setTimeout(async () => {
+    await refreshGit();
+    setGitStatus(getStatusMap());
+    updateGitChangeCount(getChangeCount());
+    updateStatus(editor.state);
+  }, GIT_REFRESH_DEBOUNCE);
+}
+
+async function refreshGitAndSyncNow() {
+  if (gitRefreshTimeout) clearTimeout(gitRefreshTimeout);
   await refreshGit();
   setGitStatus(getStatusMap());
   updateGitChangeCount(getChangeCount());
@@ -360,7 +374,7 @@ initSidebar(sidebarEl, {
   },
   onFolder: (rootPath: string) => {
     setRepoPath(rootPath);
-    refreshGitAndSync();
+    refreshGitAndSyncNow();
   },
   onFold: () => toggleSidebar(),
 });
@@ -392,7 +406,7 @@ if (ghPanelEl) {
 const initialRoot = getRootPath();
 if (initialRoot) {
   setRepoPath(initialRoot);
-  refreshGitAndSync();
+  refreshGitAndSyncNow();
 }
 
 function toggleSidebar() {
