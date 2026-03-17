@@ -224,10 +224,10 @@ updateStatus(editor.state);
 document.getElementById("btn-open")!.addEventListener("click", openFile);
 document.getElementById("btn-save")!.addEventListener("click", saveFile);
 document.getElementById("btn-import")!.addEventListener("click", importFile);
-document.getElementById("btn-copy-rich")!.addEventListener("click", copyRichText);
 document.getElementById("btn-table")!.addEventListener("click", () => {
   editTableAtCursor(editor);
 });
+
 document.getElementById("btn-export-pdf")!.addEventListener("click", () => {
   window.print();
 });
@@ -554,18 +554,31 @@ document.addEventListener("keydown", (e) => {
   if (!mod) return;
 
   if (e.shiftKey) {
-    if (e.key === "C") {
-      e.preventDefault();
-      copyRichText();
-    } else if (e.key === "M") {
-      e.preventDefault();
-      copyMarkdown();
-    } else if (e.key === "[") {
+    if (e.key === "[") {
       e.preventDefault();
       switchToPrevTab();
     } else if (e.key === "]") {
       e.preventDefault();
       switchToNextTab();
+    }
+  } else if (e.key === "c") {
+    // Cmd+C with no selection: copy entire content from focused pane
+    const previewEl = document.getElementById("preview-pane")!;
+    const editorEl = document.getElementById("editor-pane")!;
+    const active = document.activeElement;
+
+    if (previewEl.contains(active) || active === previewEl) {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) {
+        e.preventDefault();
+        copyRichText();
+      }
+    } else if (editorEl.contains(active) || active === editorEl) {
+      const sel = editor.state.selection.main;
+      if (sel.empty) {
+        e.preventDefault();
+        copyMarkdown();
+      }
     }
   } else {
     if (e.key === "s") {
