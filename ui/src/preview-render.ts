@@ -148,6 +148,13 @@ function annotateTokensWithSourceLines(tokens: any[]) {
       continue;
     }
     token._sourceLine = lineNum;
+    if (token.type === "list" && token.items) {
+      let itemLine = lineNum;
+      for (const item of token.items) {
+        item._sourceLine = itemLine;
+        itemLine += countNewlines(item.raw, 0, item.raw.length);
+      }
+    }
     lineNum += countNewlines(token.raw, 0, token.raw.length);
   }
 }
@@ -182,6 +189,9 @@ previewRenderer.list = function (this: any, { items, ordered, start, _sourceLine
   const startAttr = ordered && start !== 1 ? ` start="${start}"` : "";
   const body = items.map((item: any) => this.listitem(item)).join("");
   return `<${tag}${startAttr}${slAttr(_sourceLine)}>\n${body}</${tag}>\n`;
+};
+previewRenderer.listitem = function (this: any, { tokens, _sourceLine }: any) {
+  return `<li${slAttr(_sourceLine)}>${this.parser.parse(tokens)}</li>\n`;
 };
 previewRenderer.table = function (this: any, { header, rows, _sourceLine }: any) {
   const headerRow = `<tr>${header.map((h: any) => `<th${h.align ? ` align="${h.align}"` : ""}>${this.parser.parseInline(h.tokens)}</th>`).join("")}</tr>`;

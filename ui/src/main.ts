@@ -390,6 +390,10 @@ if (gitPanelEl) {
         statusEl.textContent = `Open failed: ${e}`;
       }
     },
+    onRefresh: () => {
+      setGitStatus(getStatusMap());
+      updateGitChangeCount(getChangeCount());
+    },
   });
 }
 

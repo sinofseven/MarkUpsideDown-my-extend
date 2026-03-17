@@ -22,11 +22,16 @@ let panelEl: HTMLElement | null = null;
 let repoPath: string | null = null;
 let gitData: GitData | null = null;
 let onFileClick: ((path: string) => void) | null = null;
+let onRefreshCb: (() => void) | null = null;
 let commitMessage = "";
 
-export function initGitPanel(el: HTMLElement, { onOpen }: { onOpen: (path: string) => void }) {
+export function initGitPanel(
+  el: HTMLElement,
+  { onOpen, onRefresh }: { onOpen: (path: string) => void; onRefresh?: () => void },
+) {
   panelEl = el;
   onFileClick = onOpen;
+  onRefreshCb = onRefresh ?? null;
   render();
 }
 
@@ -48,6 +53,7 @@ export async function refresh() {
     gitData = null;
   }
   render();
+  onRefreshCb?.();
 }
 
 export function getBranch(): string | null {

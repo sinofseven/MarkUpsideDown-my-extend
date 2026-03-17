@@ -81,6 +81,22 @@ function findSurroundingEls(elements: HTMLElement[], targetLine: number) {
   return { before: before!, after: after!, beforeLine, afterLine };
 }
 
+function computePreviewLineHeight(surr: {
+  before: HTMLElement;
+  after: HTMLElement;
+  beforeLine: number;
+  afterLine: number;
+}) {
+  if (surr.before === surr.after || surr.afterLine === surr.beforeLine) {
+    return surr.before.getBoundingClientRect().height;
+  }
+  const previewRect = previewPane.getBoundingClientRect();
+  const pst = previewPane.scrollTop;
+  const beforeY = surr.before.getBoundingClientRect().top - previewRect.top + pst;
+  const afterY = surr.after.getBoundingClientRect().top - previewRect.top + pst;
+  return (afterY - beforeY) / (surr.afterLine - surr.beforeLine);
+}
+
 function computePreviewY(
   surr: { before: HTMLElement; after: HTMLElement; beforeLine: number; afterLine: number },
   targetLine: number,
@@ -151,14 +167,17 @@ export function syncToPreview() {
 
   const topLine = editor.state.doc.lineAt(topPos).number;
   const topBlock = editor.lineBlockAt(topPos);
-  // Sub-line offset: how many px of the top line are scrolled above the viewport
+  // Fractional progress within the top editor line (0–1)
   const editorSubOffset = cmScroller.scrollTop - topBlock.top;
+  const blockProgress = topBlock.height > 0 ? editorSubOffset / topBlock.height : 0;
 
   const surr = findSurroundingEls(elements, topLine);
   if (!surr) return;
 
   const previewY = computePreviewY(surr, topLine);
-  const target = Math.max(0, Math.round(previewY + editorSubOffset));
+  // Scale sub-offset proportionally using preview line height
+  const previewLineHeight = computePreviewLineHeight(surr);
+  const target = Math.max(0, Math.round(previewY + blockProgress * previewLineHeight));
   if (Math.abs(previewPane.scrollTop - target) < 1) return;
   markProgrammaticScroll();
   previewPane.scrollTop = target;
@@ -229,6 +248,7 @@ export function syncToEditor() {
   // Determine the source line at the preview viewport top
   let targetLine: number;
   let previewSubOffset = 0;
+  let lineFraction = 0;
 
   if (before!.tagName === "PRE" && pst > beforeAbsY) {
     const info = getCodeBlockLineInfo(before!);
@@ -249,7 +269,9 @@ export function syncToEditor() {
     previewSubOffset = pst - beforeAbsY;
   } else {
     const t = Math.max(0, Math.min(1, (pst - beforeAbsY) / (afterAbsY - beforeAbsY)));
-    targetLine = Math.round(beforeLine + t * (afterLine - beforeLine));
+    const exactLine = beforeLine + t * (afterLine - beforeLine);
+    targetLine = Math.floor(exactLine);
+    lineFraction = exactLine - targetLine;
   }
 
   if (targetLine < 1) targetLine = 1;
@@ -258,7 +280,10 @@ export function syncToEditor() {
   const line = editor.state.doc.line(targetLine);
   const block = editor.lineBlockAt(line.from);
 
-  const target = Math.max(0, Math.round(block.top + previewSubOffset));
+  const target = Math.max(
+    0,
+    Math.round(block.top + previewSubOffset + lineFraction * block.height),
+  );
   if (Math.abs(cmScroller.scrollTop - target) < 1) return;
   markProgrammaticScroll();
   cmScroller.scrollTop = target;
