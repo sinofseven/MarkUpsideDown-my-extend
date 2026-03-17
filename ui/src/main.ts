@@ -12,10 +12,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@cod
 import { search, searchKeymap } from "@codemirror/search";
 import { editorTheme } from "./theme.ts";
 import { editTableAtCursor } from "./table-editor.ts";
-import {
-  showSettings,
-  checkFirstRun,
-} from "./settings.ts";
+import { showSettings, checkFirstRun } from "./settings.ts";
 import {
   initSidebar,
   setSelectedPath,
@@ -303,16 +300,17 @@ const divider = document.getElementById("divider")!;
 const editorContainer = document.getElementById("editor-container")!;
 
 let isDragging = false;
+let dragEditorLeft = 0;
+let dragAvailableWidth = 0;
 
 divider.addEventListener("mousedown", () => {
   isDragging = true;
+  dragEditorLeft = editorContainer.getBoundingClientRect().left;
+  dragAvailableWidth = previewPane.getBoundingClientRect().right - dragEditorLeft;
 });
 document.addEventListener("mousemove", (e) => {
   if (!isDragging) return;
-  const editorLeft = editorContainer.getBoundingClientRect().left;
-  const previewRight = previewPane.getBoundingClientRect().right;
-  const availableWidth = previewRight - editorLeft;
-  const ratio = (e.clientX - editorLeft) / availableWidth;
+  const ratio = (e.clientX - dragEditorLeft) / dragAvailableWidth;
   const clamped = Math.max(0.2, Math.min(0.8, ratio));
   (editorContainer as HTMLElement).style.flex = `${clamped}`;
   (previewPane as HTMLElement).style.flex = `${1 - clamped}`;

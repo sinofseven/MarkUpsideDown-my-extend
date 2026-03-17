@@ -1010,37 +1010,28 @@ pub async fn git_commit(repo_path: String, message: String) -> Result<String, St
     .map_err(|e| format!("Task error: {e}"))?
 }
 
-#[tauri::command]
-pub async fn git_push(repo_path: String) -> Result<String, String> {
-    let rp = repo_path;
+async fn git_remote_command(repo_path: String, cmd: &'static str) -> Result<String, String> {
     tokio::task::spawn_blocking(move || {
-        let output = run_git(&rp, &["push"])?;
+        let output = run_git(&repo_path, &[cmd])?;
         Ok(output.trim().to_string())
     })
     .await
     .map_err(|e| format!("Task error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn git_push(repo_path: String) -> Result<String, String> {
+    git_remote_command(repo_path, "push").await
 }
 
 #[tauri::command]
 pub async fn git_pull(repo_path: String) -> Result<String, String> {
-    let rp = repo_path;
-    tokio::task::spawn_blocking(move || {
-        let output = run_git(&rp, &["pull"])?;
-        Ok(output.trim().to_string())
-    })
-    .await
-    .map_err(|e| format!("Task error: {e}"))?
+    git_remote_command(repo_path, "pull").await
 }
 
 #[tauri::command]
 pub async fn git_fetch(repo_path: String) -> Result<String, String> {
-    let rp = repo_path;
-    tokio::task::spawn_blocking(move || {
-        let output = run_git(&rp, &["fetch"])?;
-        Ok(output.trim().to_string())
-    })
-    .await
-    .map_err(|e| format!("Task error: {e}"))?
+    git_remote_command(repo_path, "fetch").await
 }
 
 // --- GitHub via gh CLI ---

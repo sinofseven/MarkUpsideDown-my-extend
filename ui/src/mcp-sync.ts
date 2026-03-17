@@ -1,5 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import { getWorkerUrl } from "./settings.ts";
+import { getActiveTab, markTabSaved, updateActiveTab } from "./tabs.ts";
+import { getRootPath } from "./sidebar.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -98,14 +100,11 @@ export function initBridgeListeners() {
       await writeTextFile(path, editor.state.doc.toString());
       if (!currentFilePath) {
         setCurrentFilePath(path);
-        const { updateActiveTab } = await import("./tabs.ts");
         updateActiveTab({ path, name: path.split("/").pop()! });
         updateStatus();
       }
-      const { getActiveTab, markTabSaved } = await import("./tabs.ts");
       const tab = getActiveTab();
       if (tab) markTabSaved(tab.id);
-      const { getRootPath } = await import("./sidebar.ts");
       if (getRootPath()) refreshGitAndSync();
     } catch (e) {
       statusEl.textContent = `Save failed: ${e}`;
