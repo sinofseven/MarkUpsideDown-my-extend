@@ -154,40 +154,23 @@ function showStatus(message: string, isError: boolean) {
 
 // --- Render helpers ---
 
+const STATUS_MAP: Record<string, { label: string; cls: string }> = {
+  M: { label: "modified", cls: "git-modified" },
+  A: { label: "added", cls: "git-added" },
+  D: { label: "deleted", cls: "git-deleted" },
+  R: { label: "renamed", cls: "git-renamed" },
+  C: { label: "copied", cls: "git-modified" },
+  "?": { label: "untracked", cls: "git-untracked" },
+};
+
+const DEFAULT_STATUS = { label: "", cls: "git-modified" };
+
 function statusLabel(status: string): string {
-  switch (status) {
-    case "M":
-      return "modified";
-    case "A":
-      return "added";
-    case "D":
-      return "deleted";
-    case "R":
-      return "renamed";
-    case "C":
-      return "copied";
-    case "?":
-      return "untracked";
-    default:
-      return status;
-  }
+  return (STATUS_MAP[status] || DEFAULT_STATUS).label || status;
 }
 
 export function statusClass(status: string): string {
-  switch (status) {
-    case "M":
-      return "git-modified";
-    case "A":
-      return "git-added";
-    case "D":
-      return "git-deleted";
-    case "R":
-      return "git-renamed";
-    case "?":
-      return "git-untracked";
-    default:
-      return "git-modified";
-  }
+  return (STATUS_MAP[status] || DEFAULT_STATUS).cls;
 }
 
 export function statusSuffix(status: string): string {

@@ -134,7 +134,7 @@ async function startAutoSetup(
   };
   const fail = (id: string, message: string) => {
     update(id, "error");
-    showSetupError(progressContainer, message);
+    showSetupMessage(progressContainer, "setup-error", message);
     onComplete(null, null);
   };
 
@@ -220,52 +220,44 @@ async function startAutoSetup(
   urlInput.value = workerUrl;
   try {
     const testStatus = await invoke<WorkerStatus>("test_worker_url", {
-      workerUrl: workerUrl.replace(/\/+$/, ""),
+      workerUrl,
     });
     currentTestStatus = testStatus;
     if (testStatus.reachable) {
       update("verify", "done");
       if (testStatus.render_available) {
-        showSetupSuccess(progressContainer, workerUrl);
-      } else {
-        showSetupInfo(
+        showSetupMessage(
           progressContainer,
+          "setup-success",
+          `Setup complete! Worker: ${workerUrl}`,
+        );
+      } else {
+        showSetupMessage(
+          progressContainer,
+          "setup-info",
           `Worker ready at ${workerUrl}\nImport works. To enable Render JS, add secrets later from the panel below.`,
         );
       }
     } else {
       update("verify", "error");
-      showSetupError(
+      showSetupMessage(
         progressContainer,
+        "setup-error",
         `Worker deployed but health check failed. URL: ${workerUrl}`,
       );
     }
     onComplete(workerUrl, testStatus);
   } catch (e) {
     update("verify", "error");
-    showSetupError(progressContainer, `Health check error: ${e}`);
+    showSetupMessage(progressContainer, "setup-error", `Health check error: ${e}`);
     onComplete(workerUrl, null);
   }
 }
 
-function showSetupError(container: HTMLElement, message: string) {
-  const errDiv = container.querySelector(".setup-error") || document.createElement("div");
-  errDiv.className = "setup-error";
-  errDiv.textContent = message;
-  if (!errDiv.parentNode) container.appendChild(errDiv);
-}
-
-function showSetupInfo(container: HTMLElement, message: string) {
-  const div = container.querySelector(".setup-info") || document.createElement("div");
-  div.className = "setup-info";
+function showSetupMessage(container: HTMLElement, className: string, message: string) {
+  const div = container.querySelector(`.${className}`) || document.createElement("div");
+  div.className = className;
   div.textContent = message;
-  if (!div.parentNode) container.appendChild(div);
-}
-
-function showSetupSuccess(container: HTMLElement, url: string) {
-  const div = container.querySelector(".setup-success") || document.createElement("div");
-  div.className = "setup-success";
-  div.textContent = `Setup complete! Worker: ${url}`;
   if (!div.parentNode) container.appendChild(div);
 }
 

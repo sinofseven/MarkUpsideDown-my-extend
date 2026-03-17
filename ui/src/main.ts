@@ -512,7 +512,7 @@ const updatePreview = EditorView.updateListener.of((update) => {
       updateStatus(update.state);
     }, 100);
     updateActiveTab({ content });
-    syncEditorState();
+    syncEditorState(content);
   }
   // Sync preview when cursor moves — skip if a render is pending (anchors stale)
   if (update.selectionSet && !update.docChanged && !pendingRender) {
@@ -1075,10 +1075,10 @@ let syncTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastSyncedContent: string | null = null;
 let lastSyncedFilePath: string | null = null;
 
-function syncEditorState() {
+function syncEditorState(cachedContent?: string) {
   if (syncTimeout) clearTimeout(syncTimeout);
   syncTimeout = setTimeout(() => {
-    const content = editor.state.doc.toString();
+    const content = cachedContent ?? editor.state.doc.toString();
     if (content === lastSyncedContent && currentFilePath === lastSyncedFilePath) return;
     lastSyncedContent = content;
     lastSyncedFilePath = currentFilePath;

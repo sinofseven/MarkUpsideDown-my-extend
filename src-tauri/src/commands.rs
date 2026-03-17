@@ -543,9 +543,15 @@ pub async fn list_directory(
 
     // Filter out git-ignored entries when inside a git repo
     if let Some(ref root) = repo_root {
-        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        let paths: Vec<String> = entries.iter().map(|e| e.path.clone()).collect();
         if !paths.is_empty() {
-            let ignored = git_check_ignore(root, &paths);
+            let root = root.clone();
+            let ignored = tokio::task::spawn_blocking(move || {
+                let path_refs: Vec<&str> = paths.iter().map(|s| s.as_str()).collect();
+                git_check_ignore(&root, &path_refs)
+            })
+            .await
+            .unwrap_or_default();
             entries.retain(|e| !ignored.contains(&e.path));
         }
     }
