@@ -51,7 +51,7 @@ import {
   syncPreviewClickToEditor,
   buildScrollAnchors,
 } from "./scroll-sync.ts";
-import { initPreview, renderPreview, clearSvgCache } from "./preview-render.ts";
+import { initPreview, renderPreview } from "./preview-render.ts";
 import {
   initFileOps,
   saveFile,
@@ -147,7 +147,6 @@ function loadContent(content: string, filePath?: string | null) {
     currentFilePath = filePath ?? null;
     setSelectedPath(filePath ?? null);
   }
-  clearSvgCache();
   renderPreview(content);
   if (previewTimeout) {
     clearTimeout(previewTimeout);
@@ -174,22 +173,21 @@ function updateStatus(state: EditorState) {
 let gitRefreshTimeout: ReturnType<typeof setTimeout> | null = null;
 const GIT_REFRESH_DEBOUNCE = 2000;
 
-function refreshGitAndSync() {
-  if (gitRefreshTimeout) clearTimeout(gitRefreshTimeout);
-  gitRefreshTimeout = setTimeout(async () => {
-    await refreshGit();
-    setGitStatus(getStatusMap());
-    updateGitChangeCount(getChangeCount());
-    updateStatus(editor.state);
-  }, GIT_REFRESH_DEBOUNCE);
-}
-
-async function refreshGitAndSyncNow() {
-  if (gitRefreshTimeout) clearTimeout(gitRefreshTimeout);
+async function doGitRefresh() {
   await refreshGit();
   setGitStatus(getStatusMap());
   updateGitChangeCount(getChangeCount());
   updateStatus(editor.state);
+}
+
+function refreshGitAndSync() {
+  if (gitRefreshTimeout) clearTimeout(gitRefreshTimeout);
+  gitRefreshTimeout = setTimeout(doGitRefresh, GIT_REFRESH_DEBOUNCE);
+}
+
+async function refreshGitAndSyncNow() {
+  if (gitRefreshTimeout) clearTimeout(gitRefreshTimeout);
+  await doGitRefresh();
 }
 
 // --- Initialize file-ops and MCP sync (need orchestration functions) ---

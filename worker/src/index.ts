@@ -89,11 +89,6 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
     return jsonResponse({ error: "Missing ?url= parameter" }, 400);
   }
 
-  const ssrfError = await validateUrlForSsrf(targetUrl);
-  if (ssrfError) {
-    return jsonResponse({ error: ssrfError }, 400);
-  }
-
   if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) {
     return jsonResponse({ error: "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required for rendering" }, 500);
   }
@@ -109,6 +104,11 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
       headers.set("x-cache", "HIT");
       return new Response(cached.body, { status: cached.status, headers });
     }
+  }
+
+  const ssrfError = await validateUrlForSsrf(targetUrl);
+  if (ssrfError) {
+    return jsonResponse({ error: ssrfError }, 400);
   }
 
   try {

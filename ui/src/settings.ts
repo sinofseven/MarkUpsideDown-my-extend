@@ -233,6 +233,7 @@ async function startAutoSetup(
       workerUrl,
     });
     currentTestStatus = testStatus;
+    lastTestedUrl = workerUrl;
     if (testStatus.reachable) {
       update("verify", "done");
       if (testStatus.render_available) {

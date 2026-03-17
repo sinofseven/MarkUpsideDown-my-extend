@@ -187,7 +187,8 @@ export async function convertFile(filePath: string) {
   const workerUrl = await ensureWorkerUrl();
   if (!workerUrl) return;
 
-  const isImage = await invoke<boolean>("detect_file_is_image", { filePath });
+  const ext = filePath.split(".").pop()?.toLowerCase() || "";
+  const isImage = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif"].includes(ext);
 
   if (isImage) {
     if (!isImageConversionAllowed()) {

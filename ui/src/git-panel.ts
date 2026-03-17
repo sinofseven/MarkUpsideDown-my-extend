@@ -162,16 +162,16 @@ function showStatus(message: string, isError: boolean) {
 
 // --- Render helpers ---
 
-const STATUS_MAP: Record<string, { label: string; cls: string }> = {
-  M: { label: "modified", cls: "git-modified" },
-  A: { label: "added", cls: "git-added" },
-  D: { label: "deleted", cls: "git-deleted" },
-  R: { label: "renamed", cls: "git-renamed" },
-  C: { label: "copied", cls: "git-modified" },
-  "?": { label: "untracked", cls: "git-untracked" },
+const STATUS_MAP: Record<string, { label: string; cls: string; suffix: string }> = {
+  M: { label: "modified", cls: "git-modified", suffix: "modified" },
+  A: { label: "added", cls: "git-added", suffix: "added" },
+  D: { label: "deleted", cls: "git-deleted", suffix: "deleted" },
+  R: { label: "renamed", cls: "git-renamed", suffix: "renamed" },
+  C: { label: "copied", cls: "git-modified", suffix: "modified" },
+  "?": { label: "untracked", cls: "git-untracked", suffix: "untracked" },
 };
 
-const DEFAULT_STATUS = { label: "", cls: "git-modified" };
+const DEFAULT_STATUS = { label: "", cls: "git-modified", suffix: "modified" };
 
 function statusLabel(status: string): string {
   return (STATUS_MAP[status] || DEFAULT_STATUS).label || status;
@@ -182,7 +182,7 @@ export function statusClass(status: string): string {
 }
 
 export function statusSuffix(status: string): string {
-  return statusClass(status).replace("git-", "");
+  return (STATUS_MAP[status] || DEFAULT_STATUS).suffix;
 }
 
 export function createGitBadge(status: string): HTMLSpanElement {

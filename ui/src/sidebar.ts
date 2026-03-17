@@ -268,6 +268,17 @@ const SVG_FILES = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" s
 const SVG_GIT = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="3.5" r="1.5"/><circle cx="8" cy="12.5" r="1.5"/><circle cx="12" cy="8" r="1.5"/><path d="M8 5v6"/><path d="M9.4 4.2 11 6.5"/></svg>`;
 const SVG_GITHUB = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="1"/><circle cx="10.5" cy="5" r="1"/><path d="M5.5 10c0 1.5 1.5 2.5 2.5 2.5s2.5-1 2.5-2.5"/><rect x="2" y="1.5" width="12" height="10" rx="2"/><path d="M5 11.5V14"/><path d="M11 11.5V14"/></svg>`;
 
+function syncGitBadge(btn: Element, count: number) {
+  const existing = btn.querySelector(".sidebar-nav-badge");
+  if (existing) existing.remove();
+  if (count > 0) {
+    const badge = document.createElement("span");
+    badge.className = "sidebar-nav-badge";
+    badge.textContent = String(count);
+    btn.appendChild(badge);
+  }
+}
+
 function createNavButton(panel: SidebarPanel, label: string, svgIcon: string): HTMLButtonElement {
   const btn = document.createElement("button");
   btn.className = "sidebar-nav-btn";
@@ -276,13 +287,7 @@ function createNavButton(panel: SidebarPanel, label: string, svgIcon: string): H
   btn.title = label;
   btn.innerHTML = svgIcon;
 
-  // Badge for git changes
-  if (panel === "git" && gitChangeCount > 0) {
-    const badge = document.createElement("span");
-    badge.className = "sidebar-nav-badge";
-    badge.textContent = String(gitChangeCount);
-    btn.appendChild(badge);
-  }
+  if (panel === "git") syncGitBadge(btn, gitChangeCount);
 
   btn.addEventListener("click", () => switchPanel(panel));
   return btn;
@@ -317,34 +322,15 @@ function updateNavButtons() {
   if (!navBar) return;
   for (const btn of navBar.querySelectorAll(".sidebar-nav-btn") as NodeListOf<HTMLElement>) {
     btn.classList.toggle("active", btn.dataset.panel === activePanel);
-    // Sync git badge with current count
-    if (btn.dataset.panel === "git") {
-      const existing = btn.querySelector(".sidebar-nav-badge");
-      if (existing) existing.remove();
-      if (gitChangeCount > 0) {
-        const badge = document.createElement("span");
-        badge.className = "sidebar-nav-badge";
-        badge.textContent = String(gitChangeCount);
-        btn.appendChild(badge);
-      }
-    }
+    if (btn.dataset.panel === "git") syncGitBadge(btn, gitChangeCount);
   }
 }
 
 export function updateGitChangeCount(count: number) {
   gitChangeCount = count;
-  // Update badge in nav bar
   if (!navBar) return;
   const gitBtn = navBar.querySelector('.sidebar-nav-btn[data-panel="git"]');
-  if (!gitBtn) return;
-  const existing = gitBtn.querySelector(".sidebar-nav-badge");
-  if (existing) existing.remove();
-  if (count > 0) {
-    const badge = document.createElement("span");
-    badge.className = "sidebar-nav-badge";
-    badge.textContent = String(count);
-    gitBtn.appendChild(badge);
-  }
+  if (gitBtn) syncGitBadge(gitBtn, count);
 }
 
 export function getGitPanelEl() {
@@ -773,9 +759,7 @@ async function promptNewFile(dirPath: string) {
   try {
     const path = `${dirPath}/${name}`;
     await invoke("create_file", { path });
-    if (!expandedDirs.has(dirPath)) {
-      expandedDirs.add(dirPath);
-    }
+    expandedDirs.add(dirPath);
     saveState();
     await refreshTree();
   } catch (e) {
@@ -789,9 +773,7 @@ async function promptNewFolder(dirPath: string) {
   try {
     const path = `${dirPath}/${name}`;
     await invoke("create_directory", { path });
-    if (!expandedDirs.has(dirPath)) {
-      expandedDirs.add(dirPath);
-    }
+    expandedDirs.add(dirPath);
     saveState();
     await refreshTree();
   } catch (e) {
