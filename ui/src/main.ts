@@ -294,6 +294,28 @@ previewPane.addEventListener("click", (e) => {
   syncPreviewClickToEditor(e);
 });
 
+// --- Link hover URL preview in status bar ---
+
+let linkHoverActive = false;
+previewPane.addEventListener("mouseover", (e) => {
+  const anchor = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
+  if (anchor) {
+    const href = anchor.getAttribute("href") ?? "";
+    if (href) {
+      statusEl.textContent = href;
+      linkHoverActive = true;
+    }
+  }
+});
+previewPane.addEventListener("mouseout", (e) => {
+  if (!linkHoverActive) return;
+  const anchor = (e.target as HTMLElement).closest("a[href]") as HTMLAnchorElement | null;
+  if (anchor) {
+    linkHoverActive = false;
+    updateStatus(editor.state);
+  }
+});
+
 // --- Resizable divider ---
 
 const divider = document.getElementById("divider")!;

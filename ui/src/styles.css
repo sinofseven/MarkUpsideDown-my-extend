@@ -263,7 +263,7 @@ body {
 #preview-pane {
   flex: 1;
   overflow-y: auto;
-  padding: 32px;
+  padding: 16px;
   background: var(--bg);
   contain: paint style;
   overscroll-behavior: contain;
