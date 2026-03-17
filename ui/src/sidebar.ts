@@ -480,8 +480,13 @@ async function selectAndOpenFile(entry: DirEntry) {
 // --- Context Menu ---
 
 let activeContextMenu: HTMLElement | null = null;
+let contextMenuCloseHandler: ((e: Event) => void) | null = null;
 
 function removeContextMenu() {
+  if (contextMenuCloseHandler) {
+    document.removeEventListener("click", contextMenuCloseHandler, true);
+    contextMenuCloseHandler = null;
+  }
   if (activeContextMenu) {
     activeContextMenu.remove();
     activeContextMenu = null;
@@ -560,13 +565,16 @@ function showContextMenu(event: MouseEvent, entry: DirEntry) {
   }
 
   // Close on click outside
-  const close = (e: Event) => {
+  contextMenuCloseHandler = (e: Event) => {
     if (!menu.contains(e.target as Node)) {
       removeContextMenu();
-      document.removeEventListener("click", close, true);
     }
   };
-  setTimeout(() => document.addEventListener("click", close, true), 0);
+  setTimeout(() => {
+    if (contextMenuCloseHandler) {
+      document.addEventListener("click", contextMenuCloseHandler, true);
+    }
+  }, 0);
 }
 
 async function copyToClipboard(text: string) {

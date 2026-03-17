@@ -824,14 +824,6 @@ async function saveFile() {
 
 document.getElementById("btn-save")!.addEventListener("click", saveFile);
 
-// Cmd+S: save file
-document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "s") {
-    e.preventDefault();
-    saveFile();
-  }
-});
-
 // --- URL Bar (Fetch URL) ---
 
 const urlBar = document.getElementById("url-bar")!;
@@ -1023,13 +1015,6 @@ async function copyRichText() {
 }
 
 document.getElementById("btn-copy-rich")!.addEventListener("click", copyRichText);
-
-document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "C") {
-    e.preventDefault();
-    copyRichText();
-  }
-});
 
 // --- Settings ---
 
@@ -1251,14 +1236,6 @@ function toggleSidebar() {
   );
 }
 
-// Cmd+B to toggle sidebar
-document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "b") {
-    e.preventDefault();
-    toggleSidebar();
-  }
-});
-
 // Sidebar resizable divider
 let isSidebarDragging = false;
 
@@ -1301,23 +1278,33 @@ initTabs(tabBarEl, {
   },
 });
 
-// Cmd+W: close tab
+// Unified keyboard shortcut handler
 document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === "w") {
-    e.preventDefault();
-    closeActiveTab();
-  }
-});
+  const mod = e.metaKey || e.ctrlKey;
+  if (!mod) return;
 
-// Cmd+Shift+[ / ]: switch tabs
-document.addEventListener("keydown", (e) => {
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "[") {
-    e.preventDefault();
-    switchToPrevTab();
-  }
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === "]") {
-    e.preventDefault();
-    switchToNextTab();
+  if (e.shiftKey) {
+    if (e.key === "C") {
+      e.preventDefault();
+      copyRichText();
+    } else if (e.key === "[") {
+      e.preventDefault();
+      switchToPrevTab();
+    } else if (e.key === "]") {
+      e.preventDefault();
+      switchToNextTab();
+    }
+  } else {
+    if (e.key === "s") {
+      e.preventDefault();
+      saveFile();
+    } else if (e.key === "w") {
+      e.preventDefault();
+      closeActiveTab();
+    } else if (e.key === "b") {
+      e.preventDefault();
+      toggleSidebar();
+    }
   }
 });
 
