@@ -519,9 +519,9 @@ function createTreeItem(entry: DirEntry, depth: number) {
     clearTreeDropTarget();
   });
   if (entry.is_dir) {
-    item.addEventListener("dragover", (e) => {
+    // WebKit requires preventDefault() on both dragenter and dragover for drop to work
+    item.addEventListener("dragenter", (e) => {
       if (!dragSourcePath || dragSourcePath === entry.path) return;
-      // Don't allow dropping into own subtree
       if (dragSourcePath && entry.path.startsWith(dragSourcePath + "/")) return;
       e.preventDefault();
       e.stopPropagation();
@@ -529,7 +529,16 @@ function createTreeItem(entry: DirEntry, depth: number) {
       clearTreeDropTarget();
       item.classList.add("drop-target");
     });
-    item.addEventListener("dragleave", () => {
+    item.addEventListener("dragover", (e) => {
+      if (!dragSourcePath || dragSourcePath === entry.path) return;
+      if (dragSourcePath && entry.path.startsWith(dragSourcePath + "/")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer!.dropEffect = "move";
+    });
+    item.addEventListener("dragleave", (e) => {
+      // Only remove highlight when leaving the item itself, not its children
+      if (e.relatedTarget && item.contains(e.relatedTarget as Node)) return;
       item.classList.remove("drop-target");
     });
     item.addEventListener("drop", (e) => {
