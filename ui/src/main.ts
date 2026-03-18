@@ -25,6 +25,7 @@ import {
   getGitHubPanelEl,
   getSlackPanelEl,
   updateGitChangeCount,
+  refreshTree,
 } from "./sidebar.ts";
 import {
   initGitPanel,
@@ -240,7 +241,8 @@ initFileOps({
 initCrawl({
   statusEl,
   onCrawlComplete: () => {
-    // Trigger sidebar refresh after crawl saves files
+    // Refresh file tree and git status after crawl saves files
+    refreshTree();
     const root = getRootPath();
     if (root) refreshGitAndSync();
   },

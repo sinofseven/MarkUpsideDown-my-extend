@@ -574,7 +574,7 @@ function stopDirWatcher() {
   }
 }
 
-async function refreshTree() {
+export async function refreshTree() {
   if (!rootPath || !treeEl) return;
 
   const gen = ++refreshGeneration;
