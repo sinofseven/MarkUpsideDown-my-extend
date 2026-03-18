@@ -1860,18 +1860,18 @@ body {
   line-height: 1.5;
 }
 
-.settings-deploy {
-  font-size: 12px;
+.settings-manual-deploy summary {
+  cursor: pointer;
   color: var(--text-muted);
+  font-size: 12px;
 }
 
-.settings-deploy code {
-  font-family: var(--font-mono);
-  background: var(--bg);
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
+.settings-manual-deploy summary:hover {
   color: var(--text);
+}
+
+.settings-manual-deploy .settings-description {
+  margin-top: 6px;
 }
 
 .settings-worker-input-row {

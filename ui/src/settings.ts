@@ -429,13 +429,9 @@ export function showSettings({
         </div>
 
         <div class="settings-divider">
-          <span>Or configure manually</span>
+          <span>Or enter an existing Worker URL</span>
         </div>
 
-        <div class="settings-deploy">
-          <span class="settings-deploy-label">Deploy:</span>
-          <code>cd worker && wrangler deploy</code>
-        </div>
         <div class="settings-worker-input-row">
           <input
             type="url"
@@ -462,6 +458,20 @@ export function showSettings({
 wrangler secret put CLOUDFLARE_ACCOUNT_ID
 wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       </div>
+
+      <details class="settings-section settings-manual-deploy">
+        <summary class="settings-section-title">Manual deploy instructions</summary>
+        <div class="settings-description">
+          Deploy the Worker yourself from the terminal, then paste the URL above.
+        </div>
+        <pre class="settings-code">cd worker && wrangler deploy</pre>
+        <div class="settings-description">
+          To enable Render JS, also set secrets:
+        </div>
+        <pre class="settings-code">cd worker
+wrangler secret put CLOUDFLARE_ACCOUNT_ID
+wrangler secret put CLOUDFLARE_API_TOKEN</pre>
+      </details>
 
       <div class="settings-section">
         <div class="settings-section-title">Editor</div>
