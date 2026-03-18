@@ -71,6 +71,7 @@ import {
 } from "./file-ops.ts";
 import { initClipboard, copyRichText, copyMarkdown } from "./clipboard.ts";
 import { initMcpSync, syncEditorState, initBridgeListeners } from "./mcp-sync.ts";
+import { initCrawl, crawlUrl } from "./crawl.ts";
 
 // --- Tauri APIs ---
 
@@ -207,6 +208,15 @@ initFileOps({
   refreshGitAndSync,
 });
 
+initCrawl({
+  statusEl,
+  onCrawlComplete: () => {
+    // Trigger sidebar refresh after crawl saves files
+    const root = getRootPath();
+    if (root) refreshGitAndSync();
+  },
+});
+
 initMcpSync({
   editor,
   statusEl,
@@ -257,6 +267,7 @@ const urlInput = document.getElementById("url-input")! as HTMLInputElement;
 
 document.getElementById("btn-fetch")!.addEventListener("click", () => fetchUrl(urlInput, urlBar));
 document.getElementById("btn-render")!.addEventListener("click", () => renderUrl(urlInput, urlBar));
+document.getElementById("btn-crawl")!.addEventListener("click", () => crawlUrl(urlInput, urlBar));
 urlInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") fetchUrl(urlInput, urlBar);
 });

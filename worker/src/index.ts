@@ -47,7 +47,16 @@ export default {
       return handleConvert(request, env);
     }
 
-    return jsonResponse({ error: "GET /health, POST /convert, or GET /render?url=" }, 404);
+    if (request.method === "POST" && url.pathname === "/crawl") {
+      return handleCrawlStart(request, env);
+    }
+
+    const crawlMatch = url.pathname.match(/^\/crawl\/([a-zA-Z0-9_-]+)$/);
+    if (request.method === "GET" && crawlMatch) {
+      return handleCrawlStatus(crawlMatch[1], url, env);
+    }
+
+    return jsonResponse({ error: "GET /health, POST /convert, GET /render?url=, POST /crawl, or GET /crawl/:job_id" }, 404);
   },
 } satisfies ExportedHandler<Env>;
 
@@ -57,6 +66,7 @@ function handleHealth(env: Env): Response {
     capabilities: {
       convert: true,
       render: Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN),
+      crawl: Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN),
     },
   });
 }
@@ -174,6 +184,96 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
     return response;
   } catch (e) {
     return jsonResponse({ error: `Render failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
+  }
+}
+
+// --- Crawl (Browser Rendering /crawl API proxy) ---
+
+async function handleCrawlStart(request: Request, env: Env): Promise<Response> {
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) {
+    return jsonResponse({ error: "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required for crawling" }, 500);
+  }
+
+  let body: { url: string; limit?: number; depth?: number; render?: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (!body.url) {
+    return jsonResponse({ error: "Missing 'url' field" }, 400);
+  }
+
+  const ssrfError = await validateUrlForSsrf(body.url);
+  if (ssrfError) {
+    return jsonResponse({ error: ssrfError }, 400);
+  }
+
+  const crawlUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl`;
+  const crawlBody = {
+    url: body.url,
+    limit: Math.min(body.limit ?? 50, 500),
+    depth: body.depth ?? 3,
+    formats: ["markdown"],
+    render: body.render ?? true,
+  };
+
+  try {
+    const response = await fetch(crawlUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(crawlBody),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      return jsonResponse({ error: `Crawl API error (${response.status}): ${errorBody}` }, response.status);
+    }
+
+    const data = await response.json<{ success: boolean; result: { job_id: string }; errors?: unknown[] }>();
+    if (!data.success) {
+      return jsonResponse({ error: "Crawl API returned failure", details: data.errors }, 500);
+    }
+
+    return jsonResponse({ job_id: data.result.job_id });
+  } catch (e) {
+    return jsonResponse({ error: `Crawl failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
+  }
+}
+
+async function handleCrawlStatus(jobId: string, url: URL, env: Env): Promise<Response> {
+  if (!env.CLOUDFLARE_ACCOUNT_ID || !env.CLOUDFLARE_API_TOKEN) {
+    return jsonResponse({ error: "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required" }, 500);
+  }
+
+  const limit = url.searchParams.get("limit") || "100";
+  const status = url.searchParams.get("status") || "";
+  const cursor = url.searchParams.get("cursor") || "";
+
+  let crawlUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl/${jobId}?limit=${limit}`;
+  if (status) crawlUrl += `&status=${status}`;
+  if (cursor) crawlUrl += `&cursor=${cursor}`;
+
+  try {
+    const response = await fetch(crawlUrl, {
+      headers: {
+        "Authorization": `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      return jsonResponse({ error: `Crawl status API error (${response.status}): ${errorBody}` }, response.status);
+    }
+
+    const data = await response.json();
+    return jsonResponse(data);
+  } catch (e) {
+    return jsonResponse({ error: `Crawl status failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
   }
 }
 
