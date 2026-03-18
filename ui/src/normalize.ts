@@ -148,24 +148,40 @@ function splitTableCells(line: string): string[] {
 
   const cells: string[] = [];
   let current = "";
-  let inCode = false;
   let i = 0;
 
   while (i < s.length) {
     const ch = s[i];
-    if (ch === "`" && !inCode) {
-      inCode = true;
-      current += ch;
-      i++;
-    } else if (ch === "`" && inCode) {
-      inCode = false;
-      current += ch;
-      i++;
+
+    // Handle code spans with variable-length backtick delimiters (CommonMark spec)
+    if (ch === "`") {
+      let tickLen = 0;
+      while (i + tickLen < s.length && s[i + tickLen] === "`") tickLen++;
+      current += s.slice(i, i + tickLen);
+      i += tickLen;
+      // Scan for matching closing delimiter of the same length
+      let closed = false;
+      while (i < s.length) {
+        if (s[i] === "`") {
+          let closeLen = 0;
+          while (i + closeLen < s.length && s[i + closeLen] === "`") closeLen++;
+          current += s.slice(i, i + closeLen);
+          i += closeLen;
+          if (closeLen === tickLen) {
+            closed = true;
+            break;
+          }
+        } else {
+          current += s[i];
+          i++;
+        }
+      }
+      if (!closed) continue; // unclosed code span — already consumed
     } else if (ch === "\\" && i + 1 < s.length && s[i + 1] === "|") {
       // Escaped pipe — keep as literal \|
       current += "\\|";
       i += 2;
-    } else if (ch === "|" && !inCode) {
+    } else if (ch === "|") {
       cells.push(current.trim());
       current = "";
       i++;
@@ -201,6 +217,11 @@ function formatSepCell(align: "left" | "right" | "center" | "none", width: numbe
     default:
       return "-".repeat(width);
   }
+}
+
+/** Display width of a cell: counts `\|` as 1 character (the rendered pipe). */
+function displayWidth(cell: string): number {
+  return cell.replace(/\\\|/g, "|").length;
 }
 
 function reformatTables(text: string): string {
@@ -252,6 +273,13 @@ function reformatTables(text: string): string {
       dataRows = rows.slice(1);
     }
 
+    // Detect malformed tables (e.g. multi-line cells) — pass through unmodified
+    const hasMalformedRows = dataRows.some((row) => Math.abs(row.length - colCount) > 1);
+    if (hasMalformedRows) {
+      result.push(...tableLines);
+      continue;
+    }
+
     // Normalize column counts
     const allRows = [headerRow, sepRow, ...dataRows];
     for (const row of allRows) {
@@ -261,19 +289,25 @@ function reformatTables(text: string): string {
     while (alignments.length < colCount) alignments.push("none");
     if (alignments.length > colCount) alignments.length = colCount;
 
-    // Calculate column widths (min 3 for separator dashes)
+    // Calculate column widths (min 3 for separator dashes, max 40 per column)
+    const MAX_COL_WIDTH = 40;
     const widths = Array(colCount).fill(3);
     for (const row of allRows) {
       for (let c = 0; c < colCount; c++) {
-        widths[c] = Math.max(widths[c], row[c].length);
+        widths[c] = Math.max(widths[c], displayWidth(row[c]));
       }
     }
+    for (let c = 0; c < colCount; c++) {
+      widths[c] = Math.min(widths[c], MAX_COL_WIDTH);
+    }
 
-    // Format rows
+    // Format rows (display-width-aware padding for escaped pipes)
     const formatRow = (row: string[], isSep: boolean) => {
-      const cells = row.map((cell, c) =>
-        isSep ? formatSepCell(alignments[c], widths[c]) : cell.padEnd(widths[c]),
-      );
+      const cells = row.map((cell, c) => {
+        if (isSep) return formatSepCell(alignments[c], widths[c]);
+        const padAmount = widths[c] - displayWidth(cell) + cell.length;
+        return cell.padEnd(padAmount);
+      });
       return "| " + cells.join(" | ") + " |";
     };
 
