@@ -10,6 +10,8 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { defaultKeymap, indentWithTab, history, historyKeymap } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
 import { search, searchKeymap } from "@codemirror/search";
+import { lintGutter } from "@codemirror/lint";
+import { markdownLinter } from "./markdown-lint.ts";
 import { editorTheme } from "./theme.ts";
 import { editTableAtCursor } from "./table-editor.ts";
 import { showSettings, checkFirstRun } from "./settings.ts";
@@ -134,6 +136,8 @@ const editor = new EditorView({
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       editorTheme,
       search(),
+      markdownLinter,
+      lintGutter(),
       keymap.of([
         { key: "Mod-b", run: toggleBold },
         { key: "Mod-i", run: toggleItalic },
