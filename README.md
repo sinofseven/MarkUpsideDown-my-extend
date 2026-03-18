@@ -15,28 +15,32 @@ A desktop Markdown editor that bridges the web and AI, powered by [Tauri v2](htt
 |---------|-------------|
 | **Fetch URL** | Cloudflare [Markdown for Agents](https://developers.cloudflare.com/agents/guides/markdown-for-agents/) — fast, free |
 | **Fetch URL (Render JS)** | [Browser Rendering](https://developers.cloudflare.com/browser-rendering/) — SPAs, dynamic sites |
+| **Crawl website** | [Browser Rendering `/crawl` API](https://developers.cloudflare.com/browser-rendering/rest-api/crawl-endpoint/) — crawl entire sites to Markdown files |
 | **Import documents** | [Workers AI `AI.toMarkdown()`](https://developers.cloudflare.com/workers-ai/markdown-conversion/) — PDF, DOCX, XLSX, PPTX, HTML, CSV, XML |
 | **Import images** | Workers AI OCR — JPG, PNG, GIF, WebP, BMP, TIFF |
+| **Import Slack** | Slack channels and threads — converts messages to Markdown |
 | **Drag & Drop** | Drop any supported file onto the editor to import |
 
 ### Editor
 
-- **Live preview** — Split-pane with real-time rendering and bidirectional scroll sync
-- **Multi-tab editing** — Open multiple files in tabs, switch with <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd>
+- **Live preview** — Split-pane with real-time rendering, DOM-diffing (idiomorph), and bidirectional scroll sync
+- **Multi-tab editing** — Open multiple files in tabs, drag to reorder, switch with <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>[</kbd> / <kbd>]</kbd>
 - **CodeMirror 6** — Syntax highlighting, line numbers, bracket matching, search & replace
 - **Formatting shortcuts** — Bold, italic, strikethrough, inline code, link insertion
-- **Code highlighting** — 23 languages via highlight.js (lazy-loaded)
+- **Code highlighting** — 30+ languages via highlight.js (lazy-loaded), copy button on hover
 - **KaTeX math** — Inline `$...$` and display `$$...$$` rendering
 - **Mermaid diagrams** — Flowcharts, sequence diagrams, etc.
 - **Table editor** — Spreadsheet-like editing with Tab/Enter navigation, undo/redo, paste from TSV/CSV
+- **Auto-save & auto-reload** — File-backed tabs auto-save; external changes detected and reloaded
 - **SVG inlining** — Remote SVG images rendered inline with sanitization
 - **Safari Reader-inspired preview** — Clean sans-serif typography with CJK text spacing support
 
 ### File Browser & Git
 
-- **File tree sidebar** — Browse, create, rename, duplicate, delete files and folders
-- **Git panel** — View changes, stage/unstage files, commit, push, pull, fetch
+- **File tree sidebar** — Browse, create, rename, duplicate, delete files and folders; drag & drop, search
+- **Git panel** — View changes, stage/unstage files, commit, push/pull with ahead/behind counts, fetch
 - **GitHub panel** — Fetch issue and PR bodies by reference (`owner/repo#123` or URL)
+- **Slack panel** — Import Slack channels and threads as Markdown
 
 ### Export
 
@@ -165,24 +169,32 @@ src-tauri/               # Rust backend (Tauri v2)
 │   ├── commands.rs      # IPC commands (fetch, convert, crawl, file ops, git, GitHub)
 │   ├── bridge.rs        # MCP HTTP bridge (axum, localhost:31415)
 │   ├── cloudflare.rs    # Wrangler CLI integration, auto-setup wizard
+│   ├── slack.rs         # Slack API integration (channels, threads → Markdown)
 │   └── util.rs          # Shared utilities
 ├── Cargo.toml
 └── tauri.conf.json
 
 ui/                      # Frontend (Vite+ + TypeScript)
 ├── src/
-│   ├── main.ts          # Editor, preview, scroll sync, toolbar, bridge events
-│   ├── settings.ts      # Settings panel, auto-setup UI, MCP config
-│   ├── sidebar.ts       # File tree browser with context menu
-│   ├── tabs.ts          # Multi-tab management with state persistence
-│   ├── git-panel.ts     # Git status, stage/unstage, commit, push/pull
-│   ├── github-panel.ts  # GitHub issue/PR fetcher
-│   ├── table-editor.ts  # Spreadsheet-like table editor with undo/redo
+│   ├── main.ts              # Editor, toolbar, bridge events
+│   ├── preview-render.ts    # Markdown → HTML (marked + idiomorph DOM-diffing)
+│   ├── scroll-sync.ts       # Bidirectional editor↔preview scroll sync
+│   ├── settings.ts          # Settings panel, auto-setup UI, MCP config
+│   ├── sidebar.ts           # File tree browser with context menu, search, drag & drop
+│   ├── tabs.ts              # Multi-tab management with state persistence
+│   ├── git-panel.ts         # Git status, stage/unstage, commit, push/pull
+│   ├── github-panel.ts      # GitHub issue/PR fetcher
+│   ├── slack-panel.ts       # Slack channel/thread import
+│   ├── table-editor.ts      # Spreadsheet-like table editor with undo/redo
 │   ├── markdown-commands.ts # Formatting shortcuts (bold, italic, link, etc.)
-│   ├── crawl.ts         # Website crawl UI (dialog, polling, file saving)
-│   ├── theme.ts         # CodeMirror editor theme
-│   ├── global.d.ts      # Tauri type declarations
-│   └── styles.css       # All styling (editor, preview, sidebar, dialogs, print)
+│   ├── crawl.ts             # Website crawl UI (dialog, polling, file saving)
+│   ├── file-ops.ts          # File create, rename, delete, import, auto-save
+│   ├── file-watcher.ts      # External file change detection and auto-reload
+│   ├── clipboard.ts         # Rich text / Markdown copy
+│   ├── mcp-sync.ts          # Editor state sync for MCP bridge
+│   ├── theme.ts             # CodeMirror editor theme
+│   ├── global.d.ts          # Tauri type declarations
+│   └── styles.css           # All styling (editor, preview, sidebar, dialogs, print)
 ├── index.html
 └── package.json
 
