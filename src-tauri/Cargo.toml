@@ -24,3 +24,4 @@ log = "0.4"
 regex-lite = "0.1"
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 futures = "0.3"
+trash = "5"

@@ -510,6 +510,11 @@ body {
   color: var(--accent);
 }
 
+.sidebar-tree-item:focus {
+  outline: 1px solid var(--accent-blue);
+  outline-offset: -1px;
+}
+
 .sidebar-tree-indicator {
   width: 10px;
   font-size: 9px;
@@ -530,8 +535,26 @@ body {
   text-overflow: ellipsis;
 }
 
+.sidebar-rename-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  padding: 0 2px;
+  border: 1px solid var(--accent-blue);
+  border-radius: 2px;
+  background: var(--bg-main);
+  color: inherit;
+  outline: none;
+}
+
 .sidebar-tree-children {
   /* nesting handled by padding-left on items */
+}
+
+/* Sidebar cut indicator */
+.sidebar-tree-item.cut {
+  opacity: 0.5;
 }
 
 /* Sidebar drag-and-drop */

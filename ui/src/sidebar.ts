@@ -63,6 +63,8 @@ let gitStatusMap: Map<string, GitStatus> = new Map();
 let refreshGeneration = 0; // guards against concurrent refreshTree() races
 let filterQuery = "";
 let dragSourcePath: string | null = null;
+let clipboardPath: string | null = null;
+let clipboardMode: "cut" | "copy" | null = null;
 
 export type SidebarPanel = "files" | "git" | "github" | "slack";
 let activePanel: SidebarPanel = "files";
@@ -220,6 +222,7 @@ function render() {
 
   treeEl = document.createElement("div");
   treeEl.className = "sidebar-tree";
+  treeEl.addEventListener("keydown", handleTreeKeydown);
 
   if (!rootPath) {
     const empty = document.createElement("div");
@@ -466,6 +469,8 @@ function createTreeItem(entry: DirEntry, depth: number) {
   const item = document.createElement("div");
   item.className = "sidebar-tree-item";
   item.dataset.path = entry.path;
+  if (entry.is_dir) item.dataset.isDir = "true";
+  item.tabIndex = -1;
   if (entry.path === selectedPath) {
     item.classList.add("selected");
   }
@@ -540,6 +545,8 @@ function createTreeItem(entry: DirEntry, depth: number) {
   // Click handler
   item.addEventListener("click", (e) => {
     e.stopPropagation();
+    selectedPath = entry.path;
+    item.focus();
     if (entry.is_dir) {
       toggleDirectory(entry.path);
     } else {
@@ -690,10 +697,30 @@ function showContextMenu(event: MouseEvent, entry: DirEntry) {
   }
   items.push(null);
 
+  items.push({
+    label: "Cut",
+    action: () => {
+      clipboardPath = entry.path;
+      clipboardMode = "cut";
+      updateClipboardStyle();
+    },
+  });
+  items.push({
+    label: "Copy",
+    action: () => {
+      clipboardPath = entry.path;
+      clipboardMode = "copy";
+      updateClipboardStyle();
+    },
+  });
+  if (clipboardPath && clipboardMode) {
+    items.push({ label: "Paste", action: () => pasteEntry() });
+  }
+  items.push(null);
   items.push({ label: "Duplicate", action: () => duplicateEntry(entry) });
   items.push({ label: "Rename…", action: () => promptRename(entry) });
   items.push({
-    label: "Delete",
+    label: "Move to Trash",
     action: () => promptDelete(entry),
     danger: true,
   });
@@ -804,41 +831,92 @@ async function promptNewFolder(dirPath: string) {
   }
 }
 
-async function promptRename(entry: DirEntry) {
-  const newName = await promptInput("New name:", entry.name);
-  if (!newName || newName === entry.name) return;
-  try {
-    const parentDir = entry.path.substring(0, entry.path.lastIndexOf("/"));
-    const newPath = `${parentDir}/${newName}`;
-    await invoke("rename_entry", { from: entry.path, to: newPath });
-    if (entry.path === selectedPath) {
-      selectedPath = newPath;
+function promptRename(entry: DirEntry) {
+  if (!treeEl) return;
+  const item = treeEl.querySelector(
+    `.sidebar-tree-item[data-path="${CSS.escape(entry.path)}"]`,
+  ) as HTMLElement | null;
+  if (!item) return;
+
+  const nameEl = item.querySelector(".sidebar-tree-name") as HTMLElement | null;
+  if (!nameEl) return;
+
+  // Replace name span with an inline input
+  const input = document.createElement("input");
+  input.className = "sidebar-rename-input";
+  input.type = "text";
+  input.value = entry.name;
+  nameEl.replaceWith(input);
+  input.select();
+  input.focus();
+
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+    const newName = input.value.trim();
+    if (!newName || newName === entry.name) {
+      // Restore original name
+      const span = document.createElement("span");
+      span.className = "sidebar-tree-name";
+      span.textContent = entry.name;
+      input.replaceWith(span);
+      return;
     }
-    // Update expanded dirs if renamed a directory
-    if (entry.is_dir) {
-      const updated = new Set<string>();
-      for (const p of expandedDirs) {
-        if (p === entry.path) {
-          updated.add(newPath);
-        } else if (p.startsWith(entry.path + "/")) {
-          updated.add(newPath + p.substring(entry.path.length));
-        } else {
-          updated.add(p);
-        }
+    try {
+      const parentDir = entry.path.substring(0, entry.path.lastIndexOf("/"));
+      const newPath = `${parentDir}/${newName}`;
+      await invoke("rename_entry", { from: entry.path, to: newPath });
+      if (entry.path === selectedPath) {
+        selectedPath = newPath;
       }
-      expandedDirs = updated;
+      if (entry.is_dir) {
+        const updated = new Set<string>();
+        for (const p of expandedDirs) {
+          if (p === entry.path) {
+            updated.add(newPath);
+          } else if (p.startsWith(entry.path + "/")) {
+            updated.add(newPath + p.substring(entry.path.length));
+          } else {
+            updated.add(p);
+          }
+        }
+        expandedDirs = updated;
+      }
+      saveState();
+      await refreshTree();
+    } catch (e) {
+      message(`Failed to rename: ${e}`, { kind: "error" });
+      // Restore original name on error
+      const span = document.createElement("span");
+      span.className = "sidebar-tree-name";
+      span.textContent = entry.name;
+      if (input.parentElement) input.replaceWith(span);
     }
-    saveState();
-    await refreshTree();
-  } catch (e) {
-    message(`Failed to rename: ${e}`, { kind: "error" });
-  }
+  };
+
+  input.addEventListener("keydown", (e) => {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      committed = true;
+      const span = document.createElement("span");
+      span.className = "sidebar-tree-name";
+      span.textContent = entry.name;
+      input.replaceWith(span);
+    }
+  });
+  input.addEventListener("blur", () => commit());
 }
 
 async function promptDelete(entry: DirEntry) {
   const ok = await confirm(
-    `Delete "${entry.name}"${entry.is_dir ? " and all its contents" : ""}?`,
-    { title: "Confirm Delete", kind: "warning" },
+    `Move "${entry.name}"${entry.is_dir ? " and all its contents" : ""} to Trash?`,
+    { title: "Move to Trash", kind: "warning" },
   );
   if (!ok) return;
   try {
@@ -851,6 +929,196 @@ async function promptDelete(entry: DirEntry) {
     await refreshTree();
   } catch (e) {
     message(`Failed to delete: ${e}`, { kind: "error" });
+  }
+}
+
+// --- Keyboard Navigation ---
+
+function getVisibleItems(): HTMLElement[] {
+  if (!treeEl) return [];
+  return [...treeEl.querySelectorAll(".sidebar-tree-item")] as HTMLElement[];
+}
+
+function focusItemByPath(path: string) {
+  if (!treeEl) return;
+  const el = treeEl.querySelector(
+    `.sidebar-tree-item[data-path="${CSS.escape(path)}"]`,
+  ) as HTMLElement | null;
+  if (el) {
+    setSelectedPath(path);
+    el.focus();
+    el.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function entryFromItem(item: HTMLElement): DirEntry | null {
+  const path = item.dataset.path;
+  if (!path) return null;
+  const name = path.split("/").pop() ?? "";
+  const isDir = item.dataset.isDir === "true";
+  const ext = isDir ? null : name.includes(".") ? name.split(".").pop()! : null;
+  return { path, name, is_dir: isDir, extension: ext };
+}
+
+function handleTreeKeydown(e: KeyboardEvent) {
+  const items = getVisibleItems();
+  if (items.length === 0) return;
+
+  const focused = document.activeElement as HTMLElement;
+  const currentIndex = items.indexOf(focused);
+  const currentItem = currentIndex >= 0 ? items[currentIndex] : null;
+
+  switch (e.key) {
+    case "ArrowDown": {
+      e.preventDefault();
+      const next = currentIndex < items.length - 1 ? currentIndex + 1 : 0;
+      const nextPath = items[next].dataset.path;
+      if (nextPath) focusItemByPath(nextPath);
+      break;
+    }
+    case "ArrowUp": {
+      e.preventDefault();
+      const prev = currentIndex > 0 ? currentIndex - 1 : items.length - 1;
+      const prevPath = items[prev].dataset.path;
+      if (prevPath) focusItemByPath(prevPath);
+      break;
+    }
+    case "ArrowRight": {
+      e.preventDefault();
+      if (!currentItem) break;
+      const path = currentItem.dataset.path;
+      if (path && currentItem.dataset.isDir === "true" && !expandedDirs.has(path)) {
+        toggleDirectory(path);
+      }
+      break;
+    }
+    case "ArrowLeft": {
+      e.preventDefault();
+      if (!currentItem) break;
+      const path = currentItem.dataset.path;
+      if (path && currentItem.dataset.isDir === "true" && expandedDirs.has(path)) {
+        toggleDirectory(path);
+      } else if (path) {
+        // Move to parent directory
+        const parentPath = path.substring(0, path.lastIndexOf("/"));
+        if (parentPath && parentPath !== rootPath) {
+          focusItemByPath(parentPath);
+        }
+      }
+      break;
+    }
+    case "Enter": {
+      e.preventDefault();
+      if (!currentItem) break;
+      const entry = entryFromItem(currentItem);
+      if (!entry) break;
+      if (entry.is_dir) {
+        toggleDirectory(entry.path);
+      } else {
+        selectAndOpenFile(entry);
+      }
+      break;
+    }
+    case "F2": {
+      e.preventDefault();
+      if (!currentItem) break;
+      const entry = entryFromItem(currentItem);
+      if (entry) promptRename(entry);
+      break;
+    }
+    case "Backspace":
+    case "Delete": {
+      e.preventDefault();
+      if (!currentItem) break;
+      const entry = entryFromItem(currentItem);
+      if (entry) promptDelete(entry);
+      break;
+    }
+    case "x": {
+      if (!e.metaKey) break;
+      e.preventDefault();
+      if (!currentItem) break;
+      const path = currentItem.dataset.path;
+      if (path) {
+        clipboardPath = path;
+        clipboardMode = "cut";
+        updateClipboardStyle();
+      }
+      break;
+    }
+    case "c": {
+      if (!e.metaKey) break;
+      e.preventDefault();
+      if (!currentItem) break;
+      const path = currentItem.dataset.path;
+      if (path) {
+        clipboardPath = path;
+        clipboardMode = "copy";
+        updateClipboardStyle();
+      }
+      break;
+    }
+    case "v": {
+      if (!e.metaKey) break;
+      e.preventDefault();
+      pasteEntry();
+      break;
+    }
+  }
+}
+
+// --- Cut/Copy/Paste ---
+
+function updateClipboardStyle() {
+  if (!treeEl) return;
+  for (const el of treeEl.querySelectorAll(".sidebar-tree-item.cut")) {
+    el.classList.remove("cut");
+  }
+  if (clipboardPath && clipboardMode === "cut") {
+    const el = treeEl.querySelector(`.sidebar-tree-item[data-path="${CSS.escape(clipboardPath)}"]`);
+    if (el) el.classList.add("cut");
+  }
+}
+
+async function pasteEntry() {
+  if (!clipboardPath || !clipboardMode) return;
+
+  // Determine target directory: selected directory, or parent of selected file
+  let targetDir: string | null = null;
+  if (selectedPath) {
+    const items = getVisibleItems();
+    const item = items.find((el) => el.dataset.path === selectedPath);
+    if (item?.dataset.isDir === "true") {
+      targetDir = selectedPath;
+    } else if (selectedPath) {
+      targetDir = selectedPath.substring(0, selectedPath.lastIndexOf("/"));
+    }
+  }
+  if (!targetDir) targetDir = rootPath;
+  if (!targetDir) return;
+
+  try {
+    if (clipboardMode === "cut") {
+      const fileName = clipboardPath.split("/").pop();
+      if (!fileName) return;
+      const newPath = `${targetDir}/${fileName}`;
+      if (clipboardPath === newPath) return;
+      await invoke("rename_entry", { from: clipboardPath, to: newPath });
+      if (clipboardPath === selectedPath) {
+        selectedPath = newPath;
+      }
+    } else {
+      await invoke("copy_entry", { from: clipboardPath, toDir: targetDir });
+    }
+    clipboardPath = null;
+    clipboardMode = null;
+    if (!expandedDirs.has(targetDir)) {
+      expandedDirs.add(targetDir);
+    }
+    saveState();
+    await refreshTree();
+  } catch (e) {
+    message(`Failed to paste: ${e}`, { kind: "error" });
   }
 }
 

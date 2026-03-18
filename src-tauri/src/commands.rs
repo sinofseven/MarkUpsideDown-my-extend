@@ -854,15 +854,35 @@ pub async fn rename_entry(from: String, to: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn delete_entry(path: String, is_dir: bool) -> Result<(), String> {
-    if is_dir {
-        tokio::fs::remove_dir_all(&path)
-            .await
-            .map_err(|e| format!("Failed to delete directory: {e}"))
-    } else {
-        tokio::fs::remove_file(&path)
-            .await
-            .map_err(|e| format!("Failed to delete file: {e}"))
+    let _ = is_dir; // trash::delete handles both files and directories
+    let path_clone = path.clone();
+    tokio::task::spawn_blocking(move || {
+        trash::delete(&path_clone).map_err(|e| format!("Failed to move to trash: {e}"))
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn copy_entry(from: String, to_dir: String) -> Result<String, String> {
+    let src = std::path::Path::new(&from);
+    let file_name = src
+        .file_name()
+        .ok_or("Invalid source path")?
+        .to_string_lossy()
+        .to_string();
+    let dest = std::path::Path::new(&to_dir).join(&file_name);
+    if dest.exists() {
+        return Err(format!("'{}' already exists in destination", file_name));
     }
+    if src.is_dir() {
+        copy_dir_recursive(src, &dest).await?;
+    } else {
+        tokio::fs::copy(src, &dest)
+            .await
+            .map_err(|e| format!("Failed to copy: {e}"))?;
+    }
+    Ok(dest.to_string_lossy().to_string())
 }
 
 #[tauri::command]
