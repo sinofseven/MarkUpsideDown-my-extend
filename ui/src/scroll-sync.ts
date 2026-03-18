@@ -206,32 +206,34 @@ export function syncToEditor() {
     return;
   }
 
-  // Find the preview element nearest to the viewport top
+  // Find the preview element nearest to the viewport top using binary search.
+  // Elements are in DOM order, so their absolute Y positions are monotonically increasing.
   const previewRect = previewPane.getBoundingClientRect();
   const pst = previewPane.scrollTop;
 
-  let before: HTMLElement | null = null;
-  let after: HTMLElement | null = null;
-  let beforeLine = -1;
-  let afterLine = Infinity;
-  let beforeAbsY = -Infinity;
-  let afterAbsY = Infinity;
+  const getAbsY = (el: HTMLElement) => el.getBoundingClientRect().top - previewRect.top + pst;
 
-  for (const el of elements) {
-    const sl = parseInt(el.dataset.sourceLine!, 10);
-    if (isNaN(sl)) continue;
-    const absY = el.getBoundingClientRect().top - previewRect.top + pst;
-    if (absY <= pst && absY > beforeAbsY) {
-      before = el;
-      beforeLine = sl;
-      beforeAbsY = absY;
-    }
-    if (absY > pst && absY < afterAbsY) {
-      after = el;
-      afterLine = sl;
-      afterAbsY = absY;
+  // Binary search: find the last element with absY <= pst
+  let lo = 0;
+  let hi = elements.length - 1;
+  let beforeIdx = -1;
+
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (getAbsY(elements[mid]) <= pst) {
+      beforeIdx = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
     }
   }
+
+  let before: HTMLElement | null = beforeIdx >= 0 ? elements[beforeIdx] : null;
+  let after: HTMLElement | null = beforeIdx + 1 < elements.length ? elements[beforeIdx + 1] : null;
+  let beforeLine = before ? parseInt(before.dataset.sourceLine!, 10) : -1;
+  let afterLine = after ? parseInt(after.dataset.sourceLine!, 10) : Infinity;
+  let beforeAbsY = before ? getAbsY(before) : -Infinity;
+  let afterAbsY = after ? getAbsY(after) : Infinity;
 
   if (!before && !after) return;
   if (!before) {

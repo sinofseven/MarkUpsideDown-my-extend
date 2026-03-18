@@ -1079,12 +1079,11 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
     let rp = repo_path;
     tokio::task::spawn_blocking(move || {
         // Run all three git commands in parallel
-        let rp2 = rp.clone();
-        let rp3 = rp.clone();
+        // thread::scope guarantees threads finish before scope exits, so shared borrows are safe
         let (status_result, unstaged_raw, staged_raw) = std::thread::scope(|s| {
             let h0 = s.spawn(|| run_git(&rp, &["status", "-b", "--porcelain=v1"]));
-            let h1 = s.spawn(|| run_git(&rp2, &["diff", "--numstat"]));
-            let h2 = s.spawn(|| run_git(&rp3, &["diff", "--cached", "--numstat"]));
+            let h1 = s.spawn(|| run_git(&rp, &["diff", "--numstat"]));
+            let h2 = s.spawn(|| run_git(&rp, &["diff", "--cached", "--numstat"]));
             (
                 h0.join().ok().and_then(|r| r.ok()),
                 h1.join().ok().and_then(|r| r.ok()),
@@ -1300,26 +1299,24 @@ fn run_gh(args: &[&str]) -> Result<String, String> {
     run_cli("gh", args).map(|s| s.trim().to_string())
 }
 
+fn gh_fetch_body(kind: &str, owner: &str, repo: &str, number: u64) -> Result<String, String> {
+    let num = number.to_string();
+    let repo_arg = format!("{owner}/{repo}");
+    run_gh(&[kind, "view", &num, "--repo", &repo_arg, "--json", "body", "--jq", ".body"])
+}
+
 #[tauri::command]
 pub async fn github_fetch_issue(owner: String, repo: String, number: u64) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
-        let num = number.to_string();
-        let repo_arg = format!("{owner}/{repo}");
-        run_gh(&["issue", "view", &num, "--repo", &repo_arg, "--json", "body", "--jq", ".body"])
-    })
-    .await
-    .map_err(|e| format!("Task error: {e}"))?
+    tokio::task::spawn_blocking(move || gh_fetch_body("issue", &owner, &repo, number))
+        .await
+        .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub async fn github_fetch_pr(owner: String, repo: String, number: u64) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
-        let num = number.to_string();
-        let repo_arg = format!("{owner}/{repo}");
-        run_gh(&["pr", "view", &num, "--repo", &repo_arg, "--json", "body", "--jq", ".body"])
-    })
-    .await
-    .map_err(|e| format!("Task error: {e}"))?
+    tokio::task::spawn_blocking(move || gh_fetch_body("pr", &owner, &repo, number))
+        .await
+        .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]

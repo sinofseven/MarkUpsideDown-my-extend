@@ -316,24 +316,21 @@ async fn resolve_users_in_messages(
 
 // --- Format timestamp ---
 
-fn format_ts(ts: &str) -> String {
+fn format_slack_ts(ts: &str, fmt: &str) -> String {
     let secs: f64 = ts.parse().unwrap_or(0.0);
-    let secs = secs as i64;
-    let dt = chrono::DateTime::from_timestamp(secs, 0);
+    let dt = chrono::DateTime::from_timestamp(secs as i64, 0);
     match dt {
-        Some(dt) => dt.format("%Y-%m-%d %H:%M").to_string(),
+        Some(dt) => dt.format(fmt).to_string(),
         None => ts.to_string(),
     }
 }
 
+fn format_ts(ts: &str) -> String {
+    format_slack_ts(ts, "%Y-%m-%d %H:%M")
+}
+
 fn format_date(ts: &str) -> String {
-    let secs: f64 = ts.parse().unwrap_or(0.0);
-    let secs = secs as i64;
-    let dt = chrono::DateTime::from_timestamp(secs, 0);
-    match dt {
-        Some(dt) => dt.format("%Y-%m-%d").to_string(),
-        None => ts.to_string(),
-    }
+    format_slack_ts(ts, "%Y-%m-%d")
 }
 
 // --- Format a single message to Markdown ---
