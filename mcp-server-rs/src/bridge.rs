@@ -121,6 +121,11 @@ impl BridgeClient {
         Ok(())
     }
 
+    pub async fn normalize_document(&self) -> Result<(), String> {
+        self.request("POST", "/editor/normalize", None).await?;
+        Ok(())
+    }
+
     pub async fn get_document_structure(&self) -> Result<serde_json::Value, String> {
         let val = self.request("GET", "/editor/structure", None).await?;
         let json = val.unwrap_or_default();

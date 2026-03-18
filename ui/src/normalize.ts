@@ -141,6 +141,68 @@ function normalizeListMarkers(text: string): string {
 
 // --- Table reformatting ---
 
+/** Split a table row on unescaped `|` outside of inline code spans. */
+function splitTableCells(line: string): string[] {
+  // Strip leading/trailing pipes
+  let s = line.replace(/^\s*\|/, "").replace(/\|\s*$/, "");
+
+  const cells: string[] = [];
+  let current = "";
+  let inCode = false;
+  let i = 0;
+
+  while (i < s.length) {
+    const ch = s[i];
+    if (ch === "`" && !inCode) {
+      inCode = true;
+      current += ch;
+      i++;
+    } else if (ch === "`" && inCode) {
+      inCode = false;
+      current += ch;
+      i++;
+    } else if (ch === "\\" && i + 1 < s.length && s[i + 1] === "|") {
+      // Escaped pipe — keep as literal \|
+      current += "\\|";
+      i += 2;
+    } else if (ch === "|" && !inCode) {
+      cells.push(current.trim());
+      current = "";
+      i++;
+    } else {
+      current += ch;
+      i++;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+/** Extract alignment from a separator cell (e.g. `:---:` → "center"). */
+function cellAlignment(cell: string): "left" | "right" | "center" | "none" {
+  const t = cell.trim();
+  const left = t.startsWith(":");
+  const right = t.endsWith(":");
+  if (left && right) return "center";
+  if (right) return "right";
+  if (left) return "left";
+  return "none";
+}
+
+/** Build a separator cell with proper alignment markers for a given width. */
+function formatSepCell(align: "left" | "right" | "center" | "none", width: number): string {
+  switch (align) {
+    case "left":
+      return ":" + "-".repeat(width - 1);
+    case "right":
+      return "-".repeat(width - 1) + ":";
+    case "center":
+      return ":" + "-".repeat(width - 2) + ":";
+    default:
+      return "-".repeat(width);
+  }
+}
+
 function reformatTables(text: string): string {
   const lines = text.split("\n");
   const result: string[] = [];
@@ -165,14 +227,8 @@ function reformatTables(text: string): string {
       continue;
     }
 
-    // Parse rows
-    const rows = tableLines.map((line) =>
-      line
-        .replace(/^\|/, "")
-        .replace(/\|$/, "")
-        .split("|")
-        .map((cell) => cell.trim()),
-    );
+    // Parse rows using pipe-aware splitting
+    const rows = tableLines.map((line) => splitTableCells(line));
 
     // Determine column count from header
     const colCount = rows[0].length;
@@ -180,16 +236,19 @@ function reformatTables(text: string): string {
     // Check if row 2 is a valid separator
     const isSeparator = (row: string[]) => row.every((cell) => /^:?-{1,}:?$/.test(cell.trim()));
 
-    let headerRow = rows[0];
+    const headerRow = rows[0];
     let sepRow: string[];
     let dataRows: string[][];
+    let alignments: ReturnType<typeof cellAlignment>[];
 
     if (rows.length > 1 && isSeparator(rows[1])) {
       sepRow = rows[1];
+      alignments = sepRow.map((cell) => cellAlignment(cell));
       dataRows = rows.slice(2);
     } else {
       // Missing separator — generate one
       sepRow = Array(colCount).fill("---");
+      alignments = Array(colCount).fill("none" as const);
       dataRows = rows.slice(1);
     }
 
@@ -199,9 +258,11 @@ function reformatTables(text: string): string {
       while (row.length < colCount) row.push("");
       if (row.length > colCount) row.length = colCount;
     }
+    while (alignments.length < colCount) alignments.push("none");
+    if (alignments.length > colCount) alignments.length = colCount;
 
-    // Calculate column widths
-    const widths = Array(colCount).fill(3); // min width for ---
+    // Calculate column widths (min 3 for separator dashes)
+    const widths = Array(colCount).fill(3);
     for (const row of allRows) {
       for (let c = 0; c < colCount; c++) {
         widths[c] = Math.max(widths[c], row[c].length);
@@ -210,7 +271,9 @@ function reformatTables(text: string): string {
 
     // Format rows
     const formatRow = (row: string[], isSep: boolean) => {
-      const cells = row.map((cell, c) => (isSep ? "-".repeat(widths[c]) : cell.padEnd(widths[c])));
+      const cells = row.map((cell, c) =>
+        isSep ? formatSepCell(alignments[c], widths[c]) : cell.padEnd(widths[c]),
+      );
       return "| " + cells.join(" | ") + " |";
     };
 

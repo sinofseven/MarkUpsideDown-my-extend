@@ -311,6 +311,14 @@ impl McpTools {
         }
     }
 
+    #[tool(name = "normalize_document", description = "Normalize the current editor content: fix heading hierarchy, reformat tables, clean up whitespace, remove broken links, and standardize list markers", annotations(read_only_hint = false, open_world_hint = false))]
+    async fn normalize_document(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.normalize_document().await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text("Document normalized")])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
     #[tool(name = "get_document_structure", description = "Get the current document's structural information (heading tree, links, frontmatter, stats) as JSON. More efficient than parsing raw Markdown — reduces token usage for structure-aware operations.", annotations(read_only_hint = true, open_world_hint = false))]
     async fn get_document_structure(&self) -> Result<CallToolResult, rmcp::ErrorData> {
         match self.bridge.get_document_structure().await {

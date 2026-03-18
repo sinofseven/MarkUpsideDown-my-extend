@@ -43,6 +43,7 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorState>) {
         .route("/editor/save-file", post(save_file))
         .route("/editor/export-pdf", post(export_pdf))
         .route("/editor/structure", get(get_structure))
+        .route("/editor/normalize", post(normalize_document))
         .with_state(state);
 
     tauri::async_runtime::spawn(async move {
@@ -156,6 +157,11 @@ async fn save_file(
 
 async fn export_pdf(State(state): State<Arc<BridgeState>>) -> StatusCode {
     state.app.emit("bridge:export-pdf", ()).ok();
+    StatusCode::OK
+}
+
+async fn normalize_document(State(state): State<Arc<BridgeState>>) -> StatusCode {
+    state.app.emit("bridge:normalize", ()).ok();
     StatusCode::OK
 }
 

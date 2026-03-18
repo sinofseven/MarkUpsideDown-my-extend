@@ -4,6 +4,7 @@ import { getActiveTab, markTabSaved, updateActiveTab } from "./tabs.ts";
 import { getRootPath } from "./sidebar.ts";
 import { suppressNext } from "./file-watcher.ts";
 import { getDocumentStructure } from "./document-structure.ts";
+import { normalizeMarkdown } from "./normalize.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -126,5 +127,15 @@ export function initBridgeListeners() {
 
   listen("bridge:export-pdf", () => {
     window.print();
+  });
+
+  listen("bridge:normalize", () => {
+    const content = editor.state.doc.toString();
+    const cleaned = normalizeMarkdown(content);
+    if (cleaned !== content) {
+      editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: cleaned } });
+      renderPreview(cleaned);
+    }
+    syncEditorState(cleaned);
   });
 }
