@@ -348,7 +348,7 @@ export async function renderPreview(source: string) {
   });
 
   for (const img of previewPane.querySelectorAll(
-    ".preview-page img",
+    ".preview-page img:not([loading])",
   ) as NodeListOf<HTMLImageElement>) {
     img.loading = "lazy";
     img.decoding = "async";

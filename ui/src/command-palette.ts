@@ -1,5 +1,7 @@
 // --- Command Palette (Cmd+K / Ctrl+K) ---
 
+import { escapeHtml } from "./settings.ts";
+
 export interface Command {
   id: string;
   label: string;
@@ -82,13 +84,16 @@ function renderResults(list: HTMLElement, results: Command[]) {
   }
 }
 
+function updateSelection(list: HTMLElement) {
+  const items = list.children;
+  for (let i = 0; i < items.length; i++) {
+    items[i].classList.toggle("selected", i === selectedIndex);
+  }
+}
+
 function scrollSelectedIntoView(list: HTMLElement) {
   const sel = list.querySelector(".command-palette-item.selected") as HTMLElement | null;
   if (sel) sel.scrollIntoView({ block: "nearest" });
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function open() {
@@ -114,29 +119,28 @@ export function open() {
   overlay.appendChild(box);
   document.body.appendChild(overlay);
 
-  const results = filterCommands("");
-  renderResults(list, results);
+  let filtered = filterCommands("");
+  renderResults(list, filtered);
 
   // Focus input after append
   requestAnimationFrame(() => input.focus());
 
   input.addEventListener("input", () => {
     selectedIndex = 0;
-    const filtered = filterCommands(input.value);
+    filtered = filterCommands(input.value);
     renderResults(list, filtered);
   });
 
   input.addEventListener("keydown", (e) => {
-    const filtered = filterCommands(input.value);
     if (e.key === "ArrowDown") {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, filtered.length - 1);
-      renderResults(list, filtered);
+      updateSelection(list);
       scrollSelectedIntoView(list);
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, 0);
-      renderResults(list, filtered);
+      updateSelection(list);
       scrollSelectedIntoView(list);
     } else if (e.key === "Enter") {
       e.preventDefault();

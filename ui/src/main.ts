@@ -273,7 +273,7 @@ document.getElementById("btn-table")!.addEventListener("click", () => {
   editTableAtCursor(editor);
 });
 
-document.getElementById("btn-cleanup")!.addEventListener("click", () => {
+function cleanupDocument() {
   const content = editor.state.doc.toString();
   const cleaned = normalizeMarkdown(content);
   if (cleaned !== content) {
@@ -283,7 +283,9 @@ document.getElementById("btn-cleanup")!.addEventListener("click", () => {
   } else {
     statusEl.textContent = "No changes needed";
   }
-});
+}
+
+document.getElementById("btn-cleanup")!.addEventListener("click", cleanupDocument);
 document.getElementById("btn-export-pdf")!.addEventListener("click", () => {
   window.print();
 });
@@ -775,17 +777,7 @@ registerCommands([
     id: "edit.cleanup",
     label: "Clean Up Document",
     category: "Edit",
-    run: () => {
-      const content = editor.state.doc.toString();
-      const cleaned = normalizeMarkdown(content);
-      if (cleaned !== content) {
-        editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: cleaned } });
-        renderPreview(cleaned);
-        statusEl.textContent = "Document cleaned up";
-      } else {
-        statusEl.textContent = "No changes needed";
-      }
-    },
+    run: cleanupDocument,
   },
   {
     id: "export.richText",
