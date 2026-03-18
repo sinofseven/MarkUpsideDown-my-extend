@@ -234,12 +234,12 @@ async function handleCrawlStart(request: Request, env: Env): Promise<Response> {
       return jsonResponse({ error: `Crawl API error (${response.status}): ${errorBody}` }, response.status);
     }
 
-    const data = await response.json<{ success: boolean; result: { job_id: string }; errors?: unknown[] }>();
+    const data = await response.json<{ success: boolean; result: string; errors?: unknown[] }>();
     if (!data.success) {
       return jsonResponse({ error: "Crawl API returned failure", details: data.errors }, 500);
     }
 
-    return jsonResponse({ job_id: data.result.job_id });
+    return jsonResponse({ job_id: data.result });
   } catch (e) {
     return jsonResponse({ error: `Crawl failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
   }
