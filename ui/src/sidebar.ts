@@ -1,5 +1,6 @@
 import { createGitBadge, applyGitNameStyle } from "./git-panel.ts";
 import { IMPORT_EXTENSIONS, convertFile } from "./file-ops.ts";
+import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
 
 const { invoke } = window.__TAURI__.core;
 const { open: openDialog, confirm, message } = window.__TAURI__.dialog;
@@ -68,6 +69,8 @@ let filterScope: string | null = null; // null = global, path = scoped to folder
 let dragSourcePath: string | null = null;
 let clipboardPath: string | null = null;
 let clipboardMode: "cut" | "copy" | null = null;
+let dirWatcherUnwatch: UnwatchFn | null = null;
+let dirWatchDebounce: ReturnType<typeof setTimeout> | null = null;
 
 type SortBy = "name" | "date" | "type";
 const SORT_STORAGE_KEY = "markupsidedown:sidebar-sort";
@@ -132,6 +135,7 @@ export function initSidebar(
 
   if (rootPath) {
     refreshTree();
+    startDirWatcher();
   }
 }
 
@@ -154,6 +158,7 @@ export async function openFolder() {
   saveState();
   render();
   refreshTree();
+  startDirWatcher();
   onFolderChange?.(rootPath);
 }
 
@@ -308,13 +313,16 @@ function render() {
     showEmptyAreaContextMenu(e);
   });
 
-  // External file drop on tree background (drops into root)
+  // File drop on tree background (drops into root — both external and internal)
   treeEl.addEventListener("dragover", (e) => {
-    if (!rootPath || !e.dataTransfer?.types.includes("Files")) return;
-    // Don't highlight tree root when hovering over a folder item
+    if (!rootPath) return;
+    const isExternal = e.dataTransfer?.types.includes("Files");
+    const isInternal = !!dragSourcePath;
+    if (!isExternal && !isInternal) return;
+    // Don't highlight tree root when hovering over a folder/file item
     if ((e.target as HTMLElement).closest(".sidebar-tree-item")) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "copy";
+    e.dataTransfer!.dropEffect = isExternal ? "copy" : "move";
     treeEl!.classList.add("drop-target-root");
   });
   treeEl.addEventListener("dragleave", (e) => {
@@ -324,12 +332,19 @@ function render() {
   });
   treeEl.addEventListener("drop", (e) => {
     treeEl!.classList.remove("drop-target-root");
-    if (!rootPath || !e.dataTransfer?.types.includes("Files")) return;
+    if (!rootPath) return;
     // Don't handle here if a folder item already handled it
     if ((e.target as HTMLElement).closest(".sidebar-tree-item[data-is-dir='true']")) return;
     e.preventDefault();
-    if (e.dataTransfer.files.length > 0) {
+    // External file drop (from Finder)
+    if (e.dataTransfer?.types.includes("Files") && e.dataTransfer.files.length > 0) {
       handleExternalFileDrop(e.dataTransfer.files, rootPath);
+      return;
+    }
+    // Internal file/folder move to root
+    if (dragSourcePath) {
+      moveEntry(dragSourcePath, rootPath);
+      dragSourcePath = null;
     }
   });
 
@@ -474,6 +489,37 @@ export function getGitHubPanelEl() {
 
 export function getSlackPanelEl() {
   return slackPanelSlot;
+}
+
+async function startDirWatcher() {
+  stopDirWatcher();
+  if (!rootPath) return;
+  try {
+    dirWatcherUnwatch = await watch(
+      rootPath,
+      () => {
+        // Debounce to avoid rapid-fire refreshes
+        if (dirWatchDebounce) clearTimeout(dirWatchDebounce);
+        dirWatchDebounce = setTimeout(() => {
+          refreshTree();
+        }, 500);
+      },
+      { recursive: true, delayMs: 300 },
+    );
+  } catch {
+    // Watch may not be supported for some paths
+  }
+}
+
+function stopDirWatcher() {
+  if (dirWatcherUnwatch) {
+    dirWatcherUnwatch();
+    dirWatcherUnwatch = null;
+  }
+  if (dirWatchDebounce) {
+    clearTimeout(dirWatchDebounce);
+    dirWatchDebounce = null;
+  }
 }
 
 async function refreshTree() {
