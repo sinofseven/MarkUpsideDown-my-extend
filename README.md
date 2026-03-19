@@ -1,8 +1,10 @@
 # MarkUpsideDown
 
-Turn any markup into Markdown — websites, PDFs, Office docs, images.
+A Markdown editor with built-in power and smile.
 
-A desktop Markdown editor that bridges the web and AI, powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.net/), and [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/).
+No plugins. No extensions. Everything you need — live preview, file browser, Git, website crawling, document import, AI agent integration — ships in a single 15 MB app. Open it and start writing.
+
+Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.net/), and [Cloudflare Workers AI](https://developers.cloudflare.com/workers-ai/).
 
 ![License](https://img.shields.io/github/license/M-Igashi/MarkUpsideDown)
 ![Release](https://img.shields.io/github/v/release/M-Igashi/MarkUpsideDown)
