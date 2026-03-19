@@ -1,7 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import { ensureWorkerUrl, isImageConversionAllowed, isAutoSaveEnabled } from "./settings.ts";
 import { normalizeMarkdown } from "./normalize.ts";
-import { getRootPath } from "./sidebar.ts";
+import { getRootPath, refreshTree } from "./sidebar.ts";
 import { getActiveTab, isTabDirty, markTabSaved, updateActiveTab } from "./tabs.ts";
 import { suppressNext } from "./file-watcher.ts";
 
@@ -90,7 +90,10 @@ export async function saveFile() {
         if (tab) markTabSaved(tab.id);
       }
     }
-    if (getRootPath()) refreshGitAndSync();
+    if (getRootPath()) {
+      refreshTree();
+      refreshGitAndSync();
+    }
   } catch (e) {
     statusEl.textContent = `Save failed: ${e}`;
   }
