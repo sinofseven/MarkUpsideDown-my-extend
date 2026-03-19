@@ -108,7 +108,7 @@ function setApiKey(key: string) {
 }
 
 function getPermissionMode(): string {
-  return localStorage.getItem(STORAGE_KEY_PERMISSION) || "default";
+  return localStorage.getItem(STORAGE_KEY_PERMISSION) || "acceptEdits";
 }
 
 function setPermissionMode(mode: string) {
@@ -176,7 +176,7 @@ function render() {
 
   sendBtn = document.createElement("button");
   sendBtn.className = "claude-send-btn";
-  sendBtn.textContent = "Send";
+  sendBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13V3l11 5-11 5z" fill="currentColor"/></svg>`;
   sendBtn.title = "Send message (Enter / Shift+Enter for newline)";
   inputArea.appendChild(sendBtn);
 
@@ -185,24 +185,22 @@ function render() {
   // Events
   sendBtn.addEventListener("click", handleSend);
 
-  // IME composition tracking (WebKit fires keydown with isComposing=false
-  // right after compositionend, so we need a flag to suppress that Enter)
-  let justComposed = false;
-  inputEl.addEventListener("compositionstart", () => {
-    justComposed = false;
-  });
+  // IME composition tracking: WebKit fires keydown with isComposing=false
+  // right after compositionend, so we consume exactly that one Enter keyup.
+  let suppressNextEnterUp = false;
   inputEl.addEventListener("compositionend", () => {
-    justComposed = true;
-    setTimeout(() => {
-      justComposed = false;
-    }, 300);
+    suppressNextEnterUp = true;
   });
 
   inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !justComposed) {
-      e.preventDefault();
-      handleSend();
+    if (e.key !== "Enter" || e.isComposing) return;
+    if (e.shiftKey) return; // Shift+Enter = newline
+    e.preventDefault();
+    if (suppressNextEnterUp) {
+      suppressNextEnterUp = false;
+      return; // Skip the Enter that finalized IME
     }
+    handleSend();
   });
 
   // Auto-resize textarea
@@ -346,7 +344,9 @@ function updateStatusIndicator() {
     statusIndicator.title = "Not running";
   }
   if (sendBtn) {
-    sendBtn.textContent = isRunning ? "Send" : "Start";
+    sendBtn.title = isRunning
+      ? "Send message (Enter / Shift+Enter for newline)"
+      : "Start Claude session";
   }
 }
 

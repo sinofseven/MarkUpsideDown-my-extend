@@ -3147,13 +3147,15 @@ body {
   background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   cursor: pointer;
-  white-space: nowrap;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .claude-send-btn:hover {
