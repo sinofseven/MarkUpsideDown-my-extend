@@ -668,6 +668,7 @@ const claudeDivider = document.getElementById("claude-divider")!;
 
 initClaudePanel(claudePanelEl, {
   getCwd: () => getRootPath(),
+  getActiveFilePath: () => getCurrentFilePath(),
 });
 
 // Claude panel divider drag

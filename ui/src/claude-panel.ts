@@ -51,8 +51,10 @@ let statusIndicator: HTMLElement | null = null;
 
 let messages: ChatMessage[] = [];
 let isRunning = false;
+let isStreaming = false;
 let currentAssistantMsg: ChatMessage | null = null;
 let getCwd: (() => string | null) | null = null;
+let getActiveFilePath: (() => string | null) | null = null;
 let rateLimitResetTime: number | null = null;
 let rateLimitInterval: number | null = null;
 let pendingImages: PastedImage[] = [];
@@ -60,9 +62,13 @@ let imagePreviewEl: HTMLElement | null = null;
 
 // --- Public API ---
 
-export function initClaudePanel(el: HTMLElement, callbacks: { getCwd: () => string | null }) {
+export function initClaudePanel(
+  el: HTMLElement,
+  callbacks: { getCwd: () => string | null; getActiveFilePath: () => string | null },
+) {
   panelEl = el;
   getCwd = callbacks.getCwd;
+  getActiveFilePath = callbacks.getActiveFilePath;
   messages = loadMessages();
   render();
   setupListeners();
@@ -183,7 +189,13 @@ function render() {
   panelEl.appendChild(inputArea);
 
   // Events
-  sendBtn.addEventListener("click", handleSend);
+  sendBtn.addEventListener("click", () => {
+    if (isStreaming) {
+      stopClaude();
+    } else {
+      handleSend();
+    }
+  });
 
   // IME composition tracking: WebKit fires keydown with isComposing=false
   // right after compositionend, so we consume exactly that one Enter keyup.
@@ -344,9 +356,15 @@ function updateStatusIndicator() {
     statusIndicator.title = "Not running";
   }
   if (sendBtn) {
-    sendBtn.title = isRunning
-      ? "Send message (Enter / Shift+Enter for newline)"
-      : "Start Claude session";
+    if (isStreaming) {
+      sendBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" fill="currentColor"/></svg>`;
+      sendBtn.title = "Stop Claude";
+    } else {
+      sendBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13V3l11 5-11 5z" fill="currentColor"/></svg>`;
+      sendBtn.title = isRunning
+        ? "Send message (Enter / Shift+Enter for newline)"
+        : "Start Claude session";
+    }
   }
 }
 
@@ -391,13 +409,18 @@ async function handleSend() {
   renderMessages();
   scrollToBottom();
 
-  // Send to CLI
+  // Send to CLI with active file context
   try {
     const imgPayload =
       images.length > 0
         ? images.map((img) => ({ mediaType: img.mediaType, data: img.base64 }))
         : null;
-    await invoke("claude_send", { message: text || "Describe this image.", images: imgPayload });
+    let msgText = text || "Describe this image.";
+    const activeFile = getActiveFilePath?.();
+    if (activeFile) {
+      msgText = `[Active file: ${activeFile}]\n${msgText}`;
+    }
+    await invoke("claude_send", { message: msgText, images: imgPayload });
   } catch (e) {
     addSystemMessage(`Send failed: ${e}`);
   }
@@ -432,6 +455,7 @@ async function stopClaude() {
     // ignore
   }
   isRunning = false;
+  isStreaming = false;
   currentAssistantMsg = null;
   updateStatusIndicator();
 }
@@ -559,6 +583,7 @@ function setupListeners() {
   listen<{ reason: string; exit_code?: number | null }>("claude:stopped", (event) => {
     const wasRunning = isRunning;
     isRunning = false;
+    isStreaming = false;
     // Mark any streaming message as error
     if (currentAssistantMsg && currentAssistantMsg.status === "streaming") {
       currentAssistantMsg.status = "error";
@@ -610,6 +635,8 @@ function handleAssistantEvent(data: any) {
       status: "streaming",
     };
     messages.push(currentAssistantMsg);
+    isStreaming = true;
+    updateStatusIndicator();
   }
 
   // Parse content blocks
@@ -663,6 +690,8 @@ function handleResultEvent(data: any) {
     }
     updateMessageInPlace(currentAssistantMsg);
     currentAssistantMsg = null;
+    isStreaming = false;
+    updateStatusIndicator();
     persistMessages();
   }
 
