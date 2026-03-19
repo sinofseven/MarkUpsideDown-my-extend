@@ -1,3 +1,5 @@
+import { basename } from "./path-utils.ts";
+
 const { invoke } = window.__TAURI__.core;
 
 // --- State ---
@@ -73,7 +75,7 @@ export function isRepo(): boolean {
 const HIDDEN_FILES = [".DS_Store", "Thumbs.db"];
 
 function isHiddenFile(path: string): boolean {
-  return HIDDEN_FILES.includes(path.split("/").pop() || "");
+  return HIDDEN_FILES.includes(basename(path));
 }
 
 export function getChangeCount(): number {
@@ -210,11 +212,121 @@ export function applyGitNameStyle(nameEl: Element, status: string) {
 
 // --- Render ---
 
+// Persistent bottom section elements (survive re-renders to preserve textarea focus)
+let bottomEl: HTMLElement | null = null;
+let branchLabelEl: HTMLElement | null = null;
+let pullBtnEl: HTMLButtonElement | null = null;
+let pushBtnEl: HTMLButtonElement | null = null;
+let commitBtnEl: HTMLButtonElement | null = null;
+
+function ensureBottom(): HTMLElement {
+  if (bottomEl) return bottomEl;
+
+  const bottom = document.createElement("div");
+  bottom.className = "git-bottom";
+
+  const statusMsg = document.createElement("div");
+  statusMsg.className = "git-status-msg";
+  bottom.appendChild(statusMsg);
+
+  const branchRow = document.createElement("div");
+  branchRow.className = "git-branch-row";
+
+  branchLabelEl = document.createElement("span");
+  branchLabelEl.className = "git-branch-label";
+  branchRow.appendChild(branchLabelEl);
+
+  const fetchBtn = document.createElement("button");
+  fetchBtn.className = "git-fetch-btn";
+  fetchBtn.innerHTML = "⟳ Fetch";
+  fetchBtn.addEventListener("click", () => gitRemoteAction("git_fetch", "Fetch", fetchBtn));
+  branchRow.appendChild(fetchBtn);
+
+  bottom.appendChild(branchRow);
+
+  const commitArea = document.createElement("div");
+  commitArea.className = "git-commit-area";
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "git-commit-textarea";
+  textarea.placeholder = "Enter commit message";
+  textarea.value = commitMessage;
+  textarea.rows = 3;
+  textarea.addEventListener("input", () => {
+    commitMessage = textarea.value;
+    if (commitBtnEl) commitBtnEl.disabled = !commitMessage.trim();
+  });
+  textarea.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && commitMessage.trim()) {
+      e.preventDefault();
+      const hasStaged = gitData?.files.some((f) => f.staged && !isHiddenFile(f.path));
+      commitChanges(hasStaged ? "staged" : "tracked");
+    }
+  });
+  commitArea.appendChild(textarea);
+
+  const actionRow = document.createElement("div");
+  actionRow.className = "git-action-row";
+
+  const leftActions = document.createElement("div");
+  leftActions.className = "git-action-left";
+
+  pullBtnEl = document.createElement("button");
+  pullBtnEl.className = "git-icon-btn";
+  pullBtnEl.title = "Pull";
+  pullBtnEl.addEventListener("click", () => gitRemoteAction("git_pull", "Pull", pullBtnEl!));
+  leftActions.appendChild(pullBtnEl);
+
+  pushBtnEl = document.createElement("button");
+  pushBtnEl.className = "git-icon-btn";
+  pushBtnEl.title = "Push";
+  pushBtnEl.addEventListener("click", () => gitRemoteAction("git_push", "Push", pushBtnEl!));
+  leftActions.appendChild(pushBtnEl);
+
+  actionRow.appendChild(leftActions);
+
+  commitBtnEl = document.createElement("button");
+  commitBtnEl.className = "git-commit-btn";
+  actionRow.appendChild(commitBtnEl);
+
+  commitArea.appendChild(actionRow);
+  bottom.appendChild(commitArea);
+
+  bottomEl = bottom;
+  return bottom;
+}
+
+function updateBottom(staged: GitFile[]) {
+  if (!gitData || !branchLabelEl || !pullBtnEl || !pushBtnEl || !commitBtnEl) return;
+
+  branchLabelEl.textContent = `\u{e0a0} ${gitData.branch || "HEAD (detached)"}`;
+
+  pullBtnEl.innerHTML =
+    gitData.behind > 0 ? `↓ Pull <span class="git-count-badge">${gitData.behind}</span>` : "↓ Pull";
+  pushBtnEl.innerHTML =
+    gitData.ahead > 0 ? `↑ Push <span class="git-count-badge">${gitData.ahead}</span>` : "↑ Push";
+
+  // Update commit button without replacing the element
+  const newHandler =
+    staged.length > 0 ? () => commitChanges("staged") : () => commitChanges("tracked");
+  const newCommitBtn = commitBtnEl.cloneNode(false) as HTMLButtonElement;
+  newCommitBtn.textContent = staged.length > 0 ? "Commit" : "Commit All";
+  newCommitBtn.disabled = !commitMessage.trim();
+  newCommitBtn.addEventListener("click", newHandler);
+  commitBtnEl.replaceWith(newCommitBtn);
+  commitBtnEl = newCommitBtn;
+}
+
 function render() {
   if (!panelEl) return;
-  panelEl.innerHTML = "";
 
   if (!repoPath || !gitData || !gitData.is_repo) {
+    panelEl.innerHTML = "";
+    bottomEl = null;
+    branchLabelEl = null;
+    pullBtnEl = null;
+    pushBtnEl = null;
+    commitBtnEl = null;
     const msg = document.createElement("div");
     msg.className = "git-panel-clean";
     msg.textContent = repoPath ? "Not a git repository" : "Open a folder to see git status";
@@ -227,11 +339,11 @@ function render() {
   const unstaged = visibleFiles.filter((f) => !f.staged);
   const totalChanges = getChangeCount();
 
-  // --- Scrollable file list area ---
+  // --- Rebuild only the file list area ---
+  const existingFileArea = panelEl.querySelector(".git-file-area");
   const fileArea = document.createElement("div");
   fileArea.className = "git-file-area";
 
-  // Header: "N Changes ... Stage All"
   const header = document.createElement("div");
   header.className = "git-changes-header";
 
@@ -258,110 +370,27 @@ function render() {
     fileArea.appendChild(clean);
   }
 
-  // Staged section
   if (staged.length > 0) {
     fileArea.appendChild(createSection("Staged", staged, true));
   }
 
-  // Unstaged section
   if (unstaged.length > 0) {
     const label = staged.length > 0 ? "Unstaged" : "Tracked";
     fileArea.appendChild(createSection(label, unstaged, false));
   }
 
-  panelEl.appendChild(fileArea);
-
-  // --- Bottom sticky area ---
-  const bottom = document.createElement("div");
-  bottom.className = "git-bottom";
-
-  // Status message
-  const statusMsg = document.createElement("div");
-  statusMsg.className = "git-status-msg";
-  bottom.appendChild(statusMsg);
-
-  // Branch row with Fetch button
-  const branchRow = document.createElement("div");
-  branchRow.className = "git-branch-row";
-
-  const branchLabel = document.createElement("span");
-  branchLabel.className = "git-branch-label";
-  branchLabel.textContent = `\u{e0a0} ${gitData.branch || "HEAD (detached)"}`;
-  branchRow.appendChild(branchLabel);
-
-  const fetchBtn = document.createElement("button");
-  fetchBtn.className = "git-fetch-btn";
-  fetchBtn.innerHTML = "⟳ Fetch";
-  fetchBtn.addEventListener("click", () => gitRemoteAction("git_fetch", "Fetch", fetchBtn));
-  branchRow.appendChild(fetchBtn);
-
-  bottom.appendChild(branchRow);
-
-  // Commit textarea
-  const commitArea = document.createElement("div");
-  commitArea.className = "git-commit-area";
-
-  const textarea = document.createElement("textarea");
-  textarea.className = "git-commit-textarea";
-  textarea.placeholder = "Enter commit message";
-  textarea.value = commitMessage;
-  textarea.rows = 3;
-  textarea.addEventListener("input", () => {
-    commitMessage = textarea.value;
-    updateCommitBtnState();
-  });
-  textarea.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && commitMessage.trim()) {
-      e.preventDefault();
-      commitChanges(staged.length > 0 ? "staged" : "tracked");
-    }
-  });
-  commitArea.appendChild(textarea);
-
-  // Bottom action row: Pull/Push ... Commit button
-  const actionRow = document.createElement("div");
-  actionRow.className = "git-action-row";
-
-  const leftActions = document.createElement("div");
-  leftActions.className = "git-action-left";
-
-  const pullBtn = document.createElement("button");
-  pullBtn.className = "git-icon-btn";
-  pullBtn.title = "Pull";
-  pullBtn.innerHTML =
-    gitData.behind > 0 ? `↓ Pull <span class="git-count-badge">${gitData.behind}</span>` : "↓ Pull";
-  pullBtn.addEventListener("click", () => gitRemoteAction("git_pull", "Pull", pullBtn));
-  leftActions.appendChild(pullBtn);
-
-  const pushBtn = document.createElement("button");
-  pushBtn.className = "git-icon-btn";
-  pushBtn.title = "Push";
-  pushBtn.innerHTML =
-    gitData.ahead > 0 ? `↑ Push <span class="git-count-badge">${gitData.ahead}</span>` : "↑ Push";
-  pushBtn.addEventListener("click", () => gitRemoteAction("git_push", "Push", pushBtn));
-  leftActions.appendChild(pushBtn);
-
-  actionRow.appendChild(leftActions);
-
-  const commitBtn = document.createElement("button");
-  commitBtn.className = "git-commit-btn";
-  if (staged.length > 0) {
-    commitBtn.textContent = "Commit";
-    commitBtn.addEventListener("click", () => commitChanges("staged"));
+  if (existingFileArea) {
+    existingFileArea.replaceWith(fileArea);
   } else {
-    commitBtn.textContent = "Commit All";
-    commitBtn.addEventListener("click", () => commitChanges("tracked"));
+    panelEl.innerHTML = "";
+    panelEl.appendChild(fileArea);
   }
-  commitBtn.disabled = !commitMessage.trim();
-  actionRow.appendChild(commitBtn);
 
-  commitArea.appendChild(actionRow);
-  bottom.appendChild(commitArea);
-
-  panelEl.appendChild(bottom);
-
-  function updateCommitBtnState() {
-    commitBtn.disabled = !commitMessage.trim();
+  // --- Bottom: create once, update in-place ---
+  const bottom = ensureBottom();
+  updateBottom(staged);
+  if (!bottom.parentNode) {
+    panelEl.appendChild(bottom);
   }
 }
 
@@ -390,7 +419,7 @@ function createSection(title: string, files: GitFile[], isStaged: boolean): HTML
     // File name (just basename)
     const name = document.createElement("span");
     name.className = "git-file-name";
-    name.textContent = file.path.split("/").pop() || file.path;
+    name.textContent = basename(file.path);
     name.title = file.path;
     row.appendChild(name);
 

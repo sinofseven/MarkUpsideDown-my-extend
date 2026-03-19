@@ -1,4 +1,5 @@
 import type { EditorView } from "@codemirror/view";
+import { basename } from "./path-utils.ts";
 import { getWorkerUrl } from "./settings.ts";
 import { getActiveTab, markTabSaved, updateActiveTab } from "./tabs.ts";
 import { getRootPath } from "./sidebar.ts";
@@ -11,7 +12,6 @@ const { invoke } = window.__TAURI__.core;
 let editor: EditorView;
 let statusEl: HTMLElement;
 let getCurrentFilePath: () => string | null;
-let setCurrentFilePath: (p: string | null) => void;
 let loadContentAsTab: (content: string, filePath?: string) => void;
 let renderPreview: (source: string) => Promise<void>;
 let updateStatus: () => void;
@@ -25,7 +25,6 @@ export function initMcpSync(deps: {
   editor: EditorView;
   statusEl: HTMLElement;
   getCurrentFilePath: () => string | null;
-  setCurrentFilePath: (p: string | null) => void;
   loadContentAsTab: (content: string, filePath?: string) => void;
   renderPreview: (source: string) => Promise<void>;
   updateStatus: () => void;
@@ -34,7 +33,6 @@ export function initMcpSync(deps: {
   editor = deps.editor;
   statusEl = deps.statusEl;
   getCurrentFilePath = deps.getCurrentFilePath;
-  setCurrentFilePath = deps.setCurrentFilePath;
   loadContentAsTab = deps.loadContentAsTab;
   renderPreview = deps.renderPreview;
   updateStatus = deps.updateStatus;
@@ -112,8 +110,7 @@ export function initBridgeListeners() {
       suppressNext(path);
       await writeTextFile(path, editor.state.doc.toString());
       if (!currentFilePath) {
-        setCurrentFilePath(path);
-        updateActiveTab({ path, name: path.split("/").pop()! });
+        updateActiveTab({ path, name: basename(path) });
         updateStatus();
       }
       const tab = getActiveTab();

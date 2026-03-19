@@ -1,5 +1,6 @@
 import { createGitBadge, applyGitNameStyle } from "./git-panel.ts";
 import { IMPORT_EXTENSIONS, convertFile } from "./file-ops.ts";
+import { basename } from "./path-utils.ts";
 import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
 
 const { invoke } = window.__TAURI__.core;
@@ -229,7 +230,7 @@ function updateFilterScopeBadge() {
     badge.innerHTML = "";
     return;
   }
-  const folderName = filterScope.split("/").pop() ?? filterScope;
+  const folderName = basename(filterScope);
   badge.style.display = "flex";
   badge.innerHTML = "";
   const label = document.createElement("span");
@@ -435,7 +436,7 @@ function render() {
 function panelTitle(): string {
   switch (activePanel) {
     case "files":
-      return rootPath ? (rootPath.split("/").pop() ?? rootPath) : "Files";
+      return rootPath ? basename(rootPath) : "Files";
     case "git":
       return "Source Control";
     case "github":
@@ -909,7 +910,7 @@ function clearTreeDropTarget() {
 async function moveEntries(sourcePaths: Set<string>, targetDirPath: string) {
   let anyMoved = false;
   for (const sourcePath of sourcePaths) {
-    const fileName = sourcePath.split("/").pop();
+    const fileName = basename(sourcePath);
     if (!fileName) continue;
     const newPath = `${targetDirPath}/${fileName}`;
     if (sourcePath === newPath) continue;
@@ -1336,7 +1337,7 @@ async function promptDeleteSelected() {
   if (selectedPaths.size === 0) return;
   const paths = [...selectedPaths];
   const count = paths.length;
-  const label = count === 1 ? `"${paths[0].split("/").pop()}"` : `${count} items`;
+  const label = count === 1 ? `"${basename(paths[0])}"` : `${count} items`;
   const ok = await confirm(`Move ${label} to Trash?`, {
     title: "Move to Trash",
     kind: "warning",
@@ -1382,7 +1383,7 @@ function focusItemByPath(path: string) {
 function entryFromItem(item: HTMLElement): DirEntry | null {
   const path = item.dataset.path;
   if (!path) return null;
-  const name = path.split("/").pop() ?? "";
+  const name = basename(path);
   const isDir = item.dataset.isDir === "true";
   const ext = isDir ? null : name.includes(".") ? name.split(".").pop()! : null;
   return { path, name, is_dir: isDir, extension: ext, modified_at: null };
@@ -1555,7 +1556,7 @@ async function pasteEntry() {
   try {
     for (const sourcePath of clipboardPaths) {
       if (clipboardMode === "cut") {
-        const fileName = sourcePath.split("/").pop();
+        const fileName = basename(sourcePath);
         if (!fileName) continue;
         const newPath = `${targetDir}/${fileName}`;
         if (sourcePath === newPath) continue;

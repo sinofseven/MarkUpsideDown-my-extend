@@ -85,6 +85,7 @@ import {
   toggleInlineCode,
   insertLink,
 } from "./markdown-commands.ts";
+import { basename } from "./path-utils.ts";
 import { registerCommands, toggle as toggleCommandPalette } from "./command-palette.ts";
 
 // --- Tauri APIs ---
@@ -93,14 +94,10 @@ const { invoke } = window.__TAURI__.core;
 
 // --- Shared state ---
 
-let currentFilePath: string | null = null;
 let previewTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function getCurrentFilePath() {
-  return currentFilePath;
-}
-function setCurrentFilePath(p: string | null) {
-  currentFilePath = p;
+  return getActiveTab()?.path ?? null;
 }
 
 // --- CodeMirror Editor ---
@@ -176,7 +173,6 @@ function loadContent(content: string, filePath?: string | null) {
     changes: { from: 0, to: editor.state.doc.length, insert: content },
   });
   if (filePath !== undefined) {
-    currentFilePath = filePath ?? null;
     if (filePath) {
       revealPath(filePath);
     } else {
@@ -193,7 +189,7 @@ function loadContent(content: string, filePath?: string | null) {
 }
 
 function loadContentAsTab(content: string, filePath?: string) {
-  const name = filePath ? filePath.split("/").pop()! : "Untitled";
+  const name = filePath ? basename(filePath) : "Untitled";
   openTab(filePath || null, name, content);
 }
 
@@ -232,7 +228,6 @@ initFileOps({
   editor,
   statusEl,
   getCurrentFilePath,
-  setCurrentFilePath,
   loadContentAsTab,
   refreshGitAndSync,
 });
@@ -251,7 +246,6 @@ initMcpSync({
   editor,
   statusEl,
   getCurrentFilePath,
-  setCurrentFilePath,
   loadContentAsTab,
   renderPreview,
   updateStatus: () => updateStatus(editor.state),
@@ -611,7 +605,7 @@ initFileWatcher({
     }
   },
   confirmReload: async (path: string) => {
-    const fileName = path.split("/").pop() || path;
+    const fileName = basename(path);
     return confirmDialog(
       `"${fileName}" has been modified externally.\nReload and discard your unsaved changes?`,
       { title: "File Changed", kind: "warning" },

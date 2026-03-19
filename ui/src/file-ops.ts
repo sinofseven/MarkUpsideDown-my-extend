@@ -1,4 +1,5 @@
 import type { EditorView } from "@codemirror/view";
+import { basename } from "./path-utils.ts";
 import { ensureWorkerUrl, isImageConversionAllowed, isAutoSaveEnabled } from "./settings.ts";
 import { normalizeMarkdown } from "./normalize.ts";
 import { getRootPath, refreshTree } from "./sidebar.ts";
@@ -46,7 +47,6 @@ function formatBytes(bytes: number) {
 let editor: EditorView;
 let statusEl: HTMLElement;
 let getCurrentFilePath: () => string | null;
-let setCurrentFilePath: (p: string | null) => void;
 let loadContentAsTab: (content: string, filePath?: string) => void;
 let refreshGitAndSync: () => void;
 
@@ -54,14 +54,12 @@ export function initFileOps(deps: {
   editor: EditorView;
   statusEl: HTMLElement;
   getCurrentFilePath: () => string | null;
-  setCurrentFilePath: (p: string | null) => void;
   loadContentAsTab: (content: string, filePath?: string) => void;
   refreshGitAndSync: () => void;
 }) {
   editor = deps.editor;
   statusEl = deps.statusEl;
   getCurrentFilePath = deps.getCurrentFilePath;
-  setCurrentFilePath = deps.setCurrentFilePath;
   loadContentAsTab = deps.loadContentAsTab;
   refreshGitAndSync = deps.refreshGitAndSync;
 }
@@ -84,8 +82,7 @@ export async function saveFile() {
       if (path) {
         suppressNext(path);
         await writeTextFile(path, content);
-        setCurrentFilePath(path);
-        updateActiveTab({ path, name: path.split("/").pop()! });
+        updateActiveTab({ path, name: basename(path) });
         const tab = getActiveTab();
         if (tab) markTabSaved(tab.id);
       }
@@ -219,7 +216,7 @@ export async function convertFile(filePath: string) {
       statusEl.textContent = "Image conversion is disabled in Settings";
       return;
     }
-    const imageFileName = filePath.split("/").pop()!;
+    const imageFileName = basename(filePath);
     const ok = await confirm(
       `"${imageFileName}" will be sent to Workers AI for OCR.\n\nThis uses AI Neurons (billed per request). Typical cost: ~720 neurons per image.\n\nContinue?`,
       { title: "Image Conversion Cost", kind: "warning" },
@@ -236,7 +233,7 @@ export async function convertFile(filePath: string) {
     });
     loadContentAsTab(normalizeMarkdown(result.markdown), filePath);
     const tag = result.is_image ? " (image OCR)" : "";
-    const fileName = filePath.split("/").pop()!;
+    const fileName = basename(filePath);
     const mdSize = new Blob([result.markdown]).size;
     const words = result.markdown.split(/\s+/).filter(Boolean).length;
     const warn = result.warning ? ` ⚠ ${result.warning}` : "";
