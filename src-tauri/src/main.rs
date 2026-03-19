@@ -4,7 +4,6 @@
 mod bridge;
 mod cloudflare;
 mod commands;
-mod pty;
 mod util;
 
 use std::sync::Arc;
@@ -25,7 +24,6 @@ fn main() {
         .manage(editor_state_managed)
         .manage(http_client)
 
-        .manage(pty::PtyState::default())
         .setup(move |app| {
             bridge::start(app.handle().clone(), editor_state.clone());
             Ok(())
@@ -71,21 +69,10 @@ fn main() {
             cloudflare::deploy_worker,
             cloudflare::setup_worker_secrets,
             cloudflare::setup_worker_secrets_with_token,
-
-            pty::check_claude_installed,
-            pty::create_session,
-            pty::spawn_claude,
-            pty::write_pty,
-            pty::resize_pty,
-            pty::kill_pty,
-            pty::write_mcp_config,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {
                 bridge::cleanup();
-                if let Some(state) = window.try_state::<pty::PtyState>() {
-                    pty::kill_all_sessions(state);
-                }
             }
         })
         .run(tauri::generate_context!())
