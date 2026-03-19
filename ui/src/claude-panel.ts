@@ -356,11 +356,16 @@ async function createNewTab() {
   containerEl.style.display = "none";
   terminalsEl.appendChild(containerEl);
 
-  // Initialize xterm
-  const { terminal, fitAddon, resizeObserver, dataDisposable } = await initXterm(
-    containerEl,
+  // Initialize xterm + input bar
+  const termEl = document.createElement("div");
+  termEl.className = "claude-terminal-xterm";
+  containerEl.appendChild(termEl);
+
+  const { terminal, fitAddon, resizeObserver, dataDisposable, inputBar } = await initXterm(
+    termEl,
     sessionId,
   );
+  containerEl.appendChild(inputBar);
 
   const session: Session = {
     id: sessionId,
@@ -451,6 +456,128 @@ async function initXterm(
   terminal.open(termEl);
   fitAddon.fit();
 
+  // --- Chat-style input bar for IME support ---
+  // xterm's hidden textarea cannot handle IME composition in WebKit (Tauri).
+  // Instead of typing directly into the terminal, we provide a visible input
+  // bar at the bottom where the user composes text with full IME support.
+  // On Enter, the text (+ newline) is sent to PTY. Single-key actions (y/n,
+  // arrow keys, Ctrl+C, etc.) are also forwarded from the input bar.
+  const inputBar = document.createElement("div");
+  inputBar.className = "claude-input-bar";
+  inputBar.innerHTML = `<button class="claude-ctx-btn" title="Add context">+</button><div class="claude-ctx-menu" style="display:none"><button data-action="file">📄 File</button><button data-action="directory">📁 Directory</button><button data-action="image">🖼 Image</button></div><input type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Type here… (Enter to send)" />`;
+  // inputBar is appended AFTER termEl in the container (see createTab)
+
+  const inputField = inputBar.querySelector("input")!;
+  const ctxBtn = inputBar.querySelector(".claude-ctx-btn")!;
+  const ctxMenu = inputBar.querySelector(".claude-ctx-menu") as HTMLElement;
+
+  function writeToPty(text: string) {
+    const bytes = new TextEncoder().encode(text);
+    const binary = Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+    invoke("write_pty", { sessionId, data: btoa(binary) }).catch(() => {});
+  }
+
+  // --- Context menu ---
+  ctxBtn.addEventListener("click", () => {
+    const visible = ctxMenu.style.display !== "none";
+    ctxMenu.style.display = visible ? "none" : "flex";
+  });
+
+  // Close menu on outside click
+  document.addEventListener("click", (ev) => {
+    if (!ctxBtn.contains(ev.target as Node) && !ctxMenu.contains(ev.target as Node)) {
+      ctxMenu.style.display = "none";
+    }
+  });
+
+  ctxMenu.addEventListener("click", async (ev) => {
+    const btn = (ev.target as HTMLElement).closest("button[data-action]") as HTMLElement | null;
+    if (!btn) return;
+    ctxMenu.style.display = "none";
+
+    const action = btn.dataset.action;
+    const { open } = window.__TAURI__.dialog;
+
+    if (action === "file") {
+      const path = await open({ multiple: false, directory: false });
+      if (typeof path === "string") {
+        inputField.value += path + " ";
+        inputField.focus();
+      }
+    } else if (action === "directory") {
+      const path = await open({ multiple: false, directory: true });
+      if (typeof path === "string") {
+        inputField.value += path + " ";
+        inputField.focus();
+      }
+    } else if (action === "image") {
+      const path = await open({
+        multiple: false,
+        directory: false,
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp"] }],
+      });
+      if (typeof path === "string") {
+        inputField.value += path + " ";
+        inputField.focus();
+      }
+    }
+  });
+
+  // --- IME handling ---
+  let isComposing = false;
+  let compositionEndTime = 0;
+
+  inputField.addEventListener("compositionstart", () => { isComposing = true; });
+  inputField.addEventListener("compositionend", () => {
+    isComposing = false;
+    compositionEndTime = Date.now();
+  });
+
+  inputField.addEventListener("keydown", (ev) => {
+    if (isComposing) return;
+
+    if (ev.key === "Enter") {
+      // Ignore the Enter that confirmed IME composition.
+      // WebKit fires keydown(Enter) immediately after compositionend.
+      if (Date.now() - compositionEndTime < 300) return;
+      ev.preventDefault();
+      const text = inputField.value;
+      if (text) writeToPty(text);
+      writeToPty("\r");
+      inputField.value = "";
+      return;
+    }
+
+    // Single-key shortcuts forwarded directly to PTY
+    let data: string | null = null;
+    switch (ev.key) {
+      case "Escape": data = "\x1b"; break;
+      case "ArrowUp":
+        if (!inputField.value) { data = "\x1b[A"; break; }
+        return;
+      case "ArrowDown":
+        if (!inputField.value) { data = "\x1b[B"; break; }
+        return;
+    }
+
+    // Ctrl+key combos (Ctrl+C, Ctrl+D, etc.)
+    if (ev.ctrlKey && ev.key.length === 1) {
+      const code = ev.key.toLowerCase().charCodeAt(0) - 96;
+      if (code >= 0 && code <= 31) {
+        data = String.fromCharCode(code);
+      }
+    }
+
+    if (data !== null) {
+      ev.preventDefault();
+      writeToPty(data);
+      inputField.value = "";
+    }
+  });
+
+  // Click on terminal focuses input bar
+  termEl.addEventListener("mouseup", () => inputField.focus());
+
   // Relay keystrokes to backend (scoped to this session)
   const dataDisposable = terminal.onData((data) => {
     const encoded = btoa(data);
@@ -479,7 +606,7 @@ async function initXterm(
     }
   });
 
-  return { terminal, fitAddon, resizeObserver, dataDisposable };
+  return { terminal, fitAddon, resizeObserver, dataDisposable, inputBar };
 }
 
 function switchToSession(sessionId: string) {
@@ -494,7 +621,12 @@ function switchToSession(sessionId: string) {
   if (target) {
     target.containerEl.style.display = "";
     activeSessionId = sessionId;
-    requestAnimationFrame(() => target.fitAddon.fit());
+    requestAnimationFrame(() => {
+      target.fitAddon.fit();
+      // Focus the input bar
+      const input = target.containerEl.querySelector(".claude-input-bar input") as HTMLInputElement;
+      input?.focus();
+    });
   }
 
   renderTabBar();

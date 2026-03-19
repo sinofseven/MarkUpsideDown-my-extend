@@ -1114,17 +1114,30 @@ pub async fn open_in_terminal(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_mcp_binary_path(app: tauri::AppHandle) -> Result<String, String> {
     use tauri::Manager;
+    let triple = tauri::utils::platform::target_triple()
+        .map_err(|e| format!("Failed to get target triple: {e}"))?;
+    let bin_name = format!("markupsidedown-mcp-{triple}");
+
+    // Production: resource_dir/binaries/
     let resource_path = app
         .path()
         .resource_dir()
         .map_err(|e| format!("Failed to resolve resource dir: {e}"))?
         .join("binaries")
-        .join(format!(
-            "markupsidedown-mcp-{}",
-            tauri::utils::platform::target_triple()
-                .map_err(|e| format!("Failed to get target triple: {e}"))?
-        ));
-    Ok(resource_path.to_string_lossy().to_string())
+        .join(&bin_name);
+    if resource_path.exists() {
+        return Ok(resource_path.to_string_lossy().to_string());
+    }
+
+    // Dev mode fallback: src-tauri/binaries/ (resource_dir points to target/debug)
+    let dev_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("binaries")
+        .join(&bin_name);
+    if dev_path.exists() {
+        return Ok(dev_path.to_string_lossy().to_string());
+    }
+
+    Err(format!("MCP binary not found at {}", resource_path.display()))
 }
 
 // --- CLI Command Runner ---

@@ -2948,8 +2948,109 @@ body {
 .claude-terminal-container {
   position: absolute;
   inset: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
+
+.claude-terminal-xterm {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Chat-style input bar for IME support in WebKit (Tauri) */
+.claude-input-bar {
+  flex-shrink: 0;
+  padding: 6px 8px;
+  background: #181825;
+  border-top: 1px solid #313244;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.claude-input-bar input {
+  flex: 1;
+  min-width: 0;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  color: #cdd6f4;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.claude-input-bar input:focus {
+  border-color: #89b4fa;
+}
+
+.claude-input-bar input::placeholder {
+  color: #585b70;
+}
+
+/* Context (+) button */
+.claude-ctx-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #45475a;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.claude-ctx-btn:hover {
+  background: #313244;
+  border-color: #585b70;
+}
+
+/* Context dropdown menu */
+.claude-ctx-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 8px;
+  margin-bottom: 4px;
+  flex-direction: column;
+  background: #1e1e2e;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  min-width: 160px;
+}
+
+.claude-ctx-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #cdd6f4;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.claude-ctx-menu button:hover {
+  background: #313244;
+}
+
 
 /* Setup screen */
 .claude-setup {
