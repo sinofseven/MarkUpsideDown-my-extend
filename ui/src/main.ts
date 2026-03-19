@@ -394,29 +394,37 @@ const divider = document.getElementById("divider")!;
 const editorContainer = document.getElementById("editor-container")!;
 const previewWrapper = document.getElementById("preview-wrapper")!;
 
-let isDragging = false;
+function makeDraggable(handle: HTMLElement, onDrag: (clientX: number) => void, onEnd?: () => void) {
+  let active = false;
+  let rafId = 0;
+  handle.addEventListener("mousedown", () => {
+    active = true;
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!active) return;
+    cancelAnimationFrame(rafId);
+    const x = e.clientX;
+    rafId = requestAnimationFrame(() => onDrag(x));
+  });
+  document.addEventListener("mouseup", () => {
+    if (!active) return;
+    active = false;
+    onEnd?.();
+  });
+}
+
 let dragEditorLeft = 0;
 let dragAvailableWidth = 0;
 
 divider.addEventListener("mousedown", () => {
-  isDragging = true;
   dragEditorLeft = editorContainer.getBoundingClientRect().left;
   dragAvailableWidth = previewWrapper.getBoundingClientRect().right - dragEditorLeft;
 });
-let dividerDragRAF = 0;
-document.addEventListener("mousemove", (e) => {
-  if (!isDragging) return;
-  cancelAnimationFrame(dividerDragRAF);
-  const clientX = e.clientX;
-  dividerDragRAF = requestAnimationFrame(() => {
-    const ratio = (clientX - dragEditorLeft) / dragAvailableWidth;
-    const clamped = Math.max(0.2, Math.min(0.8, ratio));
-    editorContainer.style.flex = `${clamped}`;
-    previewWrapper.style.flex = `${1 - clamped}`;
-  });
-});
-document.addEventListener("mouseup", () => {
-  isDragging = false;
+makeDraggable(divider, (clientX) => {
+  const ratio = (clientX - dragEditorLeft) / dragAvailableWidth;
+  const clamped = Math.max(0.2, Math.min(0.8, ratio));
+  editorContainer.style.flex = `${clamped}`;
+  previewWrapper.style.flex = `${1 - clamped}`;
 });
 
 // --- Sidebar ---
@@ -482,29 +490,18 @@ function toggleSidebar() {
   localStorage.setItem(STORAGE_KEY_SIDEBAR_COLLAPSED, String(collapsed));
 }
 
-let isSidebarDragging = false;
-
-sidebarDivider.addEventListener("mousedown", () => {
-  isSidebarDragging = true;
-});
-let sidebarDragRAF = 0;
-document.addEventListener("mousemove", (e) => {
-  if (!isSidebarDragging) return;
-  cancelAnimationFrame(sidebarDragRAF);
-  const clientX = e.clientX;
-  sidebarDragRAF = requestAnimationFrame(() => {
+makeDraggable(
+  sidebarDivider,
+  (clientX) => {
     const width = Math.max(120, Math.min(400, clientX));
     sidebarEl.style.width = `${width}px`;
     sidebarEl.classList.remove("collapsed");
     sidebarUnfoldBtn.classList.remove("visible");
-  });
-});
-document.addEventListener("mouseup", () => {
-  if (isSidebarDragging) {
-    isSidebarDragging = false;
+  },
+  () => {
     localStorage.setItem(STORAGE_KEY_SIDEBAR_COLLAPSED, "false");
-  }
-});
+  },
+);
 
 // --- Panel Fold/Unfold ---
 
@@ -664,25 +661,12 @@ initClaudePanel(claudePanelEl, {
 });
 
 // Claude panel divider drag
-let isClaudeDragging = false;
-claudeDivider.addEventListener("mousedown", () => {
-  isClaudeDragging = true;
-});
-let claudeDragRAF = 0;
-document.addEventListener("mousemove", (e) => {
-  if (!isClaudeDragging) return;
-  cancelAnimationFrame(claudeDragRAF);
-  const clientX = e.clientX;
-  claudeDragRAF = requestAnimationFrame(() => {
-    const width = Math.max(250, Math.min(600, window.innerWidth - clientX));
-    claudePanelEl.style.width = `${width}px`;
-    claudePanelEl.classList.remove("collapsed");
-    localStorage.setItem("markupsidedown:claudeWidth", String(width));
-    localStorage.setItem("markupsidedown:claudeCollapsed", "false");
-  });
-});
-document.addEventListener("mouseup", () => {
-  isClaudeDragging = false;
+makeDraggable(claudeDivider, (clientX) => {
+  const width = Math.max(250, Math.min(600, window.innerWidth - clientX));
+  claudePanelEl.style.width = `${width}px`;
+  claudePanelEl.classList.remove("collapsed");
+  localStorage.setItem("markupsidedown:claudeWidth", String(width));
+  localStorage.setItem("markupsidedown:claudeCollapsed", "false");
 });
 
 // Hide divider when collapsed

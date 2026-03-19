@@ -287,6 +287,10 @@ function ensureBottom(): HTMLElement {
 
   commitBtnEl = document.createElement("button");
   commitBtnEl.className = "git-commit-btn";
+  commitBtnEl.addEventListener("click", () => {
+    const hasStaged = gitData?.files.some((f) => f.staged && !isHiddenFile(f.path));
+    commitChanges(hasStaged ? "staged" : "tracked");
+  });
   actionRow.appendChild(commitBtnEl);
 
   commitArea.appendChild(actionRow);
@@ -306,15 +310,8 @@ function updateBottom(staged: GitFile[]) {
   pushBtnEl.innerHTML =
     gitData.ahead > 0 ? `↑ Push <span class="git-count-badge">${gitData.ahead}</span>` : "↑ Push";
 
-  // Update commit button without replacing the element
-  const newHandler =
-    staged.length > 0 ? () => commitChanges("staged") : () => commitChanges("tracked");
-  const newCommitBtn = commitBtnEl.cloneNode(false) as HTMLButtonElement;
-  newCommitBtn.textContent = staged.length > 0 ? "Commit" : "Commit All";
-  newCommitBtn.disabled = !commitMessage.trim();
-  newCommitBtn.addEventListener("click", newHandler);
-  commitBtnEl.replaceWith(newCommitBtn);
-  commitBtnEl = newCommitBtn;
+  commitBtnEl.textContent = staged.length > 0 ? "Commit" : "Commit All";
+  commitBtnEl.disabled = !commitMessage.trim();
 }
 
 function render() {
