@@ -12,6 +12,8 @@ const STORAGE_KEY_API_KEY = "markupsidedown:claudeApiKey";
 const STORAGE_KEY_AUTH_MODE = "markupsidedown:claudeAuthMode"; // "oauth" | "apikey"
 const STORAGE_KEY_PERMISSION = "markupsidedown:claudePermission";
 const STORAGE_KEY_WIDTH = "markupsidedown:claudeWidth";
+const STORAGE_KEY_MESSAGES = "markupsidedown:claudeMessages";
+const MAX_PERSISTED_MESSAGES = 100;
 
 // --- Types ---
 
@@ -44,12 +46,15 @@ let messages: ChatMessage[] = [];
 let isRunning = false;
 let currentAssistantMsg: ChatMessage | null = null;
 let getCwd: (() => string | null) | null = null;
+let rateLimitResetTime: number | null = null;
+let rateLimitInterval: number | null = null;
 
 // --- Public API ---
 
 export function initClaudePanel(el: HTMLElement, callbacks: { getCwd: () => string | null }) {
   panelEl = el;
   getCwd = callbacks.getCwd;
+  messages = loadMessages();
   render();
   setupListeners();
 }
@@ -337,6 +342,7 @@ async function handleSend() {
     status: "done",
   };
   messages.push(userMsg);
+  persistMessages();
   renderMessages();
   scrollToBottom();
 
@@ -384,6 +390,7 @@ async function stopClaude() {
 function clearConversation() {
   messages = [];
   currentAssistantMsg = null;
+  localStorage.removeItem(STORAGE_KEY_MESSAGES);
   renderMessages();
   if (isRunning) {
     stopClaude();
@@ -399,6 +406,7 @@ function addSystemMessage(text: string) {
     thinking: "",
     status: "done",
   });
+  persistMessages();
   renderMessages();
   scrollToBottom();
 }
@@ -408,6 +416,29 @@ function scrollToBottom() {
   requestAnimationFrame(() => {
     messagesEl!.scrollTop = messagesEl!.scrollHeight;
   });
+}
+
+function showRestartButton() {
+  if (!messagesEl) return;
+  // Remove existing restart bar if any
+  messagesEl.querySelector(".claude-restart-bar")?.remove();
+  const bar = document.createElement("div");
+  bar.className = "claude-restart-bar";
+  const btn = document.createElement("button");
+  btn.className = "claude-restart-btn";
+  btn.textContent = "Restart Claude";
+  btn.addEventListener("click", async () => {
+    bar.remove();
+    try {
+      await startClaude();
+      addSystemMessage("Claude restarted. Send a message to continue.");
+    } catch (e) {
+      addSystemMessage(`Failed to restart: ${e}`);
+    }
+  });
+  bar.appendChild(btn);
+  messagesEl.appendChild(bar);
+  scrollToBottom();
 }
 
 // --- Event Listeners ---
@@ -433,12 +464,21 @@ function setupListeners() {
     }
   });
 
-  listen<{ reason: string }>("claude:stopped", () => {
+  listen<{ reason: string; exit_code?: number | null }>("claude:stopped", (event) => {
+    const wasRunning = isRunning;
     isRunning = false;
+    // Mark any streaming message as error
+    if (currentAssistantMsg && currentAssistantMsg.status === "streaming") {
+      currentAssistantMsg.status = "error";
+      updateMessageInPlace(currentAssistantMsg);
+    }
     currentAssistantMsg = null;
     updateStatusIndicator();
-    if (messages.length > 0) {
-      addSystemMessage("Claude process ended");
+    if (wasRunning) {
+      const exitCode = event.payload.exit_code;
+      const detail = exitCode !== null && exitCode !== undefined ? ` (exit ${exitCode})` : "";
+      addSystemMessage(`Claude process ended${detail}`);
+      showRestartButton();
     }
   });
 
@@ -530,6 +570,7 @@ function handleResultEvent(data: any) {
     }
     updateMessageInPlace(currentAssistantMsg);
     currentAssistantMsg = null;
+    persistMessages();
   }
 
   if (data.is_error) {
@@ -540,9 +581,61 @@ function handleResultEvent(data: any) {
 function handleRateLimitEvent(data: any) {
   const info = data.rate_limit_info;
   if (info?.status === "rate_limited") {
-    const resetsAt = info.resetsAt ? new Date(info.resetsAt * 1000).toLocaleTimeString() : "soon";
-    addSystemMessage(`Rate limited. Resets at ${resetsAt}`);
+    const resetsAtMs = info.resetsAt ? info.resetsAt * 1000 : Date.now() + 60_000;
+    startRateLimitCountdown(resetsAtMs);
   }
+}
+
+function startRateLimitCountdown(resetsAtMs: number) {
+  clearRateLimitCountdown();
+  rateLimitResetTime = resetsAtMs;
+  renderRateLimitBanner();
+  rateLimitInterval = window.setInterval(() => {
+    const remaining = (rateLimitResetTime || 0) - Date.now();
+    if (remaining <= 0) {
+      clearRateLimitCountdown();
+      removeRateLimitBanner();
+      addSystemMessage("Rate limit expired. You can continue.");
+      return;
+    }
+    updateCountdownDisplay(remaining);
+  }, 1000);
+}
+
+function clearRateLimitCountdown() {
+  if (rateLimitInterval !== null) {
+    clearInterval(rateLimitInterval);
+    rateLimitInterval = null;
+  }
+  rateLimitResetTime = null;
+}
+
+function renderRateLimitBanner() {
+  if (!messagesEl) return;
+  removeRateLimitBanner();
+  const banner = document.createElement("div");
+  banner.className = "claude-rate-limit-bar";
+  const remaining = (rateLimitResetTime || 0) - Date.now();
+  banner.innerHTML = `<span class="claude-rate-limit-text">Rate limited — resuming in <span class="claude-countdown">${formatCountdown(remaining)}</span></span>`;
+  messagesEl.appendChild(banner);
+  scrollToBottom();
+}
+
+function removeRateLimitBanner() {
+  messagesEl?.querySelector(".claude-rate-limit-bar")?.remove();
+}
+
+function updateCountdownDisplay(remainingMs: number) {
+  const el = messagesEl?.querySelector(".claude-countdown");
+  if (el) el.textContent = formatCountdown(remainingMs);
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0:00";
+  const totalSec = Math.ceil(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${sec.toString().padStart(2, "0")}`;
 }
 
 // --- Settings Dialog ---
@@ -629,4 +722,24 @@ function showClaudeSettings() {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+// --- Session Persistence ---
+
+function persistMessages() {
+  const toSave = messages.filter((m) => m.status !== "streaming").slice(-MAX_PERSISTED_MESSAGES);
+  try {
+    localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(toSave));
+  } catch {
+    // Storage full — silently fail
+  }
+}
+
+function loadMessages(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_MESSAGES);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 }

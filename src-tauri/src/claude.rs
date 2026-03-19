@@ -115,14 +115,22 @@ pub async fn claude_start(
                 let _ = app_stdout.emit("claude:event", &event);
             }
         }
-        // Process ended — mark not running
+        // Process ended — get exit code and mark not running
         let mut proc = state_clone.lock().await;
+        let exit_code = if let Some(ref mut child) = proc.child {
+            child.try_wait().ok().flatten().map(|s| s.code())
+        } else {
+            None
+        };
         proc.running = false;
         proc.child = None;
         proc.stdin = None;
         let _ = app_stdout.emit(
             "claude:stopped",
-            &serde_json::json!({"reason": "process_ended"}),
+            &serde_json::json!({
+                "reason": "process_ended",
+                "exit_code": exit_code
+            }),
         );
     });
 

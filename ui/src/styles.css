@@ -3227,3 +3227,58 @@ select.claude-settings-input {
 .claude-settings-actions button:hover {
   filter: brightness(1.05);
 }
+
+/* Rate limit banner */
+
+.claude-rate-limit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 8px;
+  background: #fef3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #856404;
+  animation: claude-pulse 2s ease-in-out infinite;
+}
+
+@keyframes claude-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.claude-countdown {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Restart bar */
+
+.claude-restart-bar {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+.claude-restart-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.claude-restart-btn:hover {
+  filter: brightness(1.1);
+}
