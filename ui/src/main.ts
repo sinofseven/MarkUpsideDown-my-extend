@@ -551,6 +551,12 @@ previewUnfoldBtn.title = "Expand Preview (⌘\\)";
 previewUnfoldBtn.innerHTML = SVG_CHEVRON_LEFT;
 appEl.appendChild(previewUnfoldBtn);
 
+const claudeUnfoldBtn = document.createElement("button");
+claudeUnfoldBtn.className = "panel-unfold-btn claude-unfold";
+claudeUnfoldBtn.title = "Expand Claude Panel (⌘J)";
+claudeUnfoldBtn.innerHTML = SVG_CHEVRON_LEFT;
+appEl.appendChild(claudeUnfoldBtn);
+
 function toggleEditor() {
   const collapsed = editorContainer.classList.toggle("collapsed");
   divider.classList.toggle("hidden", collapsed);
@@ -570,6 +576,7 @@ editorFoldBtn.addEventListener("click", toggleEditor);
 previewFoldBtn.addEventListener("click", togglePreview);
 editorUnfoldBtn.addEventListener("click", toggleEditor);
 previewUnfoldBtn.addEventListener("click", togglePreview);
+claudeUnfoldBtn.addEventListener("click", toggleClaudePanel);
 
 // Restore collapsed states
 if (sidebarCollapsed) {
@@ -672,13 +679,16 @@ makeDraggable(claudeDivider, (clientX) => {
   localStorage.setItem("markupsidedown:claudeCollapsed", "false");
 });
 
-// Hide divider when collapsed
+// Hide divider and show unfold button when collapsed
 if (isClaudePanelCollapsed()) {
   claudeDivider.style.display = "none";
+  claudeUnfoldBtn.classList.add("visible");
 }
-// Observe collapsed state for divider visibility
+// Observe collapsed state for divider and unfold button visibility
 new MutationObserver(() => {
-  claudeDivider.style.display = claudePanelEl.classList.contains("collapsed") ? "none" : "";
+  const collapsed = claudePanelEl.classList.contains("collapsed");
+  claudeDivider.style.display = collapsed ? "none" : "";
+  claudeUnfoldBtn.classList.toggle("visible", collapsed);
 }).observe(claudePanelEl, { attributes: true, attributeFilter: ["class"] });
 
 // --- Keyboard Shortcuts ---

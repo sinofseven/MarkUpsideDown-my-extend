@@ -2792,8 +2792,7 @@ body {
   overflow: hidden;
 }
 
-#claude-panel.collapsed + #claude-divider,
-#claude-panel.collapsed ~ .panel-unfold-btn.claude-unfold {
+#claude-panel.collapsed + #claude-divider {
   display: none;
 }
 
