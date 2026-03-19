@@ -51,6 +51,10 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorState>) {
         .route("/files/list", get(list_files))
         .route("/files/read", get(read_file))
         .route("/files/search", get(search_files))
+        .route("/files/create", post(create_file))
+        .route("/files/create-directory", post(create_directory))
+        .route("/files/rename", post(rename_entry))
+        .route("/files/delete", post(delete_entry))
         .route("/git/status", get(git_status))
         .with_state(state);
 
@@ -351,6 +355,58 @@ async fn search_files(
                 .collect();
             Json(serde_json::json!({ "matches": matches }))
         }
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+// --- File mutation handlers ---
+
+#[derive(Deserialize)]
+struct CreateFileRequest {
+    path: String,
+}
+
+async fn create_file(Json(body): Json<CreateFileRequest>) -> Json<serde_json::Value> {
+    match commands::create_file(body.path).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct CreateDirectoryRequest {
+    path: String,
+}
+
+async fn create_directory(Json(body): Json<CreateDirectoryRequest>) -> Json<serde_json::Value> {
+    match commands::create_directory(body.path).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct RenameEntryRequest {
+    from: String,
+    to: String,
+}
+
+async fn rename_entry(Json(body): Json<RenameEntryRequest>) -> Json<serde_json::Value> {
+    match commands::rename_entry(body.from, body.to).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct DeleteEntryRequest {
+    path: String,
+    is_dir: Option<bool>,
+}
+
+async fn delete_entry(Json(body): Json<DeleteEntryRequest>) -> Json<serde_json::Value> {
+    match commands::delete_entry(body.path, body.is_dir.unwrap_or(false)).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true })),
         Err(e) => Json(serde_json::json!({ "error": e })),
     }
 }

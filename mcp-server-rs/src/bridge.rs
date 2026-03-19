@@ -217,6 +217,32 @@ impl BridgeClient {
         }
         serde_json::from_value(json).map_err(|e| e.to_string())
     }
+
+    async fn post_check_error(&self, path: &str, body: serde_json::Value) -> Result<(), String> {
+        let val = self.request("POST", path, Some(body)).await?;
+        if let Some(json) = val {
+            if let Some(err) = json.get("error").and_then(|v| v.as_str()) {
+                return Err(err.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn create_file(&self, path: &str) -> Result<(), String> {
+        self.post_check_error("/files/create", serde_json::json!({ "path": path })).await
+    }
+
+    pub async fn create_directory(&self, path: &str) -> Result<(), String> {
+        self.post_check_error("/files/create-directory", serde_json::json!({ "path": path })).await
+    }
+
+    pub async fn rename_entry(&self, from: &str, to: &str) -> Result<(), String> {
+        self.post_check_error("/files/rename", serde_json::json!({ "from": from, "to": to })).await
+    }
+
+    pub async fn delete_entry(&self, path: &str, is_dir: bool) -> Result<(), String> {
+        self.post_check_error("/files/delete", serde_json::json!({ "path": path, "is_dir": is_dir })).await
+    }
 }
 
 #[derive(Deserialize, serde::Serialize)]

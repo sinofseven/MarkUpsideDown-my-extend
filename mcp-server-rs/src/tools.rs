@@ -130,6 +130,34 @@ pub struct SearchFilesParams {
     pub path: Option<String>,
 }
 
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CreateFileParams {
+    #[schemars(description = "Absolute path for the new file")]
+    pub path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct CreateDirectoryParams {
+    #[schemars(description = "Absolute path for the new directory")]
+    pub path: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct RenameEntryParams {
+    #[schemars(description = "Current absolute path")]
+    pub from: String,
+    #[schemars(description = "New absolute path")]
+    pub to: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct DeleteEntryParams {
+    #[schemars(description = "Absolute path to delete (moved to trash)")]
+    pub path: String,
+    #[schemars(description = "Whether the entry is a directory (default: false)")]
+    pub is_dir: Option<bool>,
+}
+
 // --- Server ---
 
 pub struct McpTools {
@@ -493,6 +521,50 @@ impl McpTools {
                     Ok(CallToolResult::success(vec![Content::text(format!("{} matches\n\n{json}", matches.len()))]))
                 }
             }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "create_file", description = "Create a new empty file. Fails if the file already exists.", annotations(read_only_hint = false, open_world_hint = false, destructive_hint = false))]
+    async fn create_file(
+        &self,
+        Parameters(params): Parameters<CreateFileParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.create_file(&params.path).await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text(format!("Created: {}", params.path))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "create_directory", description = "Create a new directory. Fails if it already exists.", annotations(read_only_hint = false, open_world_hint = false, destructive_hint = false))]
+    async fn create_directory(
+        &self,
+        Parameters(params): Parameters<CreateDirectoryParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.create_directory(&params.path).await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text(format!("Created directory: {}", params.path))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "rename_entry", description = "Rename or move a file or directory", annotations(read_only_hint = false, open_world_hint = false, destructive_hint = true))]
+    async fn rename_entry(
+        &self,
+        Parameters(params): Parameters<RenameEntryParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.rename_entry(&params.from, &params.to).await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text(format!("Renamed: {} -> {}", params.from, params.to))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "delete_entry", description = "Delete a file or directory (moved to system trash, recoverable)", annotations(read_only_hint = false, open_world_hint = false, destructive_hint = true))]
+    async fn delete_entry(
+        &self,
+        Parameters(params): Parameters<DeleteEntryParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.delete_entry(&params.path, params.is_dir.unwrap_or(false)).await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text(format!("Deleted (moved to trash): {}", params.path))])),
             Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
         }
     }
