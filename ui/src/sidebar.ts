@@ -64,6 +64,7 @@ let anchorPath: string | null = null;
 let onFileOpen: ((content: string, filePath: string) => void) | null = null;
 let onFolderChange: ((rootPath: string) => void) | null = null;
 let onSidebarFold: (() => void) | null = null;
+let onExternalChange: (() => void) | null = null;
 let gitStatusMap: Map<string, GitStatus> = new Map();
 let refreshGeneration = 0; // guards against concurrent refreshTree() races
 let filterQuery = "";
@@ -149,16 +150,19 @@ export function initSidebar(
     onOpen,
     onFolder,
     onFold,
+    onDirChange,
   }: {
     onOpen: (content: string, filePath: string) => void;
     onFolder: (rootPath: string) => void;
     onFold?: () => void;
+    onDirChange?: () => void;
   },
 ) {
   sidebarEl = el;
   onFileOpen = onOpen;
   onFolderChange = onFolder;
   onSidebarFold = onFold ?? null;
+  onExternalChange = onDirChange ?? null;
 
   // Restore state
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -533,9 +537,10 @@ async function startDirWatcher() {
         if (dirWatchDebounce) clearTimeout(dirWatchDebounce);
         dirWatchDebounce = setTimeout(() => {
           refreshTree();
+          onExternalChange?.();
         }, 500);
       },
-      { recursive: true, delayMs: 300 },
+      { recursive: true, delayMs: 200 },
     );
   } catch {
     // Watch may not be supported for some paths

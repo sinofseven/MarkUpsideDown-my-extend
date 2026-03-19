@@ -59,7 +59,7 @@ async function onFileChanged(event: WatchEvent) {
 export async function startWatching(filePath: string) {
   if (watchers.has(filePath)) return;
   try {
-    const unwatch = await watch(filePath, onFileChanged, { delayMs: 500 });
+    const unwatch = await watch(filePath, onFileChanged, { delayMs: 200 });
     watchers.set(filePath, unwatch);
   } catch {
     // Watch may fail for some paths — silently ignore

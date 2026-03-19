@@ -448,6 +448,9 @@ initSidebar(sidebarEl, {
     refreshGitAndSyncNow();
   },
   onFold: () => toggleSidebar(),
+  onDirChange: () => {
+    refreshGitAndSync();
+  },
 });
 
 const gitPanelEl = getGitPanelEl();
