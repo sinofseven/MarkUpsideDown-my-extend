@@ -7,7 +7,7 @@ const watchers = new Map<string, UnwatchFn>();
 
 // Suppress mechanism: ignore change events triggered by our own saves
 const suppressUntil = new Map<string, number>();
-const SUPPRESS_WINDOW_MS = 3000;
+const SUPPRESS_WINDOW_MS = 1000;
 
 // Dependencies injected via init
 let deps: {
@@ -59,7 +59,7 @@ async function onFileChanged(event: WatchEvent) {
 export async function startWatching(filePath: string) {
   if (watchers.has(filePath)) return;
   try {
-    const unwatch = await watch(filePath, onFileChanged, { delayMs: 200 });
+    const unwatch = await watch(filePath, onFileChanged, { delayMs: 50 });
     watchers.set(filePath, unwatch);
   } catch {
     // Watch may fail for some paths — silently ignore
