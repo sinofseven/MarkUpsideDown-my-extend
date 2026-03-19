@@ -214,7 +214,8 @@ function populateHeaderActions(container: Element) {
   if (activePanel === "files") {
     const openBtn = document.createElement("button");
     openBtn.title = "Open Folder";
-    openBtn.textContent = "Open";
+    openBtn.innerHTML =
+      '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13V3a1 1 0 011-1h4l2 2h4a1 1 0 011 1v8a1 1 0 01-1 1H3a1 1 0 01-1-1z"/></svg>';
     openBtn.addEventListener("click", openFolder);
     container.appendChild(openBtn);
   }
