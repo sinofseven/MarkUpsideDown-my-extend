@@ -23,7 +23,13 @@ let repoPath: string | null = null;
 let gitData: GitData | null = null;
 let onFileClick: ((path: string) => void) | null = null;
 let onRefreshCb: (() => void) | null = null;
-let commitMessage = "";
+let commitMessage = generateDefaultMessage();
+
+function generateDefaultMessage(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+}
 
 export function initGitPanel(
   el: HTMLElement,
@@ -64,10 +70,15 @@ export function isRepo(): boolean {
   return gitData?.is_repo ?? false;
 }
 
+const HIDDEN_FILES = [".DS_Store", "Thumbs.db"];
+
+function isHiddenFile(path: string): boolean {
+  return HIDDEN_FILES.includes(path.split("/").pop() || "");
+}
+
 export function getChangeCount(): number {
   if (!gitData?.files) return 0;
-  // Deduplicate: count unique paths
-  const paths = new Set(gitData.files.map((f) => f.path));
+  const paths = new Set(gitData.files.filter((f) => !isHiddenFile(f.path)).map((f) => f.path));
   return paths.size;
 }
 
@@ -123,7 +134,7 @@ async function commitChanges(mode: "staged" | "tracked") {
       await invoke("git_stage_all", { repoPath });
     }
     await invoke("git_commit", { repoPath, message });
-    commitMessage = "";
+    commitMessage = generateDefaultMessage();
     await refresh();
   } catch (e) {
     showStatus(`Commit failed: ${e}`, true);
@@ -211,8 +222,9 @@ function render() {
     return;
   }
 
-  const staged = gitData.files.filter((f) => f.staged);
-  const unstaged = gitData.files.filter((f) => !f.staged);
+  const visibleFiles = gitData.files.filter((f) => !isHiddenFile(f.path));
+  const staged = visibleFiles.filter((f) => f.staged);
+  const unstaged = visibleFiles.filter((f) => !f.staged);
   const totalChanges = getChangeCount();
 
   // --- Scrollable file list area ---
