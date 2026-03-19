@@ -57,6 +57,16 @@ export interface DocumentStructure {
   anchors: Set<string>;
 }
 
+/** Check if a line is valid simple YAML (key: value, list item, comment, or empty). */
+export function isValidYamlLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (trimmed === "") return true;
+  if (trimmed.startsWith("#")) return true;
+  if (trimmed.startsWith("- ")) return true;
+  if (/^[\w.-]+\s*:/.test(trimmed)) return true;
+  return false;
+}
+
 /** Generate a GitHub-style anchor from heading text. */
 export function headingToAnchor(text: string): string {
   return text
@@ -196,14 +206,7 @@ export function parseFrontmatter(lines: string[]): FrontmatterInfo | null {
   const raw = fmLines.join("\n");
 
   // Simple YAML validation
-  const valid = fmLines.every((line) => {
-    const trimmed = line.trim();
-    if (trimmed === "") return true;
-    if (trimmed.startsWith("#")) return true;
-    if (trimmed.startsWith("- ")) return true;
-    if (/^[\w.-]+\s*:/.test(trimmed)) return true;
-    return false;
-  });
+  const valid = fmLines.every(isValidYamlLine);
 
   // Simple key-value parse for valid YAML
   let parsed: Record<string, string> | null = null;

@@ -79,20 +79,20 @@ function checkHeadings(
 
 // --- Link checks ---
 
+const LINK_PATTERN = /\[([^\]]*)\]\(([^)]*)\)/g;
+
 function checkLinks(
   structure: DocumentStructure,
   doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
-  const linkPattern = /\[([^\]]*)\]\(([^)]*)\)/g;
-
   for (const link of structure.links) {
     const lineObj = doc.line(link.line);
 
     // Find the exact position of this link in the line
-    linkPattern.lastIndex = 0;
+    LINK_PATTERN.lastIndex = 0;
     let match;
-    while ((match = linkPattern.exec(lineObj.text)) !== null) {
+    while ((match = LINK_PATTERN.exec(lineObj.text)) !== null) {
       if (match[1] === link.text && match[2].trim() === link.target) {
         const from = lineObj.from + match.index;
         const to = from + match[0].length;

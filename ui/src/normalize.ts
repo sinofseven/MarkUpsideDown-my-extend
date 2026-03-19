@@ -1,3 +1,5 @@
+import { isValidYamlLine } from "./document-structure.ts";
+
 /**
  * Post-conversion Markdown normalization.
  * Applied after AI.toMarkdown() / Browser Rendering output, before loading into editor.
@@ -25,15 +27,7 @@ function stripMalformedFrontmatter(text: string): string {
   const fmBody = text.slice(4, endIdx);
   const lines = fmBody.split("\n");
 
-  // Simple YAML validation: each non-empty line should be key: value, - item, or comment
-  const valid = lines.every((line) => {
-    const trimmed = line.trim();
-    if (trimmed === "") return true;
-    if (trimmed.startsWith("#")) return true;
-    if (trimmed.startsWith("- ")) return true;
-    if (/^[\w.-]+\s*:/.test(trimmed)) return true;
-    return false;
-  });
+  const valid = lines.every(isValidYamlLine);
 
   if (valid) return text;
 

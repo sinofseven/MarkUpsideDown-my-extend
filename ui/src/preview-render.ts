@@ -7,6 +7,7 @@ import {
   markProgrammaticScroll,
   syncPreviewToCursor,
 } from "./scroll-sync.ts";
+import { escapeHtml } from "./settings.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -171,7 +172,7 @@ previewRenderer.code = function ({ text, lang, _sourceLine }: any) {
   if (lang === "mermaid") {
     return `<div${sl} class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
   }
-  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const escaped = escapeHtml(text);
   const langAttr = lang ? ` data-hljs-lang="${lang}"` : "";
   return `<pre${sl}><code class="hljs"${langAttr}>${escaped}</code></pre>`;
 };
