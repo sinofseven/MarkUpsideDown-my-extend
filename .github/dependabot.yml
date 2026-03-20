@@ -7,6 +7,16 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(deps):"
+    open-pull-requests-limit: 10
+
+  # Rust (Cargo) — mcp-server-rs/
+  - package-ecosystem: "cargo"
+    directory: "/mcp-server-rs"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps):"
+    open-pull-requests-limit: 5
 
   # npm — ui/
   - package-ecosystem: "npm"
@@ -15,6 +25,16 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "chore(deps):"
+    open-pull-requests-limit: 10
+
+  # npm — worker/
+  - package-ecosystem: "npm"
+    directory: "/worker"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(deps):"
+    open-pull-requests-limit: 5
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
