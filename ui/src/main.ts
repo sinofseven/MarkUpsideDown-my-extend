@@ -61,6 +61,7 @@ import {
   syncPreviewToCursor,
   syncPreviewClickToEditor,
   buildScrollAnchors,
+  preservePreviewScroll,
 } from "./scroll-sync.ts";
 import { initPreview, renderPreview } from "./preview-render.ts";
 import {
@@ -89,9 +90,13 @@ import { basename } from "./path-utils.ts";
 import { registerCommands, toggle as toggleCommandPalette } from "./command-palette.ts";
 import {
   initClaudePanel,
-  togglePanel as toggleClaudePanel,
+  togglePanel as _toggleClaudePanelRaw,
   isCollapsed as isClaudePanelCollapsed,
 } from "./claude-panel.ts";
+
+function toggleClaudePanel() {
+  preservePreviewScroll(() => _toggleClaudePanelRaw());
+}
 
 // --- Tauri APIs ---
 
@@ -485,9 +490,11 @@ if (initialRoot) {
 }
 
 function toggleSidebar() {
-  const collapsed = sidebarEl.classList.toggle("collapsed");
-  sidebarUnfoldBtn.classList.toggle("visible", collapsed);
-  localStorage.setItem(STORAGE_KEY_SIDEBAR_COLLAPSED, String(collapsed));
+  preservePreviewScroll(() => {
+    const collapsed = sidebarEl.classList.toggle("collapsed");
+    sidebarUnfoldBtn.classList.toggle("visible", collapsed);
+    localStorage.setItem(STORAGE_KEY_SIDEBAR_COLLAPSED, String(collapsed));
+  });
 }
 
 makeDraggable(
@@ -555,10 +562,12 @@ claudeUnfoldBtn.innerHTML = SVG_CHEVRON_LEFT;
 appEl.appendChild(claudeUnfoldBtn);
 
 function toggleEditor() {
-  const collapsed = editorContainer.classList.toggle("collapsed");
-  divider.classList.toggle("hidden", collapsed);
-  editorUnfoldBtn.classList.toggle("visible", collapsed);
-  localStorage.setItem(STORAGE_KEY_EDITOR_COLLAPSED, String(collapsed));
+  preservePreviewScroll(() => {
+    const collapsed = editorContainer.classList.toggle("collapsed");
+    divider.classList.toggle("hidden", collapsed);
+    editorUnfoldBtn.classList.toggle("visible", collapsed);
+    localStorage.setItem(STORAGE_KEY_EDITOR_COLLAPSED, String(collapsed));
+  });
 }
 
 function togglePreview() {

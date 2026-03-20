@@ -291,6 +291,48 @@ export function syncToEditor() {
   cmScroller.scrollTop = target;
 }
 
+// --- Preserve preview scroll across layout changes (panel fold/unfold) ---
+// Captures the element at the viewport top, runs the layout change, then
+// restores scroll so the same element stays in view after reflow.
+
+export function preservePreviewScroll(action: () => void) {
+  const elements = scrollState.cachedSourceLineEls;
+  if (elements.length === 0) {
+    action();
+    return;
+  }
+
+  const previewRect = previewPane.getBoundingClientRect();
+
+  // Find the last element whose top is at or above the viewport top
+  let anchorEl: HTMLElement | null = null;
+  let anchorOffset = 0;
+
+  for (const el of elements) {
+    const elTop = el.getBoundingClientRect().top - previewRect.top;
+    if (elTop <= 2) {
+      anchorEl = el;
+      anchorOffset = elTop;
+    } else {
+      break;
+    }
+  }
+
+  if (!anchorEl) {
+    anchorEl = elements[0];
+    anchorOffset = anchorEl.getBoundingClientRect().top - previewRect.top;
+  }
+
+  action();
+
+  // After reflow, restore so anchor element stays at the same viewport offset
+  requestAnimationFrame(() => {
+    const newTop = anchorEl!.getBoundingClientRect().top - previewPane.getBoundingClientRect().top;
+    markProgrammaticScroll();
+    previewPane.scrollTop += newTop - anchorOffset;
+  });
+}
+
 // --- Cursor-based sync (unchanged — already uses live measurements) ---
 
 export function syncPreviewToCursor() {
