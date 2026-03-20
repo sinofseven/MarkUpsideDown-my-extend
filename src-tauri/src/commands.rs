@@ -890,22 +890,22 @@ fn strip_js_hrefs(input: &str, lower: &str) -> String {
 fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
     let p = std::path::Path::new(path);
 
-    // For existing paths, canonicalize resolves symlinks and `..`
-    let resolved = if p.exists() {
-        p.canonicalize()
-            .map_err(|e| format!("Invalid path: {e}"))?
-    } else {
-        // For not-yet-existing paths, canonicalize the parent and append the file name
-        let parent = p
-            .parent()
-            .ok_or_else(|| "Invalid path: no parent directory".to_string())?;
-        let file_name = p
-            .file_name()
-            .ok_or_else(|| "Invalid path: no file name".to_string())?;
-        let canonical_parent = parent
-            .canonicalize()
-            .map_err(|e| format!("Invalid parent path: {e}"))?;
-        canonical_parent.join(file_name)
+    // Try to canonicalize the full path first; if the file doesn't exist yet,
+    // canonicalize the parent directory and append the file name.
+    let resolved = match p.canonicalize() {
+        Ok(canonical) => canonical,
+        Err(_) => {
+            let parent = p
+                .parent()
+                .ok_or_else(|| "Invalid path: no parent directory".to_string())?;
+            let file_name = p
+                .file_name()
+                .ok_or_else(|| "Invalid path: no file name".to_string())?;
+            let canonical_parent = parent
+                .canonicalize()
+                .map_err(|e| format!("Invalid parent path: {e}"))?;
+            canonical_parent.join(file_name)
+        }
     };
 
     let home = crate::util::home_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
