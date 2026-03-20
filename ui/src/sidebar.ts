@@ -5,7 +5,7 @@ import { escapeHtml } from "./settings.ts";
 import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
 import { KEY_SIDEBAR, KEY_SIDEBAR_SORT, KEY_SIDEBAR_PANEL } from "./storage-keys.ts";
 
-const { invoke } = window.__TAURI__.core;
+const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { open: openDialog, confirm, message } = window.__TAURI__.dialog;
 
 function promptInput(label: string, defaultValue = ""): Promise<string | null> {
@@ -54,6 +54,9 @@ interface GitStatus {
   status: string;
   staged: boolean;
 }
+
+const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"]);
+export const SIDEBAR_IMAGE_MIME = "application/x-sidebar-image";
 
 // --- State ---
 
@@ -784,6 +787,20 @@ function createTreeItem(entry: DirEntry, depth: number, displayName?: string) {
     }
     e.dataTransfer!.effectAllowed = "move";
     e.dataTransfer!.setData("text/plain", [...dragSourcePaths].join("\n"));
+    // Mark single image files so the editor can detect image drops
+    const ext = (entry.extension ?? "").toLowerCase();
+    if (!entry.is_dir && IMAGE_EXTENSIONS.has(ext) && dragSourcePaths.size === 1) {
+      e.dataTransfer!.effectAllowed = "copyMove";
+      e.dataTransfer!.setData(SIDEBAR_IMAGE_MIME, entry.path);
+      // Use a thumbnail as drag image
+      const thumb = document.createElement("img");
+      thumb.src = convertFileSrc(entry.path);
+      thumb.style.cssText =
+        "width:48px;height:48px;object-fit:cover;border-radius:4px;position:fixed;top:-200px";
+      document.body.appendChild(thumb);
+      e.dataTransfer!.setDragImage(thumb, 24, 24);
+      requestAnimationFrame(() => thumb.remove());
+    }
     item.classList.add("dragging");
   });
   item.addEventListener("dragend", () => {
@@ -869,6 +886,32 @@ function createTreeItem(entry: DirEntry, depth: number, displayName?: string) {
       showContextMenu(e, entry);
     }
   });
+
+  // Image hover thumbnail preview
+  const ext = (entry.extension ?? "").toLowerCase();
+  if (!entry.is_dir && IMAGE_EXTENSIONS.has(ext)) {
+    let tooltip: HTMLElement | null = null;
+    item.addEventListener("mouseenter", () => {
+      tooltip = document.createElement("div");
+      tooltip.className = "sidebar-image-tooltip";
+      const img = document.createElement("img");
+      img.src = convertFileSrc(entry.path);
+      tooltip.appendChild(img);
+      document.body.appendChild(tooltip);
+      const rect = item.getBoundingClientRect();
+      tooltip.style.top = `${rect.top}px`;
+      tooltip.style.left = `${rect.right + 8}px`;
+    });
+    item.addEventListener("mouseleave", () => {
+      tooltip?.remove();
+      tooltip = null;
+    });
+    // Remove tooltip when drag starts
+    item.addEventListener("dragstart", () => {
+      tooltip?.remove();
+      tooltip = null;
+    });
+  }
 
   return item;
 }

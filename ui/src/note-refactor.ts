@@ -2,7 +2,7 @@
 // replacing the selection with a link to the new file.
 
 import type { EditorView } from "@codemirror/view";
-import { basename } from "./path-utils.ts";
+import { basename, buildRelativePath } from "./path-utils.ts";
 
 const { save } = window.__TAURI__.dialog;
 const { writeTextFile } = window.__TAURI__.fs;
@@ -80,31 +80,4 @@ export async function extractToNewNote() {
   } catch (e) {
     statusEl.textContent = `Extract failed: ${e}`;
   }
-}
-
-function buildRelativePath(fromFile: string, toFile: string): string {
-  const fromDir = fromFile.substring(0, fromFile.lastIndexOf("/"));
-  const toDir = toFile.substring(0, toFile.lastIndexOf("/"));
-  const toName = toFile.substring(toFile.lastIndexOf("/") + 1);
-
-  if (fromDir === toDir) {
-    return `./${toName}`;
-  }
-
-  const fromParts = fromDir.split("/");
-  const toParts = toDir.split("/");
-
-  let common = 0;
-  while (
-    common < fromParts.length &&
-    common < toParts.length &&
-    fromParts[common] === toParts[common]
-  ) {
-    common++;
-  }
-
-  const ups = fromParts.length - common;
-  const downs = toParts.slice(common);
-
-  return [...Array(ups).fill(".."), ...downs, toName].join("/");
 }

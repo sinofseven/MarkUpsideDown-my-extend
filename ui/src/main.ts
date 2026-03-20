@@ -25,6 +25,7 @@ import {
   getGitHubPanelEl,
   updateGitChangeCount,
   refreshTree,
+  SIDEBAR_IMAGE_MIME,
 } from "./sidebar.ts";
 import {
   initGitPanel,
@@ -86,7 +87,7 @@ import {
   toggleInlineCode,
   insertLink,
 } from "./markdown-commands.ts";
-import { basename } from "./path-utils.ts";
+import { basename, buildRelativePath } from "./path-utils.ts";
 import { getStorageBool, setStorageBool } from "./storage-utils.ts";
 import {
   KEY_SIDEBAR_COLLAPSED,
@@ -339,6 +340,33 @@ urlInput.addEventListener("keydown", (e) => {
 // --- Drag & Drop ---
 
 initDragDrop(document.getElementById("app")!);
+
+// Image drag from sidebar tree → insert Markdown image link at drop position
+cmScroller.addEventListener("dragover", (e) => {
+  if (!e.dataTransfer?.types.includes(SIDEBAR_IMAGE_MIME)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+});
+cmScroller.addEventListener("drop", (e) => {
+  const imagePath = e.dataTransfer?.getData(SIDEBAR_IMAGE_MIME);
+  if (!imagePath) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const pos =
+    editor.posAtCoords({ x: e.clientX, y: e.clientY }) ?? editor.state.selection.main.head;
+  const currentFile = getCurrentFilePath();
+  const fileName = basename(imagePath).replace(/\.[^.]+$/, "");
+  const relativePath = currentFile
+    ? buildRelativePath(currentFile, imagePath)
+    : basename(imagePath);
+  const imageLink = `![${fileName}](${relativePath})`;
+  editor.dispatch({
+    changes: { from: pos, insert: imageLink },
+    selection: { anchor: pos + imageLink.length },
+  });
+  editor.focus();
+  statusEl.textContent = `Inserted image: ${basename(imagePath)}`;
+});
 
 // --- MCP Bridge ---
 

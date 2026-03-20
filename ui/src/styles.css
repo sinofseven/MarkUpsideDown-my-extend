@@ -660,6 +660,25 @@ body {
   outline-offset: -2px;
 }
 
+/* Image hover tooltip */
+.sidebar-image-tooltip {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.sidebar-image-tooltip img {
+  display: block;
+  max-width: 180px;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
 /* Context Menu */
 .sidebar-context-menu {
   position: fixed;
