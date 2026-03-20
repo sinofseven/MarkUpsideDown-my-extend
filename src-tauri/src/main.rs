@@ -5,9 +5,12 @@ mod bridge;
 mod claude;
 mod cloudflare;
 mod commands;
+mod menu;
 mod util;
 
 use std::sync::Arc;
+use tauri::Manager;
+
 fn main() {
     let editor_state = Arc::new(commands::EditorState::default());
     let editor_state_managed = editor_state.clone();
@@ -27,8 +30,13 @@ fn main() {
         .manage(claude_state)
 
         .setup(move |app| {
+            let m = menu::build(app.handle())?;
+            app.set_menu(m)?;
             bridge::start(app.handle().clone(), editor_state.clone());
             Ok(())
+        })
+        .on_menu_event(|handle, event| {
+            menu::handle_event(handle, &event);
         })
         .invoke_handler(tauri::generate_handler![
             commands::test_worker_url,
@@ -77,14 +85,18 @@ fn main() {
             claude::claude_stop,
             claude::claude_send,
             claude::claude_is_running,
+            menu::add_recent_file,
         ])
-        .on_window_event(move |_window, event| {
+        .on_window_event(move |window, event| {
             if let tauri::WindowEvent::Destroyed = event {
-                bridge::cleanup();
-                let state = claude_state_cleanup.clone();
-                tokio::spawn(async move {
-                    claude::cleanup(&state).await;
-                });
+                // Only clean up bridge/Claude when the last window closes
+                if window.app_handle().webview_windows().len() <= 1 {
+                    bridge::cleanup();
+                    let state = claude_state_cleanup.clone();
+                    tokio::spawn(async move {
+                        claude::cleanup(&state).await;
+                    });
+                }
             }
         })
         .run(tauri::generate_context!())

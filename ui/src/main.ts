@@ -221,6 +221,9 @@ function loadContent(content: string, filePath?: string | null) {
 function loadContentAsTab(content: string, filePath?: string) {
   const name = filePath ? basename(filePath) : "Untitled";
   openTab(filePath || null, name, content);
+  if (filePath) {
+    invoke("add_recent_file", { path: filePath }).catch(() => {});
+  }
 }
 
 function updateStatus(state: EditorState) {
@@ -372,6 +375,17 @@ cmScroller.addEventListener("drop", (e) => {
 
 initBridgeListeners();
 syncEditorState();
+
+// Open Recent menu event
+window.__TAURI__.event.listen<string>("menu:open-recent", async (event) => {
+  const path = event.payload;
+  try {
+    const content = await invoke<string>("read_text_file", { path });
+    loadContentAsTab(content, path);
+  } catch (e) {
+    statusEl.textContent = `Failed to open: ${e}`;
+  }
+});
 
 // --- Scroll Sync Event Listeners ---
 
