@@ -431,6 +431,7 @@ previewPane.addEventListener("click", (e) => {
 
 // --- Frontmatter panel ---
 
+const editorContainer = document.getElementById("editor-container")!;
 initFrontmatterPanel(editor, editorContainer);
 
 // --- Download images & note refactor ---
@@ -473,7 +474,6 @@ previewPane.addEventListener("mouseout", (e) => {
 // --- Resizable divider ---
 
 const divider = document.getElementById("divider")!;
-const editorContainer = document.getElementById("editor-container")!;
 const previewWrapper = document.getElementById("preview-wrapper")!;
 
 function makeDraggable(handle: HTMLElement, onDrag: (clientX: number) => void, onEnd?: () => void) {
