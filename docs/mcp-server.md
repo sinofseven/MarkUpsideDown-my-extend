@@ -129,9 +129,11 @@ Paste the copied config into your project's `.mcp.json` or global `~/.claude/set
 
 Use the **Create workspace** button in the Cowork tab of the Settings panel. This creates a folder with `.mcp.json` and `CLAUDE.md` — open it in Cowork as your workspace.
 
-### 3. Start the App
+### 3. Start the App (for Editor/File/Git tools)
 
 Launch MarkUpsideDown. The app automatically starts the HTTP bridge and writes the port to `~/.markupsidedown-bridge-port`.
+
+> **Note:** If you only need conversion tools (`fetch_markdown`, `render_markdown`, `convert_to_markdown`) and crawl tools, the app does **not** need to be running — see [Standalone Mode](#standalone-mode-no-app-required) below.
 
 ### 4. Use with the Agent
 
@@ -141,6 +143,43 @@ Launch MarkUpsideDown. The app automatically starts the HTTP bridge and writes t
 - **Git tools** (`git_stage`, `git_commit`, `git_push`, etc.) require the app to be running
 - **Content tools** (`download_image`, `fetch_page_title`) require the app to be running
 - **Conversion tools** (`fetch_markdown`, `render_markdown`, `convert_to_markdown`) work independently if `MARKUPSIDEDOWN_WORKER_URL` is set
+- **Crawl tools** (`crawl_website`, `crawl_status`) work independently if `MARKUPSIDEDOWN_WORKER_URL` is set
+
+## Standalone Mode (No App Required)
+
+The MCP server can run **without the MarkUpsideDown desktop app** for conversion and crawl workflows. This is useful for headless/CI usage or agents that only need document conversion.
+
+### Requirements
+
+- The MCP binary (bundled in the `.app` or built from `mcp-server-rs/`)
+- `MARKUPSIDEDOWN_WORKER_URL` environment variable pointing to your deployed Worker
+
+### What works without the app
+
+| Tool category | Works standalone? |
+|--------------|-------------------|
+| `fetch_markdown` | Yes (calls URL directly, no Worker needed) |
+| `render_markdown`, `convert_to_markdown` | Yes (calls Worker directly via env var) |
+| `crawl_website`, `crawl_status` | Yes (calls Worker directly via env var) |
+| `crawl_save` | No (saves files via the app bridge) |
+| Editor, file, git, content tools | No (require the running app) |
+
+### Example config (standalone)
+
+```json
+{
+  "mcpServers": {
+    "markupsidedown": {
+      "command": "/Applications/MarkUpsideDown.app/Contents/Resources/binaries/markupsidedown-mcp-aarch64-apple-darwin",
+      "env": {
+        "MARKUPSIDEDOWN_WORKER_URL": "https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev"
+      }
+    }
+  }
+}
+```
+
+When `MARKUPSIDEDOWN_WORKER_URL` is set, the MCP server uses it directly without contacting the app bridge. Editor/file/git tools will return an error if the app is not running, but conversion and crawl tools will work normally.
 
 ## Configuration
 
