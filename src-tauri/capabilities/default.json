@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/nicepkg/tauri-schema/main/schema/capability.json",
   "identifier": "default",
   "description": "Default capabilities for MarkUpsideDown",
-  "windows": ["main"],
+  "windows": ["main", "main-*"],
   "permissions": [
     "core:default",
     "dialog:default",

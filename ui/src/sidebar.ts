@@ -559,7 +559,7 @@ async function startDirWatcher() {
   }
 }
 
-function stopDirWatcher() {
+export function stopDirWatcher() {
   if (dirWatcherUnwatch) {
     dirWatcherUnwatch();
     dirWatcherUnwatch = null;

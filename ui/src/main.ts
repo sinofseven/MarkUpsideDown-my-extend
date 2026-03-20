@@ -26,6 +26,7 @@ import {
   openFolderByPath,
   updateGitChangeCount,
   refreshTree,
+  stopDirWatcher,
   SIDEBAR_IMAGE_MIME,
 } from "./sidebar.ts";
 import {
@@ -51,7 +52,12 @@ import {
   isTabDirty,
   markTabSaved,
 } from "./tabs.ts";
-import { initFileWatcher, startWatching, stopWatching } from "./file-watcher.ts";
+import {
+  initFileWatcher,
+  startWatching,
+  stopWatching,
+  stopAll as stopAllFileWatchers,
+} from "./file-watcher.ts";
 import "katex/dist/katex.min.css";
 
 import {
@@ -986,6 +992,13 @@ registerCommands([
       }),
   },
 ]);
+
+// --- Cleanup on window close ---
+
+window.addEventListener("beforeunload", () => {
+  stopDirWatcher();
+  stopAllFileWatchers();
+});
 
 // --- First-run ---
 
