@@ -44,7 +44,7 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorStates>) {
     let port = find_available_port().expect("No available port for MCP bridge");
     std::fs::write(port_file_path(), port.to_string()).ok();
 
-    let http = reqwest::Client::new();
+    let http: reqwest::Client = app.state::<reqwest::Client>().inner().clone();
     let state = Arc::new(BridgeState {
         editor: editor_state,
         app,

@@ -1,3 +1,5 @@
+import { basename } from "./path-utils.ts";
+
 const { invoke } = window.__TAURI__.core;
 const { open: openDialog } = window.__TAURI__.dialog;
 
@@ -98,11 +100,7 @@ async function doClone(
   }
 
   // Derive repo name from URL
-  const repoName =
-    url
-      .replace(/\.git$/, "")
-      .split("/")
-      .pop() || "repo";
+  const repoName = basename(url.replace(/\.git$/, "")) || "repo";
   const fullDest = `${dest}/${repoName}`;
 
   setStatus("Cloning…", "clone-status-pending");

@@ -2,7 +2,7 @@
 // rewriting URLs to relative paths.
 
 import type { EditorView } from "@codemirror/view";
-import { dirname } from "./path-utils.ts";
+import { basename, dirname } from "./path-utils.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -27,8 +27,7 @@ function getAssetsDir(filePath: string): string {
 function urlToFilename(url: string): string {
   try {
     const pathname = new URL(url).pathname;
-    const parts = pathname.split("/");
-    const last = parts[parts.length - 1] || "image";
+    const last = basename(pathname) || "image";
     // Sanitize filename
     const clean = last.replace(/[^a-zA-Z0-9._-]/g, "_");
     // Ensure it has an extension
