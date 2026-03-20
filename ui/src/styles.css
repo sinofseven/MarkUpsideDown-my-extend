@@ -1407,6 +1407,175 @@ body {
   }
 }
 
+/* Header actions (discard all + stage all) */
+.git-header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* Discard button (per-file, on hover) */
+.git-discard-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  border-radius: 3px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.git-file-row:hover .git-discard-btn {
+  opacity: 1;
+}
+
+.git-discard-btn:hover {
+  color: var(--error);
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+}
+
+/* Discard All button (header) */
+.git-discard-all-btn {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.git-discard-all-btn:hover {
+  color: var(--error);
+  border-color: var(--error);
+  background: color-mix(in srgb, var(--error) 8%, transparent);
+}
+
+/* File row wrapper for inline diff */
+.git-file-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Expanded state indicator */
+.git-file-row.expanded {
+  background: var(--bg);
+}
+
+/* Inline diff viewer */
+.git-inline-diff {
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
+  color: var(--text-muted);
+}
+
+.git-diff-line {
+  padding: 0 10px 0 16px;
+  white-space: pre;
+}
+
+.git-diff-add {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  color: var(--success);
+}
+
+.git-diff-del {
+  background: color-mix(in srgb, var(--error) 12%, transparent);
+  color: var(--error);
+}
+
+.git-diff-hunk {
+  color: var(--accent);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* Recent Commits section */
+.git-log-section {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.git-log-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.git-log-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 16px;
+  font-size: 11px;
+  min-height: 22px;
+}
+
+.git-log-row:hover {
+  background: var(--bg);
+}
+
+.git-log-hash {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.git-log-message {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.git-log-time {
+  font-size: 9px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.git-revert-btn {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  border-radius: 3px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.git-log-row:hover .git-revert-btn {
+  opacity: 1;
+}
+
+.git-revert-btn:hover {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
 /* Clone Panel */
 #clone-panel {
   flex-shrink: 0;

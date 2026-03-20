@@ -297,6 +297,48 @@ impl BridgeClient {
         self.git_remote_op("/git/fetch").await
     }
 
+    pub async fn git_diff(&self, path: &str, staged: bool) -> Result<String, String> {
+        let val = self.request("GET", &format!("/git/diff?path={}&staged={}", urlencoding::encode(path), staged), None).await?;
+        let json = val.unwrap_or_default();
+        if let Some(err) = json.get("error").and_then(|v| v.as_str()) {
+            return Err(err.to_string());
+        }
+        Ok(json.get("diff").and_then(|v| v.as_str()).unwrap_or("").to_string())
+    }
+
+    pub async fn git_discard(&self, path: &str) -> Result<(), String> {
+        self.post_check_error("/git/discard", serde_json::json!({ "path": path })).await
+    }
+
+    pub async fn git_discard_all(&self) -> Result<(), String> {
+        self.post_check_error("/git/discard-all", serde_json::json!({})).await
+    }
+
+    pub async fn git_log(&self, limit: Option<u32>) -> Result<Vec<GitLogEntry>, String> {
+        let query = match limit {
+            Some(l) => format!("/git/log?limit={}", l),
+            None => "/git/log".to_string(),
+        };
+        let val = self.request("GET", &query, None).await?;
+        let json = val.unwrap_or_default();
+        if let Some(err) = json.get("error").and_then(|v| v.as_str()) {
+            return Err(err.to_string());
+        }
+        #[derive(Deserialize)]
+        struct Resp { entries: Vec<GitLogEntry> }
+        let resp: Resp = serde_json::from_value(json).map_err(|e| e.to_string())?;
+        Ok(resp.entries)
+    }
+
+    pub async fn git_revert(&self, commit_hash: &str) -> Result<String, String> {
+        let val = self.request("POST", "/git/revert", Some(serde_json::json!({ "commit_hash": commit_hash }))).await?;
+        let json = val.unwrap_or_default();
+        if let Some(err) = json.get("error").and_then(|v| v.as_str()) {
+            return Err(err.to_string());
+        }
+        Ok(json.get("output").and_then(|v| v.as_str()).unwrap_or("").to_string())
+    }
+
     // --- Crawl save ---
 
     pub async fn crawl_save(&self, pages: &[CrawlSavePage], base_dir: &str) -> Result<CrawlSaveResult, String> {
@@ -380,6 +422,15 @@ pub struct GitStatus {
     pub is_repo: bool,
     pub ahead: u32,
     pub behind: u32,
+}
+
+#[derive(Deserialize, serde::Serialize)]
+pub struct GitLogEntry {
+    pub hash: String,
+    pub short_hash: String,
+    pub message: String,
+    pub author: String,
+    pub relative_time: String,
 }
 
 #[derive(serde::Serialize)]

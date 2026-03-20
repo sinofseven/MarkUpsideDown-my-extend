@@ -78,6 +78,11 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorStates>) {
         .route("/git/push", post(git_push))
         .route("/git/pull", post(git_pull))
         .route("/git/fetch", post(git_fetch))
+        .route("/git/diff", get(git_diff))
+        .route("/git/discard", post(git_discard))
+        .route("/git/discard-all", post(git_discard_all))
+        .route("/git/log", get(git_log))
+        .route("/git/revert", post(git_revert))
         .route("/files/copy", post(copy_entry))
         .route("/files/duplicate", post(duplicate_entry))
         .route("/crawl/save", post(crawl_save))
@@ -561,6 +566,91 @@ async fn git_fetch(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Va
         Err(e) => return e,
     };
     git_remote_op(&state, commands::git_fetch(repo_path)).await
+}
+
+// --- Git diff/discard/log/revert handlers ---
+
+#[derive(Deserialize)]
+struct GitDiffQuery {
+    path: String,
+    staged: Option<bool>,
+}
+
+async fn git_diff(
+    State(state): State<Arc<BridgeState>>,
+    Query(query): Query<GitDiffQuery>,
+) -> Json<serde_json::Value> {
+    let repo_path = match get_repo_path(&state) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match commands::git_diff(repo_path, query.path, query.staged.unwrap_or(false)).await {
+        Ok(diff) => Json(serde_json::json!({ "diff": diff })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+async fn git_discard(
+    State(state): State<Arc<BridgeState>>,
+    Json(body): Json<GitFileRequest>,
+) -> Json<serde_json::Value> {
+    let repo_path = match get_repo_path(&state) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match commands::git_discard(repo_path, body.path).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+async fn git_discard_all(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
+    let repo_path = match get_repo_path(&state) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match commands::git_discard_all(repo_path).await {
+        Ok(()) => Json(serde_json::json!({ "ok": true })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct GitLogQuery {
+    limit: Option<u32>,
+}
+
+async fn git_log(
+    State(state): State<Arc<BridgeState>>,
+    Query(query): Query<GitLogQuery>,
+) -> Json<serde_json::Value> {
+    let repo_path = match get_repo_path(&state) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match commands::git_log(repo_path, query.limit).await {
+        Ok(entries) => Json(serde_json::json!({ "entries": entries })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
+#[derive(Deserialize)]
+struct GitRevertRequest {
+    commit_hash: String,
+}
+
+async fn git_revert(
+    State(state): State<Arc<BridgeState>>,
+    Json(body): Json<GitRevertRequest>,
+) -> Json<serde_json::Value> {
+    let repo_path = match get_repo_path(&state) {
+        Ok(p) => p,
+        Err(e) => return e,
+    };
+    match commands::git_revert(repo_path, body.commit_hash).await {
+        Ok(output) => Json(serde_json::json!({ "output": output })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
 }
 
 // --- File copy/duplicate handlers ---

@@ -187,6 +187,26 @@ pub struct GitCommitParams {
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GitDiffParams {
+    #[schemars(description = "File path (relative to repo root)")]
+    pub path: String,
+    #[schemars(description = "If true, show staged diff; otherwise show unstaged diff")]
+    pub staged: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GitLogParams {
+    #[schemars(description = "Number of recent commits to return (default: 10)")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
+pub struct GitRevertParams {
+    #[schemars(description = "Full commit hash to revert")]
+    pub commit_hash: String,
+}
+
+#[derive(Debug, Deserialize, schemars::JsonSchema)]
 pub struct CrawlSaveParams {
     #[schemars(description = "Array of pages to save, each with url and markdown fields")]
     pub pages: Vec<CrawlSavePageParam>,
@@ -904,6 +924,72 @@ impl McpTools {
         match self.bridge.git_fetch().await {
             Ok(output) => {
                 let msg = if output.is_empty() { "Fetch completed".to_string() } else { output };
+                Ok(CallToolResult::success(vec![Content::text(msg)]))
+            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "git_diff", description = "Get the diff for a specific file (staged or unstaged)", annotations(read_only_hint = true, open_world_hint = false))]
+    async fn git_diff(
+        &self,
+        Parameters(params): Parameters<GitDiffParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.git_diff(&params.path, params.staged.unwrap_or(false)).await {
+            Ok(diff) => {
+                let msg = if diff.is_empty() { "No changes".to_string() } else { diff };
+                Ok(CallToolResult::success(vec![Content::text(msg)]))
+            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "git_discard", description = "Discard changes for a specific file (checkout tracked, delete untracked)", annotations(read_only_hint = false, open_world_hint = false, destructive_hint = true))]
+    async fn git_discard(
+        &self,
+        Parameters(params): Parameters<GitFileParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.git_discard(&params.path).await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text(format!("Discarded: {}", params.path))])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "git_discard_all", description = "Discard all uncommitted changes (restore tracked files and remove untracked files)", annotations(read_only_hint = false, open_world_hint = false, destructive_hint = true))]
+    async fn git_discard_all(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.git_discard_all().await {
+            Ok(()) => Ok(CallToolResult::success(vec![Content::text("All changes discarded")])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "git_log", description = "Get recent commit history", annotations(read_only_hint = true, open_world_hint = false))]
+    async fn git_log(
+        &self,
+        Parameters(params): Parameters<GitLogParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.git_log(params.limit).await {
+            Ok(entries) => {
+                if entries.is_empty() {
+                    return Ok(CallToolResult::success(vec![Content::text("No commits found")]));
+                }
+                let text = entries.iter().map(|e| {
+                    format!("{} {} ({}, {})", e.short_hash, e.message, e.author, e.relative_time)
+                }).collect::<Vec<_>>().join("\n");
+                Ok(CallToolResult::success(vec![Content::text(text)]))
+            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "git_revert", description = "Revert a commit by creating a new revert commit", annotations(read_only_hint = false, open_world_hint = false))]
+    async fn git_revert(
+        &self,
+        Parameters(params): Parameters<GitRevertParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.git_revert(&params.commit_hash).await {
+            Ok(output) => {
+                let msg = if output.is_empty() { "Revert completed".to_string() } else { output };
                 Ok(CallToolResult::success(vec![Content::text(msg)]))
             }
             Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),

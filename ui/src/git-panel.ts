@@ -20,12 +20,24 @@ interface GitData {
   behind: number;
 }
 
+interface GitLogEntry {
+  hash: string;
+  short_hash: string;
+  message: string;
+  author: string;
+  relative_time: string;
+}
+
 let panelEl: HTMLElement | null = null;
 let repoPath: string | null = null;
 let gitData: GitData | null = null;
+let logEntries: GitLogEntry[] = [];
 let onFileClick: ((path: string) => void) | null = null;
 let onRefreshCb: (() => void) | null = null;
 let commitMessage = generateDefaultMessage();
+
+// Track which file's diff is currently expanded (by path)
+let expandedDiffPath: string | null = null;
 
 const DEFAULT_MSG_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
 
@@ -51,6 +63,7 @@ export function setRepoPath(path: string | null, skipRefresh = false) {
     if (!skipRefresh) refresh();
   } else {
     gitData = null;
+    logEntries = [];
     render();
   }
 }
@@ -61,6 +74,12 @@ export async function refresh() {
     gitData = await invoke<GitData>("git_status", { repoPath });
   } catch {
     gitData = null;
+  }
+  // Fetch recent commits
+  try {
+    logEntries = await invoke<GitLogEntry[]>("git_log", { repoPath, limit: 10 });
+  } catch {
+    logEntries = [];
   }
   render();
   onRefreshCb?.();
@@ -129,6 +148,28 @@ async function unstageFile(filePath: string) {
   }
 }
 
+async function discardFile(filePath: string) {
+  if (!repoPath) return;
+  try {
+    await invoke("git_discard", { repoPath, filePath });
+    expandedDiffPath = null;
+    await refresh();
+  } catch (e) {
+    showStatus(`Discard failed: ${e}`, true);
+  }
+}
+
+async function discardAll() {
+  if (!repoPath) return;
+  try {
+    await invoke("git_discard_all", { repoPath });
+    expandedDiffPath = null;
+    await refresh();
+  } catch (e) {
+    showStatus(`Discard all failed: ${e}`, true);
+  }
+}
+
 async function commitChanges(mode: "staged" | "tracked") {
   if (!repoPath || !commitMessage.trim()) return;
   const message = commitMessage.trim();
@@ -142,6 +183,17 @@ async function commitChanges(mode: "staged" | "tracked") {
     await refresh();
   } catch (e) {
     showStatus(`Commit failed: ${e}`, true);
+  }
+}
+
+async function revertCommit(commitHash: string) {
+  if (!repoPath) return;
+  try {
+    await invoke("git_revert", { repoPath, commitHash });
+    showStatus("Revert completed", false);
+    await refresh();
+  } catch (e) {
+    showStatus(`Revert failed: ${e}`, true);
   }
 }
 
@@ -173,6 +225,17 @@ function showStatus(message: string, isError: boolean) {
     el.textContent = "";
     el.className = "git-status-msg";
   }, 4000);
+}
+
+// --- Diff loading ---
+
+async function loadDiff(filePath: string, staged: boolean): Promise<string> {
+  if (!repoPath) return "";
+  try {
+    return await invoke<string>("git_diff", { repoPath, filePath, staged });
+  } catch {
+    return "";
+  }
 }
 
 // --- Render helpers ---
@@ -359,14 +422,25 @@ function render() {
     totalChanges === 0 ? "No changes" : `${totalChanges} Change${totalChanges > 1 ? "s" : ""}`;
   header.appendChild(changesLabel);
 
+  const headerActions = document.createElement("span");
+  headerActions.className = "git-header-actions";
+
   if (unstaged.length > 0) {
+    const discardAllBtn = document.createElement("button");
+    discardAllBtn.className = "git-discard-all-btn";
+    discardAllBtn.title = "Discard All Changes";
+    discardAllBtn.textContent = "⟲";
+    discardAllBtn.addEventListener("click", discardAll);
+    headerActions.appendChild(discardAllBtn);
+
     const stageAllBtn = document.createElement("button");
     stageAllBtn.className = "git-stage-all-btn";
     stageAllBtn.textContent = "Stage All";
     stageAllBtn.addEventListener("click", stageAll);
-    header.appendChild(stageAllBtn);
+    headerActions.appendChild(stageAllBtn);
   }
 
+  header.appendChild(headerActions);
   fileArea.appendChild(header);
 
   if (totalChanges === 0) {
@@ -383,6 +457,11 @@ function render() {
   if (unstaged.length > 0) {
     const label = staged.length > 0 ? "Unstaged" : "Tracked";
     fileArea.appendChild(createSection(label, unstaged, false));
+  }
+
+  // --- Recent commits section ---
+  if (logEntries.length > 0) {
+    fileArea.appendChild(createLogSection());
   }
 
   if (existingFileArea) {
@@ -413,6 +492,9 @@ function createSection(title: string, files: GitFile[], isStaged: boolean): HTML
   list.className = "git-file-list";
 
   for (const file of files) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "git-file-wrapper";
+
     const row = document.createElement("div");
     row.className = `git-file-row ${statusClass(file.status)}`;
 
@@ -448,6 +530,19 @@ function createSection(title: string, files: GitFile[], isStaged: boolean): HTML
       row.appendChild(stats);
     }
 
+    // Discard button (unstaged only, not for staged)
+    if (!isStaged) {
+      const discardBtn = document.createElement("button");
+      discardBtn.className = "git-discard-btn";
+      discardBtn.title = "Discard Changes";
+      discardBtn.textContent = "⟲";
+      discardBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        discardFile(file.path);
+      });
+      row.appendChild(discardBtn);
+    }
+
     // Stage/unstage checkbox
     const checkbox = document.createElement("button");
     checkbox.className = `git-file-checkbox ${isStaged ? "checked" : ""}`;
@@ -462,12 +557,125 @@ function createSection(title: string, files: GitFile[], isStaged: boolean): HTML
     });
     row.appendChild(checkbox);
 
-    row.addEventListener("click", () => {
+    // Double-click to open file in editor
+    row.addEventListener("dblclick", () => {
       if (onFileClick && file.status !== "D") {
         const fullPath = `${repoPath}/${file.path}`;
         onFileClick(fullPath);
       }
     });
+
+    // Click row to toggle inline diff
+    row.addEventListener("click", () => {
+      const key = `${isStaged ? "s:" : "u:"}${file.path}`;
+      if (expandedDiffPath === key) {
+        // Collapse
+        expandedDiffPath = null;
+        const diffEl = wrapper.querySelector(".git-inline-diff");
+        if (diffEl) diffEl.remove();
+        row.classList.remove("expanded");
+      } else {
+        // Collapse any previously expanded
+        const prev = panelEl?.querySelector(".git-file-row.expanded");
+        if (prev) {
+          prev.classList.remove("expanded");
+          prev.closest(".git-file-wrapper")?.querySelector(".git-inline-diff")?.remove();
+        }
+        expandedDiffPath = key;
+        row.classList.add("expanded");
+        // Load diff
+        const diffContainer = document.createElement("div");
+        diffContainer.className = "git-inline-diff";
+        diffContainer.textContent = "Loading...";
+        wrapper.appendChild(diffContainer);
+        loadDiff(file.path, isStaged).then((diff) => {
+          if (expandedDiffPath !== key) return;
+          if (!diff.trim()) {
+            diffContainer.textContent = file.status === "?" ? "(new file)" : "(no diff available)";
+          } else {
+            diffContainer.textContent = "";
+            renderDiffLines(diffContainer, diff);
+          }
+        });
+      }
+    });
+
+    wrapper.appendChild(row);
+    list.appendChild(wrapper);
+  }
+
+  section.appendChild(list);
+  return section;
+}
+
+function renderDiffLines(container: HTMLElement, diff: string) {
+  const lines = diff.split("\n");
+  // Skip the header lines (---, +++, @@, etc.) until first hunk
+  let inHunk = false;
+  for (const line of lines) {
+    if (line.startsWith("@@")) {
+      inHunk = true;
+      const hunkLine = document.createElement("div");
+      hunkLine.className = "git-diff-line git-diff-hunk";
+      hunkLine.textContent = line;
+      container.appendChild(hunkLine);
+      continue;
+    }
+    if (!inHunk) continue;
+
+    const el = document.createElement("div");
+    el.className = "git-diff-line";
+    if (line.startsWith("+")) {
+      el.classList.add("git-diff-add");
+    } else if (line.startsWith("-")) {
+      el.classList.add("git-diff-del");
+    }
+    el.textContent = line;
+    container.appendChild(el);
+  }
+}
+
+function createLogSection(): HTMLElement {
+  const section = document.createElement("div");
+  section.className = "git-section git-log-section";
+
+  const header = document.createElement("div");
+  header.className = "git-section-header";
+  header.textContent = "Recent Commits";
+  section.appendChild(header);
+
+  const list = document.createElement("div");
+  list.className = "git-log-list";
+
+  for (const entry of logEntries) {
+    const row = document.createElement("div");
+    row.className = "git-log-row";
+
+    const hashEl = document.createElement("span");
+    hashEl.className = "git-log-hash";
+    hashEl.textContent = entry.short_hash;
+    row.appendChild(hashEl);
+
+    const msgEl = document.createElement("span");
+    msgEl.className = "git-log-message";
+    msgEl.textContent = entry.message;
+    msgEl.title = `${entry.message}\n\n${entry.author} • ${entry.relative_time}`;
+    row.appendChild(msgEl);
+
+    const timeEl = document.createElement("span");
+    timeEl.className = "git-log-time";
+    timeEl.textContent = entry.relative_time;
+    row.appendChild(timeEl);
+
+    const revertBtn = document.createElement("button");
+    revertBtn.className = "git-revert-btn";
+    revertBtn.title = "Revert this commit";
+    revertBtn.textContent = "⟲";
+    revertBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      revertCommit(entry.hash);
+    });
+    row.appendChild(revertBtn);
 
     list.appendChild(row);
   }

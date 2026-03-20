@@ -1649,6 +1649,116 @@ pub async fn git_fetch(repo_path: String) -> Result<String, String> {
     git_remote_command(repo_path, "fetch").await
 }
 
+// --- Diff ---
+
+#[tauri::command]
+pub async fn git_diff(repo_path: String, file_path: String, staged: bool) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        let mut args = vec!["diff"];
+        if staged {
+            args.push("--cached");
+        }
+        args.push("--");
+        args.push(&file_path);
+        run_git(&repo_path, &args)
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+// --- Discard ---
+
+#[tauri::command]
+pub async fn git_discard(repo_path: String, file_path: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        // Check if the file is untracked
+        let status_output = run_git(&repo_path, &["status", "--porcelain", "--", &file_path])?;
+        let is_untracked = status_output.lines().any(|l| l.starts_with("??"));
+
+        if is_untracked {
+            // Delete untracked file
+            let full_path = std::path::Path::new(&repo_path).join(&file_path);
+            std::fs::remove_file(&full_path)
+                .map_err(|e| format!("Failed to delete {}: {e}", file_path))?;
+        } else {
+            // Restore tracked file
+            run_git(&repo_path, &["checkout", "--", &file_path])?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+#[tauri::command]
+pub async fn git_discard_all(repo_path: String) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        // Restore all tracked files
+        run_git(&repo_path, &["checkout", "--", "."])?;
+        // Remove all untracked files and directories
+        run_git(&repo_path, &["clean", "-fd"])?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+// --- Log ---
+
+#[derive(Serialize)]
+pub struct GitLogEntry {
+    pub hash: String,
+    pub short_hash: String,
+    pub message: String,
+    pub author: String,
+    pub relative_time: String,
+}
+
+#[tauri::command]
+pub async fn git_log(repo_path: String, limit: Option<u32>) -> Result<Vec<GitLogEntry>, String> {
+    let limit = limit.unwrap_or(10);
+    tokio::task::spawn_blocking(move || {
+        let limit_str = format!("-{}", limit);
+        let output = run_git(
+            &repo_path,
+            &["log", &limit_str, "--format=%H%x00%h%x00%s%x00%an%x00%ar"],
+        )?;
+        let entries = output
+            .lines()
+            .filter(|l| !l.is_empty())
+            .filter_map(|line| {
+                let parts: Vec<&str> = line.splitn(5, '\0').collect();
+                if parts.len() == 5 {
+                    Some(GitLogEntry {
+                        hash: parts[0].to_string(),
+                        short_hash: parts[1].to_string(),
+                        message: parts[2].to_string(),
+                        author: parts[3].to_string(),
+                        relative_time: parts[4].to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(entries)
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
+// --- Revert ---
+
+#[tauri::command]
+pub async fn git_revert(repo_path: String, commit_hash: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        run_git(&repo_path, &["revert", "--no-edit", &commit_hash])
+            .map(|s| s.trim().to_string())
+    })
+    .await
+    .map_err(|e| format!("Task error: {e}"))?
+}
+
 // --- Clone ---
 
 #[tauri::command]
