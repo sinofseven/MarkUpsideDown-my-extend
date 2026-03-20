@@ -1213,7 +1213,7 @@ pub async fn duplicate_entry(path: String) -> Result<String, String> {
     .await
     .map_err(|e| format!("Task error: {e}"))??;
 
-    let src = std::path::Path::new(&path);
+    let src = &validated;
     if src.is_dir() {
         copy_dir_recursive(src, &dest).await?;
     } else {
