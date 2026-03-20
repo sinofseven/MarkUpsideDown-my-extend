@@ -475,7 +475,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
           <div id="settings-mcp-tab-content" class="settings-mcp-tab-content"></div>
         </div>
         <details class="settings-mcp-tools-details">
-          <summary>Available tools (15)</summary>
+          <summary>Available tools (36)</summary>
           <div class="settings-mcp-tools-list">
             <div class="settings-mcp-tool"><code>get_editor_content</code> &mdash; Get current Markdown from the editor</div>
             <div class="settings-mcp-tool"><code>set_editor_content</code> &mdash; Replace editor content</div>
@@ -490,7 +490,29 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
             <div class="settings-mcp-tool"><code>convert_to_markdown</code> &mdash; Convert local file to Markdown</div>
             <div class="settings-mcp-tool"><code>crawl_website</code> &mdash; Start a website crawl job</div>
             <div class="settings-mcp-tool"><code>crawl_status</code> &mdash; Poll crawl job status and retrieve pages</div>
-            <div class="settings-mcp-tool"><code>check_worker</code> &mdash; Test Worker connectivity and capabilities</div>
+            <div class="settings-mcp-tool"><code>crawl_save</code> &mdash; Save crawled pages as local Markdown files</div>
+            <div class="settings-mcp-tool"><code>list_directory</code> &mdash; List files and directories in the project</div>
+            <div class="settings-mcp-tool"><code>read_file</code> &mdash; Read a text file from the project</div>
+            <div class="settings-mcp-tool"><code>search_files</code> &mdash; Search file names in the project</div>
+            <div class="settings-mcp-tool"><code>create_file</code> &mdash; Create a new empty file</div>
+            <div class="settings-mcp-tool"><code>create_directory</code> &mdash; Create a new directory</div>
+            <div class="settings-mcp-tool"><code>rename_entry</code> &mdash; Rename or move a file or directory</div>
+            <div class="settings-mcp-tool"><code>delete_entry</code> &mdash; Delete a file or directory (moved to trash)</div>
+            <div class="settings-mcp-tool"><code>copy_entry</code> &mdash; Copy a file or directory to another directory</div>
+            <div class="settings-mcp-tool"><code>duplicate_entry</code> &mdash; Duplicate a file or directory</div>
+            <div class="settings-mcp-tool"><code>download_image</code> &mdash; Download an image from a URL to local path</div>
+            <div class="settings-mcp-tool"><code>fetch_page_title</code> &mdash; Extract page title for Markdown links</div>
+            <div class="settings-mcp-tool"><code>get_open_tabs</code> &mdash; List all open editor tabs</div>
+            <div class="settings-mcp-tool"><code>get_project_root</code> &mdash; Get the current project root path</div>
+            <div class="settings-mcp-tool"><code>get_dirty_files</code> &mdash; List files with unsaved changes</div>
+            <div class="settings-mcp-tool"><code>switch_tab</code> &mdash; Switch the active editor tab</div>
+            <div class="settings-mcp-tool"><code>git_status</code> &mdash; Get git status of the project</div>
+            <div class="settings-mcp-tool"><code>git_stage</code> &mdash; Stage a file for commit</div>
+            <div class="settings-mcp-tool"><code>git_unstage</code> &mdash; Unstage a file</div>
+            <div class="settings-mcp-tool"><code>git_commit</code> &mdash; Commit staged changes</div>
+            <div class="settings-mcp-tool"><code>git_push</code> &mdash; Push commits to remote</div>
+            <div class="settings-mcp-tool"><code>git_pull</code> &mdash; Pull changes from remote</div>
+            <div class="settings-mcp-tool"><code>git_fetch</code> &mdash; Fetch updates from remote</div>
           </div>
         </details>
       </div>
@@ -851,10 +873,5 @@ export function checkFirstRun() {
   }
 }
 
-export function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+// Re-exported from html-utils.ts for backward compatibility
+export { escapeHtml } from "./html-utils.ts";

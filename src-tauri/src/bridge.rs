@@ -529,15 +529,22 @@ async fn git_commit(
     }
 }
 
+async fn git_remote_op(
+    _state: &BridgeState,
+    op: impl std::future::Future<Output = Result<String, String>>,
+) -> Json<serde_json::Value> {
+    match op.await {
+        Ok(output) => Json(serde_json::json!({ "output": output })),
+        Err(e) => Json(serde_json::json!({ "error": e })),
+    }
+}
+
 async fn git_push(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
     let repo_path = match get_repo_path(&state) {
         Ok(p) => p,
         Err(e) => return e,
     };
-    match commands::git_push(repo_path).await {
-        Ok(output) => Json(serde_json::json!({ "output": output })),
-        Err(e) => Json(serde_json::json!({ "error": e })),
-    }
+    git_remote_op(&state, commands::git_push(repo_path)).await
 }
 
 async fn git_pull(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
@@ -545,10 +552,7 @@ async fn git_pull(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Val
         Ok(p) => p,
         Err(e) => return e,
     };
-    match commands::git_pull(repo_path).await {
-        Ok(output) => Json(serde_json::json!({ "output": output })),
-        Err(e) => Json(serde_json::json!({ "error": e })),
-    }
+    git_remote_op(&state, commands::git_pull(repo_path)).await
 }
 
 async fn git_fetch(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
@@ -556,10 +560,7 @@ async fn git_fetch(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Va
         Ok(p) => p,
         Err(e) => return e,
     };
-    match commands::git_fetch(repo_path).await {
-        Ok(output) => Json(serde_json::json!({ "output": output })),
-        Err(e) => Json(serde_json::json!({ "error": e })),
-    }
+    git_remote_op(&state, commands::git_fetch(repo_path)).await
 }
 
 // --- File copy/duplicate handlers ---
@@ -680,28 +681,7 @@ async fn fetch_page_title(
         let bytes = response.bytes().await.map_err(|e| format!("Failed to read body: {e}"))?;
         let text = String::from_utf8_lossy(&bytes[..bytes.len().min(65536)]);
 
-        let lower = text.to_ascii_lowercase();
-        let start = lower.find("<title").and_then(|i| lower[i..].find('>').map(|j| i + j + 1));
-        let end = lower.find("</title>");
-        match (start, end) {
-            (Some(s), Some(e)) if s < e => {
-                let title = text[s..e].trim().to_string();
-                let title = title
-                    .replace("&amp;", "&")
-                    .replace("&lt;", "<")
-                    .replace("&gt;", ">")
-                    .replace("&quot;", "\"")
-                    .replace("&#39;", "'")
-                    .replace("&#x27;", "'")
-                    .replace("&apos;", "'");
-                if title.is_empty() {
-                    Err("Empty title".to_string())
-                } else {
-                    Ok(title)
-                }
-            }
-            _ => Err("No title found".to_string()),
-        }
+        crate::util::extract_html_title(&text)
     }
     .await;
 

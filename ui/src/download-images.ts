@@ -2,6 +2,7 @@
 // rewriting URLs to relative paths.
 
 import type { EditorView } from "@codemirror/view";
+import { dirname } from "./path-utils.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -20,8 +21,7 @@ export function initDownloadImages(d: DownloadImagesDeps) {
 }
 
 function getAssetsDir(filePath: string): string {
-  const dir = filePath.substring(0, filePath.lastIndexOf("/"));
-  return `${dir}/assets`;
+  return `${dirname(filePath)}/assets`;
 }
 
 function urlToFilename(url: string): string {

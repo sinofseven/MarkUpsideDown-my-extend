@@ -3,11 +3,16 @@ export function basename(path: string): string {
   return path.split("/").pop() || path;
 }
 
+/** Extract the directory portion of a path (everything before the last `/`). */
+export function dirname(path: string): string {
+  return path.substring(0, path.lastIndexOf("/"));
+}
+
 /** Compute a relative path from one file to another. */
 export function buildRelativePath(fromFile: string, toFile: string): string {
-  const fromDir = fromFile.substring(0, fromFile.lastIndexOf("/"));
-  const toDir = toFile.substring(0, toFile.lastIndexOf("/"));
-  const toName = toFile.substring(toFile.lastIndexOf("/") + 1);
+  const fromDir = dirname(fromFile);
+  const toDir = dirname(toFile);
+  const toName = basename(toFile);
 
   if (fromDir === toDir) {
     return `./${toName}`;

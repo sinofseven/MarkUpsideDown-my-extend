@@ -1,6 +1,6 @@
 import { createGitBadge, applyGitNameStyle } from "./git-panel.ts";
 import { IMPORT_EXTENSIONS, convertFile } from "./file-ops.ts";
-import { basename } from "./path-utils.ts";
+import { basename, dirname } from "./path-utils.ts";
 import { escapeHtml } from "./settings.ts";
 import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
 import { KEY_SIDEBAR, KEY_SIDEBAR_SORT, KEY_SIDEBAR_PANEL } from "./storage-keys.ts";
@@ -1133,7 +1133,7 @@ function showContextMenu(event: MouseEvent, entry: DirEntry) {
 
   const items: ({ label: string; action: () => void; danger?: boolean } | null)[] = [];
 
-  const parentDir = entry.path.substring(0, entry.path.lastIndexOf("/"));
+  const parentDir = dirname(entry.path);
 
   if (entry.is_dir) {
     items.push({ label: "New File…", action: () => promptNewFile(entry.path) });
@@ -1336,7 +1336,7 @@ function promptRename(entry: DirEntry) {
       return;
     }
     try {
-      const parentDir = entry.path.substring(0, entry.path.lastIndexOf("/"));
+      const parentDir = dirname(entry.path);
       const newPath = `${parentDir}/${newName}`;
       await invoke("rename_entry", { from: entry.path, to: newPath });
       if (selectedPaths.has(entry.path)) {
@@ -1513,7 +1513,7 @@ function handleTreeKeydown(e: KeyboardEvent) {
         toggleDirectory(path);
       } else if (path) {
         // Move to parent directory
-        const parentPath = path.substring(0, path.lastIndexOf("/"));
+        const parentPath = dirname(path);
         if (parentPath && parentPath !== rootPath) {
           focusItemByPath(parentPath);
         }
@@ -1617,7 +1617,7 @@ async function pasteEntry() {
     if (item?.dataset.isDir === "true") {
       targetDir = primary;
     } else {
-      targetDir = primary.substring(0, primary.lastIndexOf("/"));
+      targetDir = dirname(primary);
     }
   }
   if (!targetDir) targetDir = rootPath;
@@ -1665,7 +1665,7 @@ export async function revealPath(filePath: string) {
   if (activePanel !== "files") return;
 
   // Expand all parent directories
-  let dir = filePath.substring(0, filePath.lastIndexOf("/"));
+  let dir = dirname(filePath);
   let changed = false;
   while (dir.length >= rootPath.length) {
     if (!expandedDirs.has(dir)) {
@@ -1673,7 +1673,7 @@ export async function revealPath(filePath: string) {
       changed = true;
     }
     if (dir === rootPath) break;
-    dir = dir.substring(0, dir.lastIndexOf("/"));
+    dir = dirname(dir);
   }
 
   if (changed) {

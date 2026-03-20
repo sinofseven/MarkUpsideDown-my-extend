@@ -2,7 +2,7 @@
 // replacing the selection with a link to the new file.
 
 import type { EditorView } from "@codemirror/view";
-import { basename, buildRelativePath } from "./path-utils.ts";
+import { basename, dirname, buildRelativePath } from "./path-utils.ts";
 
 const { save } = window.__TAURI__.dialog;
 const { writeTextFile } = window.__TAURI__.fs;
@@ -45,9 +45,7 @@ export async function extractToNewNote() {
       .replace(/\s+/g, "-")
       .toLowerCase() || "extracted-note";
 
-  const defaultDir = currentPath
-    ? currentPath.substring(0, currentPath.lastIndexOf("/"))
-    : undefined;
+  const defaultDir = currentPath ? dirname(currentPath) : undefined;
 
   const newPath = await save({
     defaultPath: defaultDir ? `${defaultDir}/${suggestedName}.md` : `${suggestedName}.md`,

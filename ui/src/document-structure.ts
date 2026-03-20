@@ -108,7 +108,17 @@ function findCodeBlockRanges(lines: string[]): [number, number][] {
 }
 
 function isInCodeBlock(lineIdx: number, ranges: [number, number][]): boolean {
-  return ranges.some(([s, e]) => lineIdx >= s && lineIdx <= e);
+  // Binary search: ranges are sorted by start index
+  let lo = 0;
+  let hi = ranges.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [s, e] = ranges[mid];
+    if (lineIdx < s) hi = mid - 1;
+    else if (lineIdx > e) lo = mid + 1;
+    else return true;
+  }
+  return false;
 }
 
 /** Parse all headings from lines. */
