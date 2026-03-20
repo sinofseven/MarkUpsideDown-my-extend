@@ -883,6 +883,42 @@ fn strip_js_hrefs(input: &str, lower: &str) -> String {
     out
 }
 
+// --- Path Validation ---
+
+/// Validate and sanitize a user-provided path to prevent path traversal attacks.
+/// Ensures the resolved path is under the user's home directory.
+fn validate_path(path: &str) -> Result<std::path::PathBuf, String> {
+    let p = std::path::Path::new(path);
+
+    // For existing paths, canonicalize resolves symlinks and `..`
+    let resolved = if p.exists() {
+        p.canonicalize()
+            .map_err(|e| format!("Invalid path: {e}"))?
+    } else {
+        // For not-yet-existing paths, canonicalize the parent and append the file name
+        let parent = p
+            .parent()
+            .ok_or_else(|| "Invalid path: no parent directory".to_string())?;
+        let file_name = p
+            .file_name()
+            .ok_or_else(|| "Invalid path: no file name".to_string())?;
+        let canonical_parent = parent
+            .canonicalize()
+            .map_err(|e| format!("Invalid parent path: {e}"))?;
+        canonical_parent.join(file_name)
+    };
+
+    let home = crate::util::home_dir().ok_or_else(|| "Cannot determine home directory".to_string())?;
+    if !resolved.starts_with(&home) {
+        return Err(format!(
+            "Access denied: path must be under {}",
+            home.display()
+        ));
+    }
+
+    Ok(resolved)
+}
+
 // --- File Tree ---
 
 #[derive(Serialize)]
@@ -896,6 +932,7 @@ pub struct FileEntry {
 
 #[tauri::command]
 pub async fn read_text_file(path: String) -> Result<String, String> {
+    let path = validate_path(&path)?;
     tokio::fs::read_to_string(&path)
         .await
         .map_err(|e| format!("Failed to read file: {e}"))
@@ -906,9 +943,9 @@ pub async fn list_directory(
     path: String,
     repo_root: Option<String>,
 ) -> Result<Vec<FileEntry>, String> {
-    let path = std::path::Path::new(&path);
+    let path = validate_path(&path)?;
     let mut entries = Vec::new();
-    let mut read_dir = tokio::fs::read_dir(path)
+    let mut read_dir = tokio::fs::read_dir(&path)
         .await
         .map_err(|e| format!("Failed to read directory: {e}"))?;
 
@@ -984,11 +1021,11 @@ fn git_check_ignore(repo_path: &str, paths: &[&str]) -> std::collections::HashSe
 
 #[tauri::command]
 pub async fn create_file(path: String) -> Result<(), String> {
-    let p = std::path::Path::new(&path);
+    let p = validate_path(&path)?;
     match tokio::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(p)
+        .open(&p)
         .await
     {
         Ok(_) => Ok(()),
@@ -1001,8 +1038,8 @@ pub async fn create_file(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn create_directory(path: String) -> Result<(), String> {
-    let p = std::path::Path::new(&path);
-    match tokio::fs::create_dir(p).await {
+    let p = validate_path(&path)?;
+    match tokio::fs::create_dir(&p).await {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
             Err("Directory already exists".to_string())
@@ -1013,6 +1050,8 @@ pub async fn create_directory(path: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn rename_entry(from: String, to: String) -> Result<(), String> {
+    let from = validate_path(&from)?;
+    let to = validate_path(&to)?;
     tokio::fs::rename(&from, &to)
         .await
         .map_err(|e| format!("Failed to rename: {e}"))
@@ -1020,7 +1059,7 @@ pub async fn rename_entry(from: String, to: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn write_file_bytes(path: String, data: Vec<u8>) -> Result<(), String> {
-    let dest = std::path::Path::new(&path);
+    let dest = validate_path(&path)?;
     if dest.exists() {
         return Err(format!(
             "'{}' already exists",
@@ -1029,7 +1068,7 @@ pub async fn write_file_bytes(path: String, data: Vec<u8>) -> Result<(), String>
                 .unwrap_or_default()
         ));
     }
-    tokio::fs::write(&path, &data)
+    tokio::fs::write(&dest, &data)
         .await
         .map_err(|e| format!("Failed to write file: {e}"))
 }
@@ -1037,7 +1076,8 @@ pub async fn write_file_bytes(path: String, data: Vec<u8>) -> Result<(), String>
 #[tauri::command]
 pub async fn delete_entry(path: String, is_dir: bool) -> Result<(), String> {
     let _ = is_dir; // trash::delete handles both files and directories
-    let path_clone = path.clone();
+    let validated = validate_path(&path)?;
+    let path_clone = validated.to_string_lossy().to_string();
     tokio::task::spawn_blocking(move || {
         trash::delete(&path_clone).map_err(|e| format!("Failed to move to trash: {e}"))
     })
@@ -1047,20 +1087,21 @@ pub async fn delete_entry(path: String, is_dir: bool) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn copy_entry(from: String, to_dir: String) -> Result<String, String> {
-    let src = std::path::Path::new(&from);
+    let src = validate_path(&from)?;
+    let to_dir = validate_path(&to_dir)?;
     let file_name = src
         .file_name()
         .ok_or("Invalid source path")?
         .to_string_lossy()
         .to_string();
-    let dest = std::path::Path::new(&to_dir).join(&file_name);
+    let dest = to_dir.join(&file_name);
     if dest.exists() {
         return Err(format!("'{}' already exists in destination", file_name));
     }
     if src.is_dir() {
-        copy_dir_recursive(src, &dest).await?;
+        copy_dir_recursive(&src, &dest).await?;
     } else {
-        tokio::fs::copy(src, &dest)
+        tokio::fs::copy(&src, &dest)
             .await
             .map_err(|e| format!("Failed to copy: {e}"))?;
     }
@@ -1069,7 +1110,8 @@ pub async fn copy_entry(from: String, to_dir: String) -> Result<String, String> 
 
 #[tauri::command]
 pub async fn duplicate_entry(path: String) -> Result<String, String> {
-    let path_clone = path.clone();
+    let validated = validate_path(&path)?;
+    let path_clone = validated.to_string_lossy().to_string();
     let dest = tokio::task::spawn_blocking(move || {
         let src = std::path::Path::new(&path_clone);
         let parent = src.parent().ok_or("No parent directory")?;
