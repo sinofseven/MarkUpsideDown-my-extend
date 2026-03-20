@@ -323,13 +323,22 @@ export function preservePreviewScroll(action: () => void) {
     anchorOffset = anchorEl.getBoundingClientRect().top - previewRect.top;
   }
 
+  // Suppress scroll-sync events triggered by the reflow
+  markProgrammaticScroll();
+
   action();
+
+  // Cancel any pending sync (e.g. syncPreviewToCursor from CodeMirror selectionSet)
+  cancelAnimationFrame(scrollState.syncRAF);
+  scrollState.syncRAF = 0;
 
   // After reflow, restore so anchor element stays at the same viewport offset
   requestAnimationFrame(() => {
-    const newTop = anchorEl!.getBoundingClientRect().top - previewPane.getBoundingClientRect().top;
     markProgrammaticScroll();
+    const newTop = anchorEl!.getBoundingClientRect().top - previewPane.getBoundingClientRect().top;
     previewPane.scrollTop += newTop - anchorOffset;
+    // Best-effort: sync editor scroll to match preview position
+    syncToEditor();
   });
 }
 
