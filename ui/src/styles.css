@@ -1407,27 +1407,18 @@ body {
   }
 }
 
-/* GitHub Panel */
-#github-panel {
+/* Clone Panel */
+#clone-panel {
   flex-shrink: 0;
 }
 
-.gh-panel-header {
-  padding: 6px 10px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-.gh-input-row {
+.clone-input-row {
   display: flex;
   gap: 4px;
-  padding: 0 8px 6px;
+  padding: 4px 8px;
 }
 
-.gh-input {
+.clone-input {
   flex: 1;
   background: var(--bg);
   color: var(--text);
@@ -1440,11 +1431,15 @@ body {
   min-width: 0;
 }
 
-.gh-input:focus {
+.clone-input:focus {
   border-color: var(--accent);
 }
 
-.gh-fetch-btn {
+.clone-dest-input {
+  cursor: default;
+}
+
+.clone-btn {
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
@@ -1455,25 +1450,34 @@ body {
   flex-shrink: 0;
 }
 
-.gh-fetch-btn:hover {
+.clone-btn:hover {
   background: var(--border);
 }
 
-.gh-status {
-  padding: 0 10px 6px;
+.clone-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.clone-btn-primary {
+  width: 100%;
+}
+
+.clone-status {
+  padding: 2px 10px 6px;
   font-size: 10px;
   min-height: 14px;
 }
 
-.gh-status-ok {
+.clone-status-ok {
   color: var(--success);
 }
 
-.gh-status-error {
+.clone-status-error {
   color: var(--error);
 }
 
-.gh-status-pending {
+.clone-status-pending {
   color: var(--text-muted);
 }
 

@@ -42,7 +42,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 
 - **File tree sidebar** — Browse, create, rename, duplicate, delete files and folders; drag & drop, search
 - **Git panel** — View changes, stage/unstage files, commit, push/pull with ahead/behind counts, fetch
-- **GitHub panel** — Fetch issue and PR bodies by reference (`owner/repo#123` or URL)
+- **Clone repository** — Clone Git repositories (HTTPS/SSH) and open them in the editor
 
 ### Clipboard
 

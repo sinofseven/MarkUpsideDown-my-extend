@@ -132,7 +132,7 @@ function updateSelectionDOM() {
 type SortBy = "name" | "date" | "type";
 let sortBy: SortBy = (localStorage.getItem(KEY_SIDEBAR_SORT) as SortBy) || "name";
 
-export type SidebarPanel = "files" | "git" | "github";
+export type SidebarPanel = "files" | "git" | "clone";
 let activePanel: SidebarPanel = "files";
 
 // --- DOM ---
@@ -140,7 +140,7 @@ let activePanel: SidebarPanel = "files";
 let sidebarEl: HTMLElement | null = null;
 let treeEl: HTMLElement | null = null;
 let gitPanelSlot: HTMLElement | null = null;
-let ghPanelSlot: HTMLElement | null = null;
+let clonePanelSlot: HTMLElement | null = null;
 let filesContainer: HTMLElement | null = null;
 let navBar: HTMLElement | null = null;
 let gitChangeCount = 0;
@@ -179,7 +179,7 @@ export function initSidebar(
 
   // Restore active panel
   const savedPanel = localStorage.getItem(KEY_SIDEBAR_PANEL);
-  if (savedPanel === "files" || savedPanel === "git" || savedPanel === "github") {
+  if (savedPanel === "files" || savedPanel === "git" || savedPanel === "clone") {
     activePanel = savedPanel;
   }
 
@@ -419,20 +419,20 @@ function render() {
   }
   sidebarEl.appendChild(gitPanelSlot);
 
-  // GitHub panel slot — reuse existing element
-  if (!ghPanelSlot) {
-    ghPanelSlot = document.createElement("div");
-    ghPanelSlot.id = "github-panel";
-    ghPanelSlot.className = "sidebar-panel-content";
+  // Clone panel slot — reuse existing element
+  if (!clonePanelSlot) {
+    clonePanelSlot = document.createElement("div");
+    clonePanelSlot.id = "clone-panel";
+    clonePanelSlot.className = "sidebar-panel-content";
   }
-  sidebarEl.appendChild(ghPanelSlot);
+  sidebarEl.appendChild(clonePanelSlot);
 
   // Bottom nav bar
   navBar = document.createElement("div");
   navBar.className = "sidebar-nav";
   navBar.appendChild(createNavButton("files", "Files", SVG_FILES));
   navBar.appendChild(createNavButton("git", "Git", SVG_GIT));
-  navBar.appendChild(createNavButton("github", "GitHub", SVG_GITHUB));
+  navBar.appendChild(createNavButton("clone", "Clone", SVG_CLONE));
   sidebarEl.appendChild(navBar);
 
   updatePanelVisibility();
@@ -444,15 +444,15 @@ function panelTitle(): string {
       return rootPath ? basename(rootPath) : "Files";
     case "git":
       return "Source Control";
-    case "github":
-      return "GitHub";
+    case "clone":
+      return "Clone Repository";
   }
 }
 
 // SVG icons (16x16, stroke-based for consistency)
 const SVG_FILES = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 2h4l2 2h6v9H2V2z"/><path d="M2 5h12"/></svg>`;
 const SVG_GIT = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="3.5" r="1.5"/><circle cx="8" cy="12.5" r="1.5"/><circle cx="12" cy="8" r="1.5"/><path d="M8 5v6"/><path d="M9.4 4.2 11 6.5"/></svg>`;
-const SVG_GITHUB = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="5" r="1"/><circle cx="10.5" cy="5" r="1"/><path d="M5.5 10c0 1.5 1.5 2.5 2.5 2.5s2.5-1 2.5-2.5"/><rect x="2" y="1.5" width="12" height="10" rx="2"/><path d="M5 11.5V14"/><path d="M11 11.5V14"/></svg>`;
+const SVG_CLONE = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8"/><path d="M5 7l3 3 3-3"/><path d="M2 11v2a1 1 0 001 1h10a1 1 0 001-1v-2"/></svg>`;
 
 function syncGitBadge(btn: Element, count: number) {
   const existing = btn.querySelector(".sidebar-nav-badge");
@@ -501,7 +501,7 @@ export function switchPanel(panel: SidebarPanel) {
 function updatePanelVisibility() {
   if (filesContainer) filesContainer.style.display = activePanel === "files" ? "" : "none";
   if (gitPanelSlot) gitPanelSlot.style.display = activePanel === "git" ? "" : "none";
-  if (ghPanelSlot) ghPanelSlot.style.display = activePanel === "github" ? "" : "none";
+  if (clonePanelSlot) clonePanelSlot.style.display = activePanel === "clone" ? "" : "none";
 }
 
 function updateNavButtons() {
@@ -523,8 +523,19 @@ export function getGitPanelEl() {
   return gitPanelSlot;
 }
 
-export function getGitHubPanelEl() {
-  return ghPanelSlot;
+export function getClonePanelEl() {
+  return clonePanelSlot;
+}
+
+export function openFolderByPath(path: string) {
+  rootPath = path;
+  expandedDirs.clear();
+  expandedDirs.add(rootPath);
+  saveState();
+  render();
+  refreshTree();
+  startDirWatcher();
+  onFolderChange?.(rootPath);
 }
 
 async function startDirWatcher() {

@@ -22,7 +22,8 @@ import {
   getRootPath,
   setGitStatus,
   getGitPanelEl,
-  getGitHubPanelEl,
+  getClonePanelEl,
+  openFolderByPath,
   updateGitChangeCount,
   refreshTree,
   SIDEBAR_IMAGE_MIME,
@@ -35,7 +36,7 @@ import {
   getChangeCount,
   getBranch,
 } from "./git-panel.ts";
-import { initGitHubPanel } from "./github-panel.ts";
+import { initClonePanel } from "./clone-panel.ts";
 
 import {
   initTabs,
@@ -551,12 +552,12 @@ if (gitPanelEl) {
   });
 }
 
-const ghPanelEl = getGitHubPanelEl();
-if (ghPanelEl) {
-  initGitHubPanel(ghPanelEl, {
-    onContent: (body: string, ref_: string) => {
-      loadContentAsTab(body);
-      statusEl.textContent = `Fetched: ${ref_}`;
+const clonePanelEl = getClonePanelEl();
+if (clonePanelEl) {
+  initClonePanel(clonePanelEl, {
+    onComplete: (repoPath: string) => {
+      openFolderByPath(repoPath);
+      statusEl.textContent = `Cloned: ${basename(repoPath)}`;
     },
   });
 }

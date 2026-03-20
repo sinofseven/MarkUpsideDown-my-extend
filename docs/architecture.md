@@ -52,7 +52,7 @@ MCP Server (mcp-server-rs/)
 | Sidebar | File tree browser with context menu, search, drag & drop | `ui/src/sidebar.ts` |
 | Tabs | Multi-tab editing with state persistence, drag reorder | `ui/src/tabs.ts` |
 | Git panel | Status, stage/unstage, commit, push/pull with ahead/behind, fetch | `ui/src/git-panel.ts` |
-| GitHub panel | Issue/PR body fetcher via `gh` CLI | `ui/src/github-panel.ts` |
+| Clone panel | Repository clone UI (HTTPS/SSH) | `ui/src/clone-panel.ts` |
 | Claude panel | Chat UI via Claude Code CLI stream-json mode | `ui/src/claude-panel.ts` |
 | Table editor | Spreadsheet grid with undo/redo, paste TSV/CSV | `ui/src/table-editor.ts` |
 | Formatting | Markdown shortcuts (bold, italic, link, strikethrough, code) | `ui/src/markdown-commands.ts` |
@@ -157,13 +157,11 @@ See [mcp-server.md](mcp-server.md) for the full tool list.
 | `git_pull` | Pull from remote | `commands.rs` |
 | `git_fetch` | Fetch remote updates | `commands.rs` |
 
-### GitHub
+### Clone
 
 | Command | Description | Module |
 |---------|-------------|--------|
-| `github_fetch_issue` | Fetch GitHub issue body via `gh` CLI | `commands.rs` |
-| `github_fetch_pr` | Fetch GitHub PR body via `gh` CLI | `commands.rs` |
-| `github_list_repos` | List GitHub repos via `gh` CLI | `commands.rs` |
+| `git_clone` | Clone a Git repository to a local directory | `commands.rs` |
 
 ### Cloudflare / Wrangler
 

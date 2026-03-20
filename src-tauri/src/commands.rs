@@ -1643,37 +1643,12 @@ pub async fn git_fetch(repo_path: String) -> Result<String, String> {
     git_remote_command(repo_path, "fetch").await
 }
 
-// --- GitHub via gh CLI ---
-
-fn run_gh(args: &[&str]) -> Result<String, String> {
-    run_cli("gh", args).map(|s| s.trim().to_string())
-}
-
-fn gh_fetch_body(kind: &str, owner: &str, repo: &str, number: u64) -> Result<String, String> {
-    let num = number.to_string();
-    let repo_arg = format!("{owner}/{repo}");
-    run_gh(&[kind, "view", &num, "--repo", &repo_arg, "--json", "body", "--jq", ".body"])
-}
+// --- Clone ---
 
 #[tauri::command]
-pub async fn github_fetch_issue(owner: String, repo: String, number: u64) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || gh_fetch_body("issue", &owner, &repo, number))
-        .await
-        .map_err(|e| format!("Task error: {e}"))?
-}
-
-#[tauri::command]
-pub async fn github_fetch_pr(owner: String, repo: String, number: u64) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || gh_fetch_body("pr", &owner, &repo, number))
-        .await
-        .map_err(|e| format!("Task error: {e}"))?
-}
-
-#[tauri::command]
-pub async fn github_list_repos() -> Result<Vec<String>, String> {
-    tokio::task::spawn_blocking(|| {
-        let output = run_gh(&["repo", "list", "--json", "nameWithOwner", "--jq", ".[].nameWithOwner"])?;
-        Ok(output.lines().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+pub async fn git_clone(url: String, dest: String) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || {
+        run_cli("git", &["clone", &url, &dest]).map(|s| s.trim().to_string())
     })
     .await
     .map_err(|e| format!("Task error: {e}"))?
