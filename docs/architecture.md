@@ -243,14 +243,6 @@ The Tauri backend runs an axum HTTP server on `localhost:31415` (fallback: 31416
 | `/git/pull` | POST | Pull from remote |
 | `/git/fetch` | POST | Fetch from remote |
 
-### GitHub
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/github/issue` | GET | Fetch issue body as Markdown |
-| `/github/pr` | GET | Fetch PR body as Markdown |
-| `/github/repos` | GET | List accessible repositories |
-
 ## Scroll Sync
 
 The editor and preview panes are bidirectionally scroll-synced using viewport-based live measurement:
@@ -283,7 +275,7 @@ Preview updates use idiomorph (DOM-diffing) instead of innerHTML for flicker-fre
 | Website crawl | reqwest → Worker `/crawl` → Browser Rendering → poll → save .md files |
 | SVG inlining | reqwest → SVG URL → sanitize (string-based) → inline DOM |
 | Git operations | `git` CLI subprocess (via `spawn_blocking`) |
-| GitHub | `gh` CLI subprocess |
+| Git clone | `git` CLI subprocess |
 | MCP agent access | MCP Server → HTTP → axum bridge → Tauri events → Frontend |
 | Claude chat | Claude Code CLI (stream-json) → stdout → Tauri events → Frontend |
 | Auto-setup | Rust → wrangler CLI → Cloudflare API |
