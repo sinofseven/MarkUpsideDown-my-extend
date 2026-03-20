@@ -1,0 +1,88 @@
+// Smart Typography: auto-convert ASCII quotes, dashes, and ellipsis
+// as the user types. Respects code blocks and inline code.
+
+import { ViewPlugin, ViewUpdate } from "@codemirror/view";
+
+const STORAGE_KEY = "markupsidedown:smartTypography";
+
+export function isSmartTypographyEnabled(): boolean {
+  return localStorage.getItem(STORAGE_KEY) !== "0";
+}
+
+export function setSmartTypographyEnabled(enabled: boolean) {
+  localStorage.setItem(STORAGE_KEY, enabled ? "1" : "0");
+}
+
+interface Rule {
+  pattern: RegExp;
+  replace: string | ((match: RegExpMatchArray) => string);
+}
+
+const rules: Rule[] = [
+  // Ellipsis: three dots → …
+  { pattern: /\.\.\./, replace: "\u2026" },
+  // Em dash: three hyphens → —
+  { pattern: /---/, replace: "\u2014" },
+  // En dash: two hyphens → –
+  { pattern: /--/, replace: "\u2013" },
+];
+
+function isInsideCode(doc: string, pos: number): boolean {
+  const before = doc.slice(0, pos);
+
+  // Inside fenced code block?
+  const fences = before.split("```").length - 1;
+  if (fences % 2 === 1) return true;
+
+  // Inside inline code? Count backticks on the current line
+  const lineStart = before.lastIndexOf("\n") + 1;
+  const line = before.slice(lineStart);
+  const backticks = line.split("`").length - 1;
+  return backticks % 2 === 1;
+}
+
+export const smartTypography = ViewPlugin.fromClass(
+  class {
+    update(update: ViewUpdate) {
+      if (!update.docChanged || !isSmartTypographyEnabled()) return;
+
+      for (const tr of update.transactions) {
+        if (!tr.isUserEvent("input.type") && !tr.isUserEvent("input")) continue;
+
+        tr.changes.iterChanges((_fromA, _toA, _fromB, toB) => {
+          const doc = update.state.doc.toString();
+
+          for (const rule of rules) {
+            const len = rule.pattern.source.length;
+            // Check the characters just before cursor
+            const start = Math.max(0, toB - len);
+            const segment = doc.slice(start, toB);
+            const match = segment.match(rule.pattern);
+            if (!match) continue;
+
+            const matchStart = start + match.index!;
+            const matchEnd = matchStart + match[0].length;
+
+            if (isInsideCode(doc, matchStart)) continue;
+
+            const replacement =
+              typeof rule.replace === "function" ? rule.replace(match) : rule.replace;
+
+            // Schedule the replacement after the current transaction
+            requestAnimationFrame(() => {
+              // Re-verify the text is still there
+              const currentDoc = update.view.state.doc.toString();
+              if (currentDoc.slice(matchStart, matchEnd) === match[0]) {
+                update.view.dispatch({
+                  changes: { from: matchStart, to: matchEnd, insert: replacement },
+                  selection: { anchor: matchStart + replacement.length },
+                });
+              }
+            });
+            return; // Only one rule per keystroke
+          }
+        });
+      }
+    }
+  },
+);

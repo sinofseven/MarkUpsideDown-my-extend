@@ -88,6 +88,13 @@ import {
 } from "./markdown-commands.ts";
 import { basename } from "./path-utils.ts";
 import { registerCommands, toggle as toggleCommandPalette } from "./command-palette.ts";
+import { autoLinkTitle } from "./auto-link-title.ts";
+import { initLinkContextMenu } from "./link-context-menu.ts";
+import { smartTypography } from "./smart-typography.ts";
+import { initDownloadImages, downloadExternalImages } from "./download-images.ts";
+import { initNoteRefactor, extractToNewNote } from "./note-refactor.ts";
+import { initFrontmatterPanel, updateFrontmatterPanel } from "./frontmatter-panel.ts";
+import { startPresentation } from "./presentation.ts";
 import {
   initClaudePanel,
   togglePanel as _toggleClaudePanelRaw,
@@ -119,6 +126,7 @@ const updatePreviewListener = EditorView.updateListener.of((update) => {
     if (previewTimeout) clearTimeout(previewTimeout);
     previewTimeout = setTimeout(() => {
       renderPreview(content);
+      updateFrontmatterPanel(content);
       updateStatus(update.state);
     }, 100);
     updateActiveTab({ content });
@@ -157,6 +165,8 @@ const editor = new EditorView({
         ...historyKeymap,
         indentWithTab,
       ]),
+      autoLinkTitle,
+      smartTypography,
       updatePreviewListener,
       EditorView.lineWrapping,
     ],
@@ -190,6 +200,7 @@ function loadContent(content: string, filePath?: string | null) {
     }
   }
   renderPreview(content);
+  updateFrontmatterPanel(content);
   if (previewTimeout) {
     clearTimeout(previewTimeout);
     previewTimeout = null;
@@ -366,6 +377,26 @@ previewPane.addEventListener("click", (e) => {
   const sel = window.getSelection();
   if (sel && !sel.isCollapsed) return;
   syncPreviewClickToEditor(e);
+});
+
+// --- Frontmatter panel ---
+
+initFrontmatterPanel(editor, editorContainer);
+
+// --- Download images & note refactor ---
+
+initDownloadImages({ editor, statusEl, getCurrentFilePath });
+initNoteRefactor({ editor, statusEl, getCurrentFilePath, loadContentAsTab });
+
+// --- Link context menu in preview ---
+
+initLinkContextMenu(previewPane, {
+  statusEl,
+  loadContentAsTab,
+  normalizeMarkdown,
+  crawlUrl,
+  urlInput,
+  urlBar,
 });
 
 // --- Link hover URL preview in status bar ---
@@ -839,6 +870,24 @@ registerCommands([
     label: "Crawl Website",
     category: "Convert",
     run: () => crawlUrl(urlInput, urlBar),
+  },
+  {
+    id: "edit.downloadImages",
+    label: "Download External Images",
+    category: "Edit",
+    run: downloadExternalImages,
+  },
+  {
+    id: "edit.extractNote",
+    label: "Extract to New Note",
+    category: "Edit",
+    run: extractToNewNote,
+  },
+  {
+    id: "view.presentation",
+    label: "Start Presentation",
+    category: "View",
+    run: () => startPresentation(editor.state.doc.toString()),
   },
   {
     id: "view.sidebar",

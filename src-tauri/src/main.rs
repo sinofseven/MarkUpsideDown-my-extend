@@ -44,6 +44,8 @@ fn main() {
             commands::github_fetch_pr,
             commands::github_list_repos,
             commands::sync_editor_state,
+            commands::fetch_page_title,
+            commands::download_image,
             commands::fetch_svg,
             commands::get_mcp_binary_path,
             commands::create_cowork_workspace,

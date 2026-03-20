@@ -491,6 +491,95 @@ fn sanitize_filename(name: &str) -> String {
         .to_string()
 }
 
+// --- Fetch Page Title ---
+
+#[tauri::command]
+pub async fn fetch_page_title(
+    url: String,
+    client: tauri::State<'_, reqwest::Client>,
+) -> Result<String, String> {
+    let response = client
+        .get(&url)
+        .timeout(Duration::from_secs(10))
+        .header("Accept", "text/html")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    // Read only the first 64KB to find <title>
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read body: {e}"))?;
+    let text = String::from_utf8_lossy(&bytes[..bytes.len().min(65536)]);
+
+    // Extract <title>...</title> (case-insensitive)
+    let lower = text.to_ascii_lowercase();
+    let start = lower.find("<title").and_then(|i| lower[i..].find('>').map(|j| i + j + 1));
+    let end = lower.find("</title>");
+    match (start, end) {
+        (Some(s), Some(e)) if s < e => {
+            let title = text[s..e].trim().to_string();
+            // Decode HTML entities
+            let title = title
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&#39;", "'")
+                .replace("&#x27;", "'")
+                .replace("&apos;", "'");
+            if title.is_empty() {
+                Err("Empty title".to_string())
+            } else {
+                Ok(title)
+            }
+        }
+        _ => Err("No title found".to_string()),
+    }
+}
+
+// --- Download Image to Local File ---
+
+#[tauri::command]
+pub async fn download_image(
+    url: String,
+    dest_path: String,
+    client: tauri::State<'_, reqwest::Client>,
+) -> Result<String, String> {
+    let response = client
+        .get(&url)
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch image: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("HTTP {}", response.status()));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read image: {e}"))?;
+
+    if let Some(parent) = std::path::Path::new(&dest_path).parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Failed to create directory: {e}"))?;
+    }
+
+    tokio::fs::write(&dest_path, &bytes)
+        .await
+        .map_err(|e| format!("Failed to write image: {e}"))?;
+
+    Ok(dest_path)
+}
+
 // --- Document to Markdown via Workers AI ---
 
 #[derive(Deserialize)]

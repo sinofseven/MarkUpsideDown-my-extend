@@ -1,4 +1,5 @@
 import { isLintEnabled, setLintEnabled } from "./markdown-lint.ts";
+import { isSmartTypographyEnabled, setSmartTypographyEnabled } from "./smart-typography.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -437,6 +438,10 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
           <input type="checkbox" id="settings-lint" />
           <span class="settings-toggle-label">Markdown structure linting (heading hierarchy, links, tables)</span>
         </label>
+        <label class="settings-toggle-row">
+          <input type="checkbox" id="settings-smart-typography" />
+          <span class="settings-toggle-label">Smart typography (auto-convert ..., --, --- to typographic characters)</span>
+        </label>
       </div>
 
       <div class="settings-section">
@@ -526,6 +531,11 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   const lintCheckbox = document.getElementById("settings-lint") as HTMLInputElement;
   lintCheckbox.checked = isLintEnabled();
 
+  const smartTypoCheckbox = document.getElementById(
+    "settings-smart-typography",
+  ) as HTMLInputElement;
+  smartTypoCheckbox.checked = isSmartTypographyEnabled();
+
   // --- MCP Integration Section ---
   initMcpSection();
 
@@ -610,6 +620,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     setImageConversionAllowed(allowImageCheckbox.checked);
     setAutoSaveEnabled(autosaveCheckbox.checked);
     setLintEnabled(lintCheckbox.checked);
+    setSmartTypographyEnabled(smartTypoCheckbox.checked);
     markSetupDone();
     close();
     if (onSave) onSave(url);
