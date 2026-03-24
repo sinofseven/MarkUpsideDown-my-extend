@@ -100,8 +100,6 @@ import {
   KEY_SIDEBAR_COLLAPSED,
   KEY_EDITOR_COLLAPSED,
   KEY_PREVIEW_COLLAPSED,
-  KEY_CLAUDE_WIDTH,
-  KEY_CLAUDE_COLLAPSED,
 } from "./storage-keys.ts";
 import { registerCommands, toggle as toggleCommandPalette } from "./command-palette.ts";
 import { autoLinkTitle } from "./auto-link-title.ts";
@@ -111,16 +109,6 @@ import { initDownloadImages, downloadExternalImages } from "./download-images.ts
 import { initNoteRefactor, extractToNewNote } from "./note-refactor.ts";
 import { initFrontmatterPanel, updateFrontmatterPanel } from "./frontmatter-panel.ts";
 import { startPresentation } from "./presentation.ts";
-import {
-  initClaudePanel,
-  togglePanel as _toggleClaudePanelRaw,
-  isCollapsed as isClaudePanelCollapsed,
-} from "./claude-panel.ts";
-
-function toggleClaudePanel() {
-  preservePreviewScroll(() => _toggleClaudePanelRaw());
-}
-
 // --- Tauri APIs ---
 
 const { invoke } = window.__TAURI__.core;
@@ -637,12 +625,6 @@ previewUnfoldBtn.title = "Expand Preview (⌘3)";
 previewUnfoldBtn.innerHTML = SVG_CHEVRON_LEFT;
 appEl.appendChild(previewUnfoldBtn);
 
-const claudeUnfoldBtn = document.createElement("button");
-claudeUnfoldBtn.className = "panel-unfold-btn claude-unfold";
-claudeUnfoldBtn.title = "Expand Claude Panel (⌘4)";
-claudeUnfoldBtn.innerHTML = SVG_CHEVRON_LEFT;
-appEl.appendChild(claudeUnfoldBtn);
-
 function toggleEditor() {
   preservePreviewScroll(() => {
     const collapsed = editorContainer.classList.toggle("collapsed");
@@ -664,8 +646,6 @@ editorFoldBtn.addEventListener("click", toggleEditor);
 previewFoldBtn.addEventListener("click", togglePreview);
 editorUnfoldBtn.addEventListener("click", toggleEditor);
 previewUnfoldBtn.addEventListener("click", togglePreview);
-claudeUnfoldBtn.addEventListener("click", toggleClaudePanel);
-
 // Restore collapsed states
 if (sidebarCollapsed) {
   sidebarUnfoldBtn.classList.add("visible");
@@ -750,53 +730,6 @@ for (const tab of getTabs()) {
 // Append editor fold button to editor-header (stays at right edge)
 document.getElementById("editor-header")!.appendChild(editorFoldBtn);
 
-// --- Claude Panel ---
-
-const claudePanelEl = document.getElementById("claude-panel")!;
-const claudeDivider = document.getElementById("claude-divider")!;
-
-initClaudePanel(claudePanelEl, {
-  getCwd: () => getRootPath(),
-  getActiveFilePath: () => getCurrentFilePath(),
-  onFileEdited: (filePath: string) => {
-    const tab = getTabByPath(filePath);
-    if (tab) reloadTabFromDisk(filePath);
-  },
-  getEditorSelection: () => {
-    const sel = editor.state.selection.main;
-    if (sel.empty) return null;
-    return editor.state.sliceDoc(sel.from, sel.to);
-  },
-  listDirectory: async (path: string) => {
-    const root = getRootPath();
-    return invoke<{ name: string; path: string; is_dir: boolean }[]>("list_directory", {
-      path,
-      repoRoot: root,
-    });
-  },
-});
-
-// Claude panel divider drag
-makeDraggable(claudeDivider, (clientX) => {
-  const width = Math.max(250, Math.min(600, window.innerWidth - clientX));
-  claudePanelEl.style.width = `${width}px`;
-  claudePanelEl.classList.remove("collapsed");
-  localStorage.setItem(KEY_CLAUDE_WIDTH, String(width));
-  setStorageBool(KEY_CLAUDE_COLLAPSED, false);
-});
-
-// Hide divider and show unfold button when collapsed
-if (isClaudePanelCollapsed()) {
-  claudeDivider.style.display = "none";
-  claudeUnfoldBtn.classList.add("visible");
-}
-// Observe collapsed state for divider and unfold button visibility
-new MutationObserver(() => {
-  const collapsed = claudePanelEl.classList.contains("collapsed");
-  claudeDivider.style.display = collapsed ? "none" : "";
-  claudeUnfoldBtn.classList.toggle("visible", collapsed);
-}).observe(claudePanelEl, { attributes: true, attributeFilter: ["class"] });
-
 // --- Keyboard Shortcuts ---
 
 document.addEventListener("keydown", (e) => {
@@ -820,9 +753,6 @@ document.addEventListener("keydown", (e) => {
   } else if (e.key === "3") {
     e.preventDefault();
     togglePreview();
-  } else if (e.key === "4") {
-    e.preventDefault();
-    toggleClaudePanel();
   } else if (e.key === "c") {
     // Cmd+C with no selection: copy entire content from focused pane
     const previewEl = document.getElementById("preview-pane")!;
@@ -972,13 +902,6 @@ registerCommands([
     shortcut: "⌘3",
     category: "View",
     run: togglePreview,
-  },
-  {
-    id: "view.claude",
-    label: "Toggle Claude Panel",
-    shortcut: "⌘4",
-    category: "View",
-    run: toggleClaudePanel,
   },
   {
     id: "app.settings",

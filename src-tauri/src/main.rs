@@ -2,7 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod bridge;
-mod claude;
 mod cloudflare;
 mod commands;
 mod menu;
@@ -18,9 +17,6 @@ fn main() {
     let http_client = reqwest::Client::builder()
         .build()
         .expect("Failed to create HTTP client");
-    let claude_state = claude::new_state();
-    let claude_state_cleanup = claude_state.clone();
-
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -28,7 +24,6 @@ fn main() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(editor_states_managed)
         .manage(http_client)
-        .manage(claude_state)
 
         .setup(move |app| {
             let m = menu::build(app.handle())?;
@@ -86,10 +81,6 @@ fn main() {
             cloudflare::deploy_worker,
             cloudflare::setup_worker_secrets,
             cloudflare::setup_worker_secrets_with_token,
-            claude::claude_start,
-            claude::claude_stop,
-            claude::claude_send,
-            claude::claude_is_running,
             menu::add_recent_file,
         ])
         .on_window_event(move |window, event| {
@@ -100,13 +91,9 @@ fn main() {
                 tauri::WindowEvent::Destroyed => {
                     // Remove this window's editor state
                     editor_states_events.remove_window(window.label());
-                    // Only clean up bridge/Claude when the last window closes
+                    // Only clean up bridge when the last window closes
                     if window.app_handle().webview_windows().len() <= 1 {
                         bridge::cleanup();
-                        let state = claude_state_cleanup.clone();
-                        tokio::spawn(async move {
-                            claude::cleanup(&state).await;
-                        });
                     }
                 }
                 _ => {}

@@ -23,12 +23,3 @@ export const KEY_SIDEBAR_PANEL = "markupsidedown:sidebarPanel";
 
 // --- Tabs ---
 export const KEY_TABS = "markupsidedown:tabs";
-
-// --- Claude panel ---
-export const KEY_CLAUDE_COLLAPSED = "markupsidedown:claudeCollapsed";
-export const KEY_CLAUDE_API_KEY = "markupsidedown:claudeApiKey";
-export const KEY_CLAUDE_AUTH_MODE = "markupsidedown:claudeAuthMode";
-export const KEY_CLAUDE_PERMISSION = "markupsidedown:claudePermission";
-export const KEY_CLAUDE_WIDTH = "markupsidedown:claudeWidth";
-export const KEY_CLAUDE_MODEL = "markupsidedown:claudeModel";
-export const KEY_CLAUDE_MESSAGES = "markupsidedown:claudeMessages";
