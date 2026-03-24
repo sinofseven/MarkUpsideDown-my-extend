@@ -13,7 +13,7 @@ pub struct TabInfo {
     pub is_dirty: bool,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct EditorStateInner {
     pub content: String,
     pub file_path: Option<String>,
@@ -78,21 +78,6 @@ impl EditorStates {
     }
 }
 
-impl Clone for EditorStateInner {
-    fn clone(&self) -> Self {
-        Self {
-            content: self.content.clone(),
-            file_path: self.file_path.clone(),
-            cursor_pos: self.cursor_pos,
-            cursor_line: self.cursor_line,
-            cursor_column: self.cursor_column,
-            worker_url: self.worker_url.clone(),
-            document_structure: self.document_structure.clone(),
-            root_path: self.root_path.clone(),
-            tabs: self.tabs.clone(),
-        }
-    }
-}
 
 #[tauri::command]
 pub fn sync_editor_state(
