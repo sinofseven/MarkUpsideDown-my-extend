@@ -2845,6 +2845,101 @@ body {
   font-size: 11px;
 }
 
+.settings-mcp-banner {
+  font-size: 13px;
+  color: var(--fg, #ccc);
+  padding: 8px 12px;
+  background: var(--bg, #1a1a2e);
+  border: 1px solid var(--accent, #7c3aed);
+  border-radius: 6px;
+  margin-bottom: 4px;
+}
+
+.mcp-tab-recommended {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--accent, #7c3aed);
+  color: #fff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+.settings-mcp-tab.active .mcp-tab-recommended {
+  background: #fff;
+  color: var(--accent, #7c3aed);
+}
+
+.mcp-badge-recommended {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: var(--accent, #7c3aed);
+  color: #fff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.settings-mcp-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--fg, #ccc);
+}
+
+.settings-mcp-step {
+  line-height: 1.5;
+}
+
+.settings-mcp-step code {
+  font-size: 11px;
+  background: var(--bg, #1a1a2e);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.settings-mcp-config-label {
+  font-size: 11px;
+  color: var(--fg-muted, #888);
+}
+
+.settings-mcp-config-label code {
+  font-size: 11px;
+  background: var(--bg, #1a1a2e);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.settings-mcp-config-option {
+  font-size: 12px;
+  border: 1px solid var(--border, #333);
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.settings-mcp-config-option summary {
+  cursor: pointer;
+  color: var(--fg, #ccc);
+  font-weight: 500;
+}
+
+.settings-mcp-config-option .settings-code {
+  margin-top: 6px;
+}
+
+.settings-mcp-note {
+  font-size: 11px;
+  color: var(--fg-muted, #888);
+  font-style: italic;
+  line-height: 1.5;
+}
+
 /* Crawl dialog */
 .crawl-dialog-overlay {
   position: fixed;

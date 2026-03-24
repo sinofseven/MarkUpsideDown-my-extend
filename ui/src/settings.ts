@@ -452,6 +452,9 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
 
       <div class="settings-section">
         <div class="settings-section-title">AI Agent Integration</div>
+        <div class="settings-mcp-banner">
+          MarkUpsideDown works with any Claude client via MCP. Choose your preferred client below.
+        </div>
         <div class="settings-description">
           MCP allows AI agents (Claude Desktop, Claude Code, Cowork) to read and write your editor,
           convert documents, and fetch web pages as Markdown.
@@ -468,14 +471,15 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
         </div>
         <div class="settings-mcp-config">
           <div class="settings-mcp-tabs">
-            <button class="settings-mcp-tab active" data-mcp-target="claude-desktop">Claude Desktop</button>
-            <button class="settings-mcp-tab" data-mcp-target="claude-code">Claude Code</button>
+            <button class="settings-mcp-tab active" data-mcp-target="claude-desktop-chat">Chat</button>
+            <button class="settings-mcp-tab" data-mcp-target="claude-desktop-code"><span class="mcp-tab-recommended">Recommended</span> Code</button>
+            <button class="settings-mcp-tab" data-mcp-target="claude-code-terminal">Terminal</button>
             <button class="settings-mcp-tab" data-mcp-target="cowork">Cowork</button>
           </div>
           <div id="settings-mcp-tab-content" class="settings-mcp-tab-content"></div>
         </div>
         <details class="settings-mcp-tools-details">
-          <summary>Available tools (36)</summary>
+          <summary>Available tools (41)</summary>
           <div class="settings-mcp-tools-list">
             <div class="settings-mcp-tool"><code>get_editor_content</code> &mdash; Get current Markdown from the editor</div>
             <div class="settings-mcp-tool"><code>set_editor_content</code> &mdash; Replace editor content</div>
@@ -513,6 +517,11 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
             <div class="settings-mcp-tool"><code>git_push</code> &mdash; Push commits to remote</div>
             <div class="settings-mcp-tool"><code>git_pull</code> &mdash; Pull changes from remote</div>
             <div class="settings-mcp-tool"><code>git_fetch</code> &mdash; Fetch updates from remote</div>
+            <div class="settings-mcp-tool"><code>git_diff</code> &mdash; Get the diff for a specific file (staged or unstaged)</div>
+            <div class="settings-mcp-tool"><code>git_discard</code> &mdash; Discard changes for a specific file</div>
+            <div class="settings-mcp-tool"><code>git_discard_all</code> &mdash; Discard all uncommitted changes</div>
+            <div class="settings-mcp-tool"><code>git_log</code> &mdash; Get recent commit history</div>
+            <div class="settings-mcp-tool"><code>git_revert</code> &mdash; Revert a commit by creating a new revert commit</div>
           </div>
         </details>
       </div>
@@ -690,25 +699,92 @@ function generateMcpConfigJson(binaryPath: string, workerUrl: string) {
   );
 }
 
-function renderClaudeDesktopTab(container: HTMLElement, binaryPath: string, workerUrl: string) {
+function renderClaudeDesktopChatTab(container: HTMLElement, binaryPath: string, workerUrl: string) {
   const json = generateMcpConfigJson(binaryPath, workerUrl);
   container.innerHTML = `
     <div class="settings-mcp-instruction">
-      Add to <code>~/Library/Application Support/Claude/claude_desktop_config.json</code>
+      <strong>Claude Desktop — Chat</strong><br>
+      For the standard Claude Desktop chat interface.
     </div>
+    <div class="settings-mcp-steps">
+      <div class="settings-mcp-step"><strong>1.</strong> Open Claude Desktop &rarr; Settings &rarr; Developer &rarr; Edit Config</div>
+      <div class="settings-mcp-step"><strong>2.</strong> Paste the JSON below</div>
+      <div class="settings-mcp-step"><strong>3.</strong> Restart Claude Desktop</div>
+      <div class="settings-mcp-step"><strong>4.</strong> Start a conversation — MarkUpsideDown tools appear automatically</div>
+    </div>
+    <div class="settings-mcp-config-label">Config file: <code>~/Library/Application Support/Claude/claude_desktop_config.json</code></div>
     <pre class="settings-code settings-mcp-json">${escapeHtml(json)}</pre>
     <button class="settings-mcp-copy-btn" data-copy-text="${escapeHtml(json)}">Copy to clipboard</button>
+    <div class="settings-mcp-note">
+      MarkUpsideDown must be running for editor/file/git tools.
+      Conversion/crawl tools work standalone if Worker URL is set.
+    </div>
   `;
   attachCopyHandler(container);
 }
 
-function renderClaudeCodeTab(container: HTMLElement, binaryPath: string, workerUrl: string) {
+function renderClaudeDesktopCodeTab(container: HTMLElement, binaryPath: string, workerUrl: string) {
   const json = generateMcpConfigJson(binaryPath, workerUrl);
   container.innerHTML = `
     <div class="settings-mcp-instruction">
-      Add to <code>.mcp.json</code> in your project root (per-project), or
-      <code>~/.claude/settings.json</code> (global).
+      <strong>Claude Desktop — Code Tab</strong>
+      <span class="mcp-badge-recommended">Recommended</span><br>
+      The Code tab runs full Claude Code with access to the filesystem and all MCP tools.
+      This is the recommended replacement for the built-in Claude panel.
     </div>
+    <div class="settings-mcp-steps">
+      <div class="settings-mcp-step"><strong>1.</strong> Open Claude Desktop &rarr; Code tab</div>
+      <div class="settings-mcp-step"><strong>2.</strong> Select your project folder (the folder open in MarkUpsideDown)</div>
+      <div class="settings-mcp-step"><strong>3.</strong> Add MCP config using one of the options below</div>
+      <div class="settings-mcp-step"><strong>4.</strong> Start coding — Claude Code can read/write your editor via MCP and edit files directly</div>
+    </div>
+    <details class="settings-mcp-config-option" open>
+      <summary>Option A — Global (all projects)</summary>
+      <div class="settings-mcp-config-label">Add to <code>~/.claude/settings.json</code></div>
+      <pre class="settings-code settings-mcp-json">${escapeHtml(json)}</pre>
+      <button class="settings-mcp-copy-btn" data-copy-text="${escapeHtml(json)}">Copy to clipboard</button>
+    </details>
+    <details class="settings-mcp-config-option">
+      <summary>Option B — Per-project</summary>
+      <div class="settings-mcp-config-label">Create <code>.mcp.json</code> in your project root</div>
+      <pre class="settings-code settings-mcp-json">${escapeHtml(json)}</pre>
+      <button class="settings-mcp-copy-btn" data-copy-text="${escapeHtml(json)}">Copy to clipboard</button>
+    </details>
+    <div class="settings-mcp-note">
+      Changes to files are auto-detected by MarkUpsideDown's file-watcher — no manual reload needed.
+    </div>
+  `;
+  for (const btn of container.querySelectorAll<HTMLButtonElement>(".settings-mcp-copy-btn")) {
+    btn.addEventListener("click", async () => {
+      const text = btn.dataset.copyText || "";
+      await navigator.clipboard.writeText(text);
+      const original = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => {
+        btn.textContent = original;
+      }, 1500);
+    });
+  }
+}
+
+function renderClaudeCodeTerminalTab(
+  container: HTMLElement,
+  binaryPath: string,
+  workerUrl: string,
+) {
+  const json = generateMcpConfigJson(binaryPath, workerUrl);
+  container.innerHTML = `
+    <div class="settings-mcp-instruction">
+      <strong>Claude Code — Terminal</strong><br>
+      For users who run Claude Code from the terminal (Zed, iTerm, etc.).
+    </div>
+    <div class="settings-mcp-steps">
+      <div class="settings-mcp-step"><strong>1.</strong> Navigate to your project: <code>cd /path/to/your/project</code></div>
+      <div class="settings-mcp-step"><strong>2.</strong> Add MCP config (per-project <code>.mcp.json</code> or global <code>~/.claude/settings.json</code>)</div>
+      <div class="settings-mcp-step"><strong>3.</strong> Run <code>claude</code> in the terminal</div>
+      <div class="settings-mcp-step"><strong>4.</strong> MCP tools are available — Claude Code can interact with the editor</div>
+    </div>
+    <div class="settings-mcp-config-label">Add to <code>.mcp.json</code> in your project root, or <code>~/.claude/settings.json</code> (global)</div>
     <pre class="settings-code settings-mcp-json">${escapeHtml(json)}</pre>
     <button class="settings-mcp-copy-btn" data-copy-text="${escapeHtml(json)}">Copy to clipboard</button>
   `;
@@ -822,8 +898,9 @@ async function initMcpSection() {
   const workerUrl = getWorkerUrl();
 
   const renderers: Record<string, (container: HTMLElement) => void> = {
-    "claude-desktop": (c) => renderClaudeDesktopTab(c, mcpBinaryPath, workerUrl),
-    "claude-code": (c) => renderClaudeCodeTab(c, mcpBinaryPath, workerUrl),
+    "claude-desktop-chat": (c) => renderClaudeDesktopChatTab(c, mcpBinaryPath, workerUrl),
+    "claude-desktop-code": (c) => renderClaudeDesktopCodeTab(c, mcpBinaryPath, workerUrl),
+    "claude-code-terminal": (c) => renderClaudeCodeTerminalTab(c, mcpBinaryPath, workerUrl),
     cowork: (c) => renderCoworkTab(c, mcpBinaryPath, workerUrl),
   };
 
@@ -834,14 +911,14 @@ async function initMcpSection() {
   }
 
   // Show default tab
-  showTab("claude-desktop");
+  showTab("claude-desktop-chat");
 
   // Tab switching
   for (const tab of tabs) {
     tab.addEventListener("click", () => {
       for (const t of tabs) t.classList.remove("active");
       tab.classList.add("active");
-      showTab(tab.dataset.mcpTarget || "claude-desktop");
+      showTab(tab.dataset.mcpTarget || "claude-desktop-chat");
     });
   }
 }

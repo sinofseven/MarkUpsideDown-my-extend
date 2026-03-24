@@ -18,7 +18,7 @@ Editor (CodeMirror)
 - **Editor tools** communicate with the running app via the local HTTP bridge
 - **Conversion tools** call the Cloudflare Worker directly (app not required if Worker URL is set)
 
-## Available Tools (36)
+## Available Tools (41)
 
 ### Editor Tools (require the app to be running)
 
@@ -92,6 +92,23 @@ Editor (CodeMirror)
 | `git_push` | Push commits to remote | — |
 | `git_pull` | Pull changes from remote | — |
 | `git_fetch` | Fetch updates from remote without merging | — |
+| `git_diff` | Get the diff for a specific file | `path: string`, `staged?: boolean` |
+| `git_discard` | Discard changes for a specific file | `path: string` |
+| `git_discard_all` | Discard all uncommitted changes | — |
+| `git_log` | Get recent commit history | `limit?: number` |
+| `git_revert` | Revert a commit by creating a new revert commit | `hash: string` |
+
+
+## Recommended Workflow
+
+The best way to use AI with MarkUpsideDown is through **Claude Desktop's Code tab** or **Claude Code in the terminal**. Both provide full Claude Code capabilities and connect to MarkUpsideDown via MCP.
+
+1. Open your project in MarkUpsideDown
+2. Connect Claude Code (via Code tab or terminal) with the MCP config
+3. Claude Code can read/write your editor, manage files, and run git operations through MCP tools
+4. MarkUpsideDown's **file-watcher** automatically detects changes made by Claude Code — edits appear in real-time without manual reload
+
+This replaces the need for a built-in chat panel, since Claude Code handles the full AI interaction natively.
 
 
 ## Setup
@@ -102,7 +119,7 @@ Open **Settings** in the app and scroll to **AI Agent Integration**. The MCP bin
 
 ### 2. Configure Your AI Agent
 
-#### Claude Desktop
+#### Claude Desktop — Chat
 
 Paste the copied config into `~/Library/Application Support/Claude/claude_desktop_config.json`.
 
@@ -121,7 +138,15 @@ Example:
 }
 ```
 
-#### Claude Code
+#### Claude Desktop — Code Tab (Recommended)
+
+The Code tab runs full Claude Code with filesystem access and all MCP tools. This is the recommended way to use AI with MarkUpsideDown.
+
+Add the config to `~/.claude/settings.json` (global) or `.mcp.json` (per-project). The JSON format is the same as above.
+
+Changes made by Claude Code to files are automatically detected by MarkUpsideDown's file-watcher — no manual reload needed.
+
+#### Claude Code — Terminal
 
 Paste the copied config into your project's `.mcp.json` or global `~/.claude/settings.json`.
 
