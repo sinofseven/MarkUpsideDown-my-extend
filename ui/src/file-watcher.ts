@@ -34,25 +34,7 @@ function isRecentlySuppressed(filePath: string): boolean {
   return false;
 }
 
-async function onFileChanged(event: WatchEvent) {
-  // React to modify and create events
-  // Create events cover atomic writes (write temp file → rename over original)
-  // used by most editors (Vim, Zed, sed -i) and tools (Claude Code Edit)
-  const kind = event.type;
-  if (typeof kind !== "object") return;
-
-  // Handle file removal — close the tab for deleted files
-  if ("remove" in kind) {
-    for (const path of event.paths) {
-      if (!path) continue;
-      const tab = deps.getTabByPath(path);
-      if (tab) deps.onFileDeleted?.(path);
-    }
-    return;
-  }
-
-  if (!("modify" in kind) && !("create" in kind)) return;
-
+async function handleReload(event: WatchEvent) {
   for (const path of event.paths) {
     if (!path || isRecentlySuppressed(path)) continue;
 
@@ -65,6 +47,35 @@ async function onFileChanged(event: WatchEvent) {
     }
 
     await deps.reloadTab(path);
+  }
+}
+
+async function onFileChanged(event: WatchEvent) {
+  const kind = event.type;
+
+  // 'any' — generic event (common on macOS FSEvents); treat as modify
+  if (kind === "any") {
+    await handleReload(event);
+    return;
+  }
+
+  if (typeof kind !== "object") return;
+
+  // Handle file removal — close the tab for deleted files
+  if ("remove" in kind) {
+    for (const path of event.paths) {
+      if (!path) continue;
+      const tab = deps.getTabByPath(path);
+      if (tab) deps.onFileDeleted?.(path);
+    }
+    return;
+  }
+
+  // React to modify and create events
+  // Create events cover atomic writes (write temp file → rename over original)
+  // used by most editors (Vim, Zed, sed -i) and tools (Claude Code Edit)
+  if ("modify" in kind || "create" in kind) {
+    await handleReload(event);
   }
 }
 
