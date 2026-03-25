@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 // --- Shared Editor State (for MCP bridge) ---
@@ -1391,7 +1391,12 @@ fn unquote_git_path(s: &str) -> String {
     String::from_utf8(out).unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
 }
 
+/// Serialize all git CLI calls so concurrent operations (e.g. status polling
+/// during a multi-step revert) don't race on the index file.
+static GIT_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
 fn run_git(repo_path: &str, args: &[&str]) -> Result<String, String> {
+    let _guard = GIT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let mut full_args = vec!["-C", repo_path];
     full_args.extend_from_slice(args);
     run_cli("git", &full_args)
