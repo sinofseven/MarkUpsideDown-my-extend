@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { basename } from "./path-utils.ts";
+import { basename, getExtension, IMAGE_EXTENSIONS, MD_EXTENSIONS } from "./path-utils.ts";
 import { ensureWorkerUrl, isImageConversionAllowed, isAutoSaveEnabled } from "./settings.ts";
 import { fetchUrlAsMarkdown, renderUrlAsMarkdown } from "./fetch-markdown.ts";
 import { normalizeMarkdown } from "./normalize.ts";
@@ -17,8 +17,6 @@ export interface ConvertResult {
   original_size: number;
   warning?: string;
 }
-
-const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "tiff", "tif"];
 
 export const IMPORT_EXTENSIONS = [
   "pdf",
@@ -182,8 +180,8 @@ export async function convertFile(filePath: string) {
   const workerUrl = await ensureWorkerUrl();
   if (!workerUrl) return;
 
-  const ext = filePath.split(".").pop()?.toLowerCase() || "";
-  const isImage = IMAGE_EXTENSIONS.includes(ext);
+  const ext = getExtension(filePath);
+  const isImage = IMAGE_EXTENSIONS.has(ext);
 
   if (isImage) {
     if (!isImageConversionAllowed()) {
@@ -265,8 +263,7 @@ export function initDragDrop(appEl: HTMLElement) {
 
     // Handle external file drop on editor area
     const file = files[0];
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    const MD_EXTENSIONS = ["md", "markdown", "mdx"];
+    const ext = getExtension(file.name);
 
     const root = getRootPath();
     if (root) {
@@ -276,7 +273,7 @@ export function initDragDrop(appEl: HTMLElement) {
         const buffer = await file.arrayBuffer();
         const data = Array.from(new Uint8Array(buffer));
         await invoke("write_file_bytes", { path: targetPath, data });
-        if (MD_EXTENSIONS.includes(ext)) {
+        if (MD_EXTENSIONS.has(ext)) {
           const content = await invoke<string>("read_text_file", { path: targetPath });
           loadContentAsTab(content, targetPath);
         } else if (IMPORT_EXTENSIONS.includes(ext)) {
@@ -289,7 +286,7 @@ export function initDragDrop(appEl: HTMLElement) {
       }
     } else {
       // No project open — read content directly for markdown, or convert via temp approach
-      if (MD_EXTENSIONS.includes(ext)) {
+      if (MD_EXTENSIONS.has(ext)) {
         const text = await file.text();
         loadContentAsTab(text);
       } else if (IMPORT_EXTENSIONS.includes(ext)) {
@@ -306,11 +303,11 @@ export function initDragDrop(appEl: HTMLElement) {
       if (!paths || paths.length === 0) return;
 
       const filePath = paths[0];
-      const ext = filePath.split(".").pop()?.toLowerCase() || "";
+      const ext = getExtension(filePath);
 
       if (IMPORT_EXTENSIONS.includes(ext)) {
         await convertFile(filePath);
-      } else if (ext === "md" || ext === "markdown" || ext === "mdx") {
+      } else if (MD_EXTENSIONS.has(ext)) {
         const content = await invoke<string>("read_text_file", { path: filePath });
         loadContentAsTab(content, filePath);
       } else {

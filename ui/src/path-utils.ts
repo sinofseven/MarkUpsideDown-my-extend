@@ -1,3 +1,22 @@
+/** Extract the lowercase file extension from a path or filename (without the dot). */
+export function getExtension(path: string): string {
+  return path.split(".").pop()?.toLowerCase() || "";
+}
+
+export const IMAGE_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "gif",
+  "webp",
+  "bmp",
+  "tiff",
+  "tif",
+  "svg",
+]);
+
+export const MD_EXTENSIONS = new Set(["md", "markdown", "mdx"]);
+
 /** Extract the filename from a path (everything after the last `/`). */
 export function basename(path: string): string {
   return path.split("/").pop() || path;

@@ -1,6 +1,6 @@
 import { createGitBadge, applyGitNameStyle } from "./git-panel.ts";
 import { IMPORT_EXTENSIONS, convertFile } from "./file-ops.ts";
-import { basename, dirname } from "./path-utils.ts";
+import { basename, dirname, getExtension, IMAGE_EXTENSIONS, MD_EXTENSIONS } from "./path-utils.ts";
 import { escapeHtml } from "./html-utils.ts";
 import { watch, type UnwatchFn } from "@tauri-apps/plugin-fs";
 import { KEY_SIDEBAR, KEY_SIDEBAR_SORT, KEY_SIDEBAR_PANEL } from "./storage-keys.ts";
@@ -55,7 +55,6 @@ interface GitStatus {
   staged: boolean;
 }
 
-const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg"]);
 export const SIDEBAR_IMAGE_MIME = "application/x-sidebar-image";
 
 // --- State ---
@@ -1025,11 +1024,10 @@ async function moveEntries(sourcePaths: Set<string>, targetDirPath: string) {
 }
 
 async function handleExternalFileDrop(files: FileList, targetDir: string) {
-  const MD_EXTENSIONS = ["md", "markdown", "mdx"];
   let copiedCount = 0;
 
   for (const file of files) {
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const ext = getExtension(file.name);
     const targetPath = `${targetDir}/${file.name}`;
 
     try {
@@ -1039,7 +1037,7 @@ async function handleExternalFileDrop(files: FileList, targetDir: string) {
       copiedCount++;
 
       // Open markdown files in editor after copy
-      if (MD_EXTENSIONS.includes(ext)) {
+      if (MD_EXTENSIONS.has(ext)) {
         const content = await invoke<string>("read_text_file", { path: targetPath });
         onFileOpen?.(content, targetPath);
       } else if (IMPORT_EXTENSIONS.includes(ext)) {
@@ -1482,7 +1480,7 @@ function entryFromItem(item: HTMLElement): DirEntry | null {
   if (!path) return null;
   const name = basename(path);
   const isDir = item.dataset.isDir === "true";
-  const ext = isDir ? null : name.includes(".") ? name.split(".").pop()! : null;
+  const ext = isDir ? null : name.includes(".") ? getExtension(name) || null : null;
   return { path, name, is_dir: isDir, extension: ext, modified_at: null };
 }
 
