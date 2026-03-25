@@ -7,7 +7,7 @@ import { escapeHtml } from "./html-utils.ts";
 
 let panelEl: HTMLElement | null = null;
 let editor: EditorView;
-let collapsed = false;
+let collapsed = true;
 let lastHeadings: Heading[] = [];
 
 export function initTocPanel(ed: EditorView, container: HTMLElement) {
