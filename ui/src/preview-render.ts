@@ -8,6 +8,7 @@ import {
   syncPreviewToCursor,
 } from "./scroll-sync.ts";
 import { escapeHtml } from "./html-utils.ts";
+import { open as openMermaidViewer } from "./mermaid-viewer.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -429,8 +430,17 @@ export async function renderPreview(source: string) {
             const copyBtn = document.createElement("button");
             copyBtn.className = "mermaid-copy-btn";
             copyBtn.textContent = "Copy as PNG";
-            copyBtn.addEventListener("click", () => copyMermaidAsPng(el, copyBtn));
+            copyBtn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              copyMermaidAsPng(el, copyBtn);
+            });
             el.appendChild(copyBtn);
+            const expandHint = document.createElement("span");
+            expandHint.className = "mermaid-expand-hint";
+            expandHint.textContent = "Click to expand";
+            el.appendChild(expandHint);
+            el.style.cursor = "pointer";
+            el.addEventListener("click", () => openMermaidViewer(el));
           } catch (err) {
             const pre = document.createElement("pre");
             pre.className = "mermaid-error";
