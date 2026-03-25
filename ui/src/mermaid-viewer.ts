@@ -13,6 +13,7 @@ let dragStartTY = 0;
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 10;
 const ZOOM_STEP = 0.15;
+const FIT_PADDING = 40;
 
 function applyTransform(container: HTMLElement) {
   container.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
@@ -22,6 +23,27 @@ function resetView() {
   scale = 1;
   translateX = 0;
   translateY = 0;
+  const container = overlay?.querySelector<HTMLElement>(".mermaid-viewer-svg");
+  if (container) applyTransform(container);
+  updateZoomLabel();
+}
+
+function fitToView() {
+  const viewport = overlay?.querySelector<HTMLElement>(".mermaid-viewer-viewport");
+  const svgEl = overlay?.querySelector<SVGElement>(".mermaid-viewer-svg svg");
+  if (!viewport || !svgEl) return;
+
+  const vw = viewport.clientWidth - FIT_PADDING * 2;
+  const vh = viewport.clientHeight - FIT_PADDING * 2;
+  const sw = svgEl.clientWidth || svgEl.getBoundingClientRect().width;
+  const sh = svgEl.clientHeight || svgEl.getBoundingClientRect().height;
+  if (sw === 0 || sh === 0) return;
+
+  scale = Math.min(1, vw / sw, vh / sh);
+  // Center the SVG in the viewport
+  translateX = (viewport.clientWidth - sw * scale) / 2;
+  translateY = (viewport.clientHeight - sh * scale) / 2;
+
   const container = overlay?.querySelector<HTMLElement>(".mermaid-viewer-svg");
   if (container) applyTransform(container);
   updateZoomLabel();
@@ -85,6 +107,7 @@ function handleKeyDown(e: KeyboardEvent) {
   if (e.key === "=" || e.key === "+") zoom(ZOOM_STEP * scale);
   if (e.key === "-") zoom(-ZOOM_STEP * scale);
   if (e.key === "0") resetView();
+  if (e.key === "f") fitToView();
 }
 
 function copyAsPng(svgEl: SVGElement, btn: HTMLButtonElement) {
@@ -97,12 +120,13 @@ export function open(mermaidContainer: HTMLElement) {
   const svg = mermaidContainer.querySelector("svg");
   if (!svg) return;
 
-  scale = 1;
-  translateX = 0;
-  translateY = 0;
-
   overlay = document.createElement("div");
   overlay.className = "mermaid-viewer-overlay";
+
+  // Close on background click
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
 
   // Viewport area
   const viewport = document.createElement("div");
@@ -123,13 +147,16 @@ export function open(mermaidContainer: HTMLElement) {
   const toolbar = document.createElement("div");
   toolbar.className = "mermaid-viewer-toolbar";
 
+  const closeBtn = btn("Close", close);
+  closeBtn.classList.add("mermaid-viewer-text-btn", "mermaid-viewer-close-btn");
+
   const zoomIn = btn("+", () => zoom(ZOOM_STEP * scale));
-  const zoomOut = btn("−", () => zoom(-ZOOM_STEP * scale));
+  const zoomOut = btn("\u2212", () => zoom(-ZOOM_STEP * scale));
   const zoomLabel = document.createElement("span");
   zoomLabel.className = "mermaid-viewer-zoom-label";
   zoomLabel.textContent = "100%";
-  const resetBtn = btn("Reset", resetView);
-  resetBtn.classList.add("mermaid-viewer-text-btn");
+  const fitBtn = btn("Fit", fitToView);
+  fitBtn.classList.add("mermaid-viewer-text-btn");
 
   const copyBtn = document.createElement("button");
   copyBtn.className = "mermaid-viewer-btn mermaid-viewer-text-btn";
@@ -139,13 +166,18 @@ export function open(mermaidContainer: HTMLElement) {
     copyBtn.addEventListener("click", () => copyAsPng(viewerSvg, copyBtn));
   }
 
-  const closeBtn = btn("✕", close);
+  const hint = document.createElement("span");
+  hint.className = "mermaid-viewer-hint";
+  hint.textContent = "Esc to close";
 
-  toolbar.append(zoomOut, zoomLabel, zoomIn, resetBtn, copyBtn, closeBtn);
+  toolbar.append(closeBtn, zoomOut, zoomLabel, zoomIn, fitBtn, copyBtn, hint);
   overlay.appendChild(toolbar);
 
   document.body.appendChild(overlay);
   document.addEventListener("keydown", handleKeyDown);
+
+  // Fit to view after DOM is ready
+  requestAnimationFrame(() => fitToView());
 }
 
 function btn(label: string, onClick: () => void): HTMLButtonElement {
