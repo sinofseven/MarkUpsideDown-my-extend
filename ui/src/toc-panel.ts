@@ -17,6 +17,26 @@ export function initTocPanel(ed: EditorView, container: HTMLElement) {
   panelEl.className = "toc-panel";
   panelEl.style.display = "none";
   container.insertBefore(panelEl, container.firstChild);
+
+  // Single delegated click listener (never accumulates on re-render)
+  panelEl.addEventListener("click", (e) => {
+    const toggle = (e.target as HTMLElement).closest(".toc-toggle");
+    if (toggle) {
+      collapsed = !collapsed;
+      render();
+      return;
+    }
+    const item = (e.target as HTMLElement).closest(".toc-item") as HTMLElement | null;
+    if (!item) return;
+    const lineNum = Number(item.dataset.line);
+    if (!lineNum) return;
+    const line = editor.state.doc.line(lineNum);
+    editor.dispatch({
+      selection: { anchor: line.from },
+      scrollIntoView: true,
+    });
+    editor.focus();
+  });
 }
 
 export function updateTocPanel(content: string) {
@@ -58,24 +78,6 @@ function render() {
   }
 
   panelEl.innerHTML = html;
-
-  panelEl.querySelector(".toc-toggle")?.addEventListener("click", () => {
-    collapsed = !collapsed;
-    render();
-  });
-
-  panelEl.querySelector(".toc-body")?.addEventListener("click", (e) => {
-    const item = (e.target as HTMLElement).closest(".toc-item") as HTMLElement | null;
-    if (!item) return;
-    const lineNum = Number(item.dataset.line);
-    if (!lineNum) return;
-    const line = editor.state.doc.line(lineNum);
-    editor.dispatch({
-      selection: { anchor: line.from },
-      scrollIntoView: true,
-    });
-    editor.focus();
-  });
 }
 
 /** Highlight the heading closest to the current editor viewport. */

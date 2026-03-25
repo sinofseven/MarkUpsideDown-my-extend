@@ -20,6 +20,12 @@ export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
 
   // Single delegated click listener (never accumulates)
   panelEl.addEventListener("click", (e) => {
+    const toggle = (e.target as HTMLElement).closest(".frontmatter-toggle");
+    if (toggle) {
+      panelEl!.dataset.collapsed = panelEl!.dataset.collapsed === "true" ? "false" : "true";
+      updateFrontmatterPanel(editor.state.doc.toString());
+      return;
+    }
     const row = (e.target as HTMLElement).closest(".frontmatter-row");
     if (row && lastFm) {
       const line = editor.state.doc.line(lastFm.startLine + 1);
@@ -68,12 +74,4 @@ export function updateFrontmatterPanel(content: string) {
   }
 
   panelEl.innerHTML = html;
-
-  const toggle = panelEl.querySelector(".frontmatter-toggle");
-  if (toggle) {
-    toggle.addEventListener("click", () => {
-      panelEl!.dataset.collapsed = collapsed ? "false" : "true";
-      updateFrontmatterPanel(editor.state.doc.toString());
-    });
-  }
 }

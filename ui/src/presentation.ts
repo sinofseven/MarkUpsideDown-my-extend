@@ -4,6 +4,7 @@
 let overlay: HTMLElement | null = null;
 let slides: string[] = [];
 let currentSlide = 0;
+let markedModule: typeof import("marked") | null = null;
 
 export function startPresentation(content: string) {
   // Split at horizontal rules (--- on its own line)
@@ -105,7 +106,8 @@ async function showSlide(index: number) {
 
   // We need to render into the slide element directly
   // Use marked directly for simplicity
-  const { marked } = await import("marked");
+  markedModule ??= await import("marked");
+  const { marked } = markedModule;
   const html = await marked.parse(slides[index]);
 
   slideEl.innerHTML = `<article class="preview-page presentation-content">${html}</article>`;
