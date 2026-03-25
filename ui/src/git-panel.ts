@@ -70,17 +70,12 @@ export function setRepoPath(path: string | null, skipRefresh = false) {
 
 export async function refresh() {
   if (!repoPath) return;
-  try {
-    gitData = await invoke<GitData>("git_status", { repoPath });
-  } catch {
-    gitData = null;
-  }
-  // Fetch recent commits
-  try {
-    logEntries = await invoke<GitLogEntry[]>("git_log", { repoPath, limit: 10 });
-  } catch {
-    logEntries = [];
-  }
+  const [statusResult, logResult] = await Promise.allSettled([
+    invoke<GitData>("git_status", { repoPath }),
+    invoke<GitLogEntry[]>("git_log", { repoPath, limit: 10 }),
+  ]);
+  gitData = statusResult.status === "fulfilled" ? statusResult.value : null;
+  logEntries = logResult.status === "fulfilled" ? logResult.value : [];
   render();
   onRefreshCb?.();
 }

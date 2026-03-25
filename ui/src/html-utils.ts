@@ -6,3 +6,28 @@ export function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+/** Copy an SVG element to clipboard as a 2x PNG (Retina). */
+export function copySvgAsPng(svgEl: SVGElement, btn: HTMLButtonElement) {
+  const svgData = new XMLSerializer().serializeToString(svgEl);
+  const img = new Image();
+  img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  img.onload = () => {
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth * scale;
+    canvas.height = img.naturalHeight * scale;
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(() => {
+        btn.textContent = "Copied!";
+        setTimeout(() => {
+          btn.textContent = "Copy as PNG";
+        }, 1500);
+      });
+    });
+  };
+}

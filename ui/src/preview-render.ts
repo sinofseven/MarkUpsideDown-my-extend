@@ -7,7 +7,7 @@ import {
   markProgrammaticScroll,
   syncPreviewToCursor,
 } from "./scroll-sync.ts";
-import { escapeHtml } from "./html-utils.ts";
+import { escapeHtml, copySvgAsPng } from "./html-utils.ts";
 import { open as openMermaidViewer } from "./mermaid-viewer.ts";
 
 const { invoke } = window.__TAURI__.core;
@@ -540,25 +540,5 @@ export async function renderPreview(source: string) {
 function copyMermaidAsPng(container: HTMLElement, btn: HTMLButtonElement) {
   const svg = container.querySelector("svg");
   if (!svg) return;
-  const svgData = new XMLSerializer().serializeToString(svg);
-  const img = new Image();
-  img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-  img.onload = () => {
-    const scale = 2; // Retina
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth * scale;
-    canvas.height = img.naturalHeight * scale;
-    const ctx = canvas.getContext("2d")!;
-    ctx.scale(scale, scale);
-    ctx.drawImage(img, 0, 0);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(() => {
-        btn.textContent = "Copied!";
-        setTimeout(() => {
-          btn.textContent = "Copy as PNG";
-        }, 1500);
-      });
-    });
-  };
+  copySvgAsPng(svg, btn);
 }

@@ -1,3 +1,5 @@
+import { copySvgAsPng } from "./html-utils.ts";
+
 let overlay: HTMLDivElement | null = null;
 let scale = 1;
 let translateX = 0;
@@ -86,27 +88,7 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 function copyAsPng(svgEl: SVGElement, btn: HTMLButtonElement) {
-  const svgData = new XMLSerializer().serializeToString(svgEl);
-  const img = new Image();
-  img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
-  img.onload = () => {
-    const s = 2;
-    const canvas = document.createElement("canvas");
-    canvas.width = img.naturalWidth * s;
-    canvas.height = img.naturalHeight * s;
-    const ctx = canvas.getContext("2d")!;
-    ctx.scale(s, s);
-    ctx.drawImage(img, 0, 0);
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(() => {
-        btn.textContent = "Copied!";
-        setTimeout(() => {
-          btn.textContent = "Copy as PNG";
-        }, 1500);
-      });
-    });
-  };
+  copySvgAsPng(svgEl, btn);
 }
 
 export function open(mermaidContainer: HTMLElement) {

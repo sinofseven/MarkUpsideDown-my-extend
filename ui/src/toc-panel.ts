@@ -2,7 +2,7 @@
 // quick navigation to any section in the editor.
 
 import type { EditorView } from "@codemirror/view";
-import { parseHeadings, type Heading } from "./document-structure.ts";
+import { parseHeadings, findCodeBlockRanges, type Heading } from "./document-structure.ts";
 import { escapeHtml } from "./html-utils.ts";
 
 let panelEl: HTMLElement | null = null;
@@ -23,21 +23,7 @@ export function updateTocPanel(content: string) {
   if (!panelEl) return;
 
   const lines = content.split("\n");
-  // Build code ranges inline to avoid re-exporting from document-structure
-  const codeRanges: [number, number][] = [];
-  let i = 0;
-  while (i < lines.length) {
-    if (lines[i].startsWith("```")) {
-      const start = i;
-      i++;
-      while (i < lines.length && !lines[i].startsWith("```")) i++;
-      codeRanges.push([start, i]);
-      i++;
-    } else {
-      i++;
-    }
-  }
-
+  const codeRanges = findCodeBlockRanges(lines);
   const headings = parseHeadings(lines, codeRanges);
   lastHeadings = headings;
 

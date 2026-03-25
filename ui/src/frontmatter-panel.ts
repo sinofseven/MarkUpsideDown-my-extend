@@ -7,6 +7,7 @@ import { escapeHtml } from "./html-utils.ts";
 
 let panelEl: HTMLElement | null = null;
 let editor: EditorView;
+let lastFm: { startLine: number } | null = null;
 
 export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
   editor = ed;
@@ -16,6 +17,19 @@ export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
   panelEl.style.display = "none";
   panelEl.dataset.collapsed = "true";
   container.insertBefore(panelEl, container.firstChild);
+
+  // Single delegated click listener (never accumulates)
+  panelEl.addEventListener("click", (e) => {
+    const row = (e.target as HTMLElement).closest(".frontmatter-row");
+    if (row && lastFm) {
+      const line = editor.state.doc.line(lastFm.startLine + 1);
+      editor.dispatch({
+        selection: { anchor: line.from },
+        scrollIntoView: true,
+      });
+      editor.focus();
+    }
+  });
 }
 
 export function updateFrontmatterPanel(content: string) {
@@ -26,8 +40,11 @@ export function updateFrontmatterPanel(content: string) {
 
   if (!fm || !fm.parsed || Object.keys(fm.parsed).length === 0) {
     panelEl.style.display = "none";
+    lastFm = null;
     return;
   }
+
+  lastFm = fm;
 
   panelEl.style.display = "";
   const collapsed = panelEl.dataset.collapsed === "true";
@@ -59,18 +76,4 @@ export function updateFrontmatterPanel(content: string) {
       updateFrontmatterPanel(editor.state.doc.toString());
     });
   }
-
-  // Click on key or value to jump to frontmatter in editor
-  panelEl.addEventListener("click", (e) => {
-    const row = (e.target as HTMLElement).closest(".frontmatter-row");
-    if (row && fm) {
-      // Jump to frontmatter start
-      const line = editor.state.doc.line(fm.startLine + 1);
-      editor.dispatch({
-        selection: { anchor: line.from },
-        scrollIntoView: true,
-      });
-      editor.focus();
-    }
-  });
 }

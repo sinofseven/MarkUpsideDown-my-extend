@@ -90,7 +90,7 @@ export function headingToAnchor(text: string): string {
 }
 
 /** Identify fenced code block line ranges (0-based indices). */
-function findCodeBlockRanges(lines: string[]): [number, number][] {
+export function findCodeBlockRanges(lines: string[]): [number, number][] {
   const ranges: [number, number][] = [];
   let i = 0;
   while (i < lines.length) {
