@@ -33,8 +33,15 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 - **Markdown linting** — Structural warnings for heading hierarchy, broken links, table formatting
 - **Code highlighting** — 24 languages via highlight.js (lazy-loaded), copy button on hover
 - **KaTeX math** — Inline `$...$` and display `$$...$$` rendering
-- **Mermaid diagrams** — Flowcharts, sequence diagrams, etc.
+- **Mermaid diagrams** — Flowcharts, sequence diagrams, etc. Click to open zoom/pan viewer with Copy as PNG
+- **GitHub-style alerts** — `[!NOTE]`, `[!TIP]`, `[!WARNING]`, `[!IMPORTANT]`, `[!CAUTION]` blockquotes with colored icons
+- **Table of Contents** — Heading navigation panel with active heading tracking (<kbd>Cmd</kbd>+<kbd>4</kbd>)
+- **Frontmatter panel** — Collapsible YAML frontmatter display above the editor
 - **Table editor** — Spreadsheet-like editing with Tab/Enter navigation, undo/redo, paste from TSV/CSV
+- **Presentation mode** — Split document at `---` and present slides fullscreen
+- **Auto link title** — Paste a URL to auto-fetch the page title and format as `[Title](url)`
+- **Smart typography** — Auto-convert `...` → `…`, `--` → `–`, `---` → `—` as you type
+- **Note refactor** — Extract selected text into a new linked Markdown file
 - **Auto-save & auto-reload** — File-backed tabs auto-save; external changes detected and reloaded
 - **SVG inlining** — Remote SVG images rendered inline with sanitization
 
@@ -56,7 +63,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 
 ### Keyboard Shortcuts
 
-Press <kbd>Cmd</kbd>+<kbd>K</kbd> to open the command palette with all available commands. See [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) for the full shortcut reference.
+Press <kbd>Cmd</kbd>+<kbd>K</kbd> to open the command palette with all available commands. Right-click links in the preview for quick Fetch/Render/Crawl actions. See [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) for the full shortcut reference.
 
 ## Requirements
 

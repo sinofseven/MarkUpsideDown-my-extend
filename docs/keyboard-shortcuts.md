@@ -28,6 +28,7 @@ All commands are also accessible via the **Command Palette** (<kbd>Cmd</kbd>+<kb
 | <kbd>Cmd</kbd>+<kbd>1</kbd> | Toggle sidebar |
 | <kbd>Cmd</kbd>+<kbd>2</kbd> | Toggle editor pane |
 | <kbd>Cmd</kbd>+<kbd>3</kbd> | Toggle preview pane |
+| <kbd>Cmd</kbd>+<kbd>4</kbd> | Toggle Table of Contents |
 
 ## Copy (<kbd>Cmd</kbd>+<kbd>C</kbd>)
 

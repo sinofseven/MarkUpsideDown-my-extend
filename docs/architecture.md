@@ -54,16 +54,28 @@ MCP Server (mcp-server-rs/)
 | Clone panel | Repository clone UI (HTTPS/SSH) | `ui/src/clone-panel.ts` |
 | Table editor | Spreadsheet grid with undo/redo, paste TSV/CSV | `ui/src/table-editor.ts` |
 | Formatting | Markdown shortcuts (bold, italic, link, strikethrough, code) | `ui/src/markdown-commands.ts` |
+| Auto link title | Paste URL → auto-fetch title → `[Title](url)` | `ui/src/auto-link-title.ts` |
+| Link context menu | Right-click links in preview for Fetch/Render/Crawl | `ui/src/link-context-menu.ts` |
+| Smart typography | Auto-convert `...`, `--`, `---` to typographic chars | `ui/src/smart-typography.ts` |
 | Crawl | Website crawl UI (options dialog, polling, file saving) | `ui/src/crawl.ts` |
 | File operations | Create, rename, delete, import, auto-save | `ui/src/file-ops.ts` |
 | File watcher | External file change detection and auto-reload | `ui/src/file-watcher.ts` |
 | Clipboard | Rich text / Markdown copy | `ui/src/clipboard.ts` |
 | MCP sync | Editor state sync for MCP bridge | `ui/src/mcp-sync.ts` |
+| Download images | Download external images to `./assets/` | `ui/src/download-images.ts` |
+| Note refactor | Extract selection into new linked file | `ui/src/note-refactor.ts` |
 | Normalize | Post-conversion Markdown normalization | `ui/src/normalize.ts` |
 | Document structure | Heading tree, links, tables, stats parser | `ui/src/document-structure.ts` |
 | Markdown lint | Structural linting (headings, links, tables) | `ui/src/markdown-lint.ts` |
 | Command palette | Fuzzy search over all commands (Cmd+K) | `ui/src/command-palette.ts` |
+| Frontmatter panel | Collapsible YAML frontmatter display | `ui/src/frontmatter-panel.ts` |
+| TOC panel | Heading navigation with active tracking (Cmd+4) | `ui/src/toc-panel.ts` |
+| Presentation mode | Slide presentation (split at `---`) | `ui/src/presentation.ts` |
+| Mermaid viewer | Zoom/pan viewer for Mermaid diagrams (Copy as PNG) | `ui/src/mermaid-viewer.ts` |
 | Theme | CodeMirror editor theme (warm paper palette) | `ui/src/theme.ts` |
+| Path utils | `basename()`, `dirname()`, `buildRelativePath()` | `ui/src/path-utils.ts` |
+| HTML utils | `escapeHtml()`, `copySvgAsPng()` | `ui/src/html-utils.ts` |
+| Fetch markdown | Shared URL→Markdown pipeline | `ui/src/fetch-markdown.ts` |
 | Backend commands | Rust (Tauri IPC) | `src-tauri/src/commands.rs` |
 | Auto-setup | Wrangler CLI (login, deploy, secrets) | `src-tauri/src/cloudflare.rs` |
 | MCP bridge | Rust (axum HTTP server) | `src-tauri/src/bridge.rs` |
@@ -125,6 +137,13 @@ See [mcp-server.md](mcp-server.md) for the full tool list.
 | `crawl_status` | Poll crawl job status and retrieve completed pages | `commands.rs` |
 | `crawl_save` | Save crawled pages as Markdown files to local directory | `commands.rs` |
 
+### Content & Assets
+
+| Command | Description | Module |
+|---------|-------------|--------|
+| `fetch_page_title` | Extract `<title>` from a web page (for auto-link-title) | `commands.rs` |
+| `download_image` | Download image from URL to local file | `commands.rs` |
+
 ### File Operations
 
 | Command | Description | Module |
@@ -153,6 +172,12 @@ See [mcp-server.md](mcp-server.md) for the full tool list.
 | `git_push` | Push to remote | `commands.rs` |
 | `git_pull` | Pull from remote | `commands.rs` |
 | `git_fetch` | Fetch remote updates | `commands.rs` |
+| `git_diff` | Get diff for a specific file (staged or unstaged) | `commands.rs` |
+| `git_discard` | Discard changes for a specific file | `commands.rs` |
+| `git_discard_all` | Discard all uncommitted changes | `commands.rs` |
+| `git_log` | Get recent commit history | `commands.rs` |
+| `git_revert` | Revert a commit (creates new revert commit) | `commands.rs` |
+| `git_show` | Show diff for a specific commit | `commands.rs` |
 
 ### Clone
 
@@ -169,6 +194,12 @@ See [mcp-server.md](mcp-server.md) for the full tool list.
 | `deploy_worker` | Deploy Worker from embedded source files | `cloudflare.rs` |
 | `setup_worker_secrets` | Auto-configure Worker secrets | `cloudflare.rs` |
 | `setup_worker_secrets_with_token` | Configure secrets with user-provided token | `cloudflare.rs` |
+
+### Menu
+
+| Command | Description | Module |
+|---------|-------------|--------|
+| `add_recent_file` | Add file to the Open Recent menu | `menu.rs` |
 
 ## MCP Bridge Endpoints
 
