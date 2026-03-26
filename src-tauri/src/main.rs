@@ -7,10 +7,41 @@ mod commands;
 mod menu;
 mod util;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tauri::{Emitter, Manager};
 use tauri_plugin_cli::CliExt;
+
+/// Resolve file path strings to absolute paths, filtering to files that exist.
+fn resolve_file_paths<'a>(
+    values: impl Iterator<Item = &'a str>,
+    base_dir: &Path,
+) -> Vec<String> {
+    values
+        .filter(|s| !s.is_empty() && !s.starts_with('-'))
+        .filter_map(|s| {
+            let path = if PathBuf::from(s).is_absolute() {
+                PathBuf::from(s)
+            } else {
+                base_dir.join(s)
+            };
+            if path.exists() {
+                Some(path.to_string_lossy().to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Extract file path strings from a CLI arg value (handles both string and array).
+fn extract_cli_file_values(value: &serde_json::Value) -> Vec<&str> {
+    match value {
+        serde_json::Value::Array(arr) => arr.iter().filter_map(|v| v.as_str()).collect(),
+        serde_json::Value::String(s) => vec![s.as_str()],
+        _ => vec![],
+    }
+}
 
 fn main() {
     let editor_states = Arc::new(commands::EditorStates::default());
@@ -25,6 +56,20 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_cli::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
+            // Focus existing window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+
+            // Forward file arguments (args[0] is the binary path)
+            let base_dir = PathBuf::from(cwd);
+            let paths = resolve_file_paths(args.iter().skip(1).map(|s| s.as_str()), &base_dir);
+            for path in paths {
+                let _ = app.emit("cli:open-file", path);
+            }
+        }))
         .manage(editor_states_managed)
         .manage(http_client)
 
@@ -33,25 +78,21 @@ fn main() {
             app.set_menu(m)?;
             bridge::start(app.handle().clone(), editor_states.clone());
 
-            // Handle CLI file argument
+            // Handle CLI file arguments (supports multiple files)
             if let Ok(matches) = app.cli().matches() {
                 if let Some(file_arg) = matches.args.get("file") {
-                    if let Some(path_str) = file_arg.value.as_str().filter(|s| !s.is_empty()) {
-                        let path = if PathBuf::from(path_str).is_absolute() {
-                            PathBuf::from(path_str)
-                        } else {
-                            std::env::current_dir()
-                                .unwrap_or_default()
-                                .join(path_str)
-                        };
-                        if path.exists() {
-                            let path_string = path.to_string_lossy().to_string();
-                            let handle = app.handle().clone();
-                            tauri::async_runtime::spawn(async move {
-                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                                let _ = handle.emit("cli:open-file", path_string);
-                            });
-                        }
+                    let values = extract_cli_file_values(&file_arg.value);
+                    let base_dir = std::env::current_dir().unwrap_or_default();
+                    let paths = resolve_file_paths(values.into_iter(), &base_dir);
+                    if !paths.is_empty() {
+                        let handle = app.handle().clone();
+                        tauri::async_runtime::spawn(async move {
+                            // Wait for frontend to be ready
+                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                            for path in paths {
+                                let _ = handle.emit("cli:open-file", path);
+                            }
+                        });
                     }
                 }
             }

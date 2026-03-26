@@ -97,6 +97,21 @@ The Worker powers document import and JS-rendered page fetching.
 
 On first launch, Settings opens automatically. If you used auto-setup, the Worker URL is already filled in. Otherwise, paste your Worker URL and click **Test**.
 
+### 4. CLI Access (Optional)
+
+Create a symlink so you can open files from the terminal:
+
+```bash
+sudo ln -sf /Applications/MarkUpsideDown.app/Contents/MacOS/MarkUpsideDown /usr/local/bin/markupsidedown
+```
+
+```bash
+markupsidedown README.md                          # open a file
+markupsidedown file1.md file2.md notes/todo.md    # open multiple files as tabs
+```
+
+If the app is already running, files are opened in the existing window. See [docs/cli.md](docs/cli.md) for details.
+
 ## Build from Source
 
 **Requirements:** Rust 1.85+, Node.js 22+, [Vite+](https://viteplus.dev/) (optional, for lint/format)
@@ -115,6 +130,7 @@ cargo tauri build      # production build
 | [docs/mcp-server.md](docs/mcp-server.md) | MCP setup guide and 41-tool reference |
 | [docs/worker-deployment.md](docs/worker-deployment.md) | Worker deployment, API tokens, pricing |
 | [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) | All keyboard shortcuts |
+| [docs/cli.md](docs/cli.md) | CLI setup and usage |
 
 ## License
 

@@ -33,8 +33,9 @@
           "name": "file",
           "index": 1,
           "takesValue": true,
+          "multiple": true,
           "required": false,
-          "description": "File to open"
+          "description": "Files to open"
         }
       ]
     }
