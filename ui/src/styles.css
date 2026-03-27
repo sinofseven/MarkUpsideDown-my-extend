@@ -750,6 +750,12 @@ body {
   cursor: default;
 }
 
+.link-context-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
 /* TOC Panel */
 .toc-panel {
   border-bottom: 1px solid var(--border);

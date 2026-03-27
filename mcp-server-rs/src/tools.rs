@@ -297,7 +297,7 @@ impl McpTools {
 
     // --- Conversion Tools (use Worker, no app needed) ---
 
-    #[tool(name = "fetch_markdown", description = "Fetch a URL and return its content as Markdown using Cloudflare Markdown for Agents", annotations(read_only_hint = true, open_world_hint = true))]
+    #[tool(name = "fetch_markdown", description = "Fetch a URL as Markdown (static only, no JS rendering). Use get_markdown instead for automatic SPA detection.", annotations(read_only_hint = true, open_world_hint = true))]
     async fn fetch_markdown(
         &self,
         Parameters(params): Parameters<UrlParams>,
@@ -344,7 +344,7 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "render_markdown", description = "Fetch a JavaScript-rendered page as Markdown via Browser Rendering", annotations(read_only_hint = true, open_world_hint = true))]
+    #[tool(name = "render_markdown", description = "Fetch a JavaScript-rendered page as Markdown via Browser Rendering (explicit). Use get_markdown instead for automatic SPA detection.", annotations(read_only_hint = true, open_world_hint = true))]
     async fn render_markdown(
         &self,
         Parameters(params): Parameters<UrlParams>,
@@ -365,6 +365,94 @@ impl McpTools {
                 return Err(err);
             }
             Ok(data.markdown.unwrap_or_default())
+        }
+        .await;
+
+        match result {
+            Ok(text) => Ok(CallToolResult::success(vec![Content::text(text)])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "get_markdown", description = "Fetch a URL and return its content as Markdown. Automatically detects JavaScript-rendered pages and uses Browser Rendering when available. Recommended over fetch_markdown/render_markdown for most use cases.", annotations(read_only_hint = true, open_world_hint = true))]
+    async fn get_markdown(
+        &self,
+        Parameters(params): Parameters<UrlParams>,
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = async {
+            // 1. Try Markdown for Agents (direct fetch)
+            let response = self
+                .http
+                .get(&params.url)
+                .header("Accept", "text/markdown")
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+
+            let content_type = response
+                .headers()
+                .get("content-type")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+            let body = response.text().await.map_err(|e| e.to_string())?;
+
+            if content_type.contains("text/markdown") {
+                return Ok(format!("--- Markdown for Agents ---\n\n{body}"));
+            }
+
+            // 2. Try Worker /fetch with SPA detection
+            let worker_url = self.resolve_worker_url().await;
+            if let Ok(worker_url) = worker_url {
+                #[derive(Deserialize)]
+                struct FetchResp {
+                    markdown: Option<String>,
+                    spa_detected: Option<bool>,
+                    error: Option<String>,
+                }
+
+                let fetch_resp = self
+                    .http
+                    .post(format!("{worker_url}/fetch"))
+                    .json(&serde_json::json!({ "url": params.url }))
+                    .send()
+                    .await
+                    .map_err(|e| e.to_string())?;
+
+                let data: FetchResp = fetch_resp.json().await.map_err(|e| e.to_string())?;
+                if let Some(err) = data.error {
+                    return Err(err);
+                }
+
+                let markdown = data.markdown.unwrap_or_default();
+                let spa_detected = data.spa_detected.unwrap_or(false);
+
+                // 2a. If SPA detected, try Browser Rendering
+                if spa_detected {
+                    #[derive(Deserialize)]
+                    struct RenderResp {
+                        markdown: Option<String>,
+                        error: Option<String>,
+                    }
+
+                    let render_url = format!("{worker_url}/render?url={}", urlencoding::encode(&params.url));
+                    if let Ok(resp) = self.http.get(&render_url).send().await {
+                        if let Ok(rdata) = resp.json::<RenderResp>().await {
+                            if rdata.error.is_none() {
+                                if let Some(rendered) = rdata.markdown {
+                                    return Ok(format!("--- Browser Rendering (auto) ---\n\n{rendered}"));
+                                }
+                            }
+                        }
+                    }
+                    // Render failed — return fetch result
+                }
+
+                return Ok(format!("--- AI.toMarkdown ---\n\n{markdown}"));
+            }
+
+            // 3. Fallback: raw HTML
+            Ok(format!("--- raw HTML (no Worker) ---\n\n{body}"))
         }
         .await;
 

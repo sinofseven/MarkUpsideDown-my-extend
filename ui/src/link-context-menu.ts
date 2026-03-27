@@ -2,7 +2,7 @@
 // Offers: Open in Browser, Fetch as Markdown, Render as Markdown, Crawl Site.
 
 import { getWorkerUrl } from "./settings.ts";
-import { fetchUrlAsMarkdown, renderUrlAsMarkdown } from "./fetch-markdown.ts";
+import { getUrlAsMarkdown, fetchUrlAsMarkdown, renderUrlAsMarkdown } from "./fetch-markdown.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -52,13 +52,18 @@ function showMenu(x: number, y: number, url: string) {
   menu = document.createElement("div");
   menu.className = "link-context-menu";
 
-  const items: { label: string; disabled?: boolean; action: () => void }[] = [
+  const items: { label: string; disabled?: boolean; separator?: boolean; action: () => void }[] = [
     {
       label: "Open in Browser",
       action: () => invoke("plugin:shell|open", { path: url }),
     },
     {
+      label: "Get as Markdown",
+      action: () => getAsMarkdown(url),
+    },
+    {
       label: "Fetch as Markdown",
+      separator: true,
       action: () => fetchAsMarkdown(url),
     },
     {
@@ -77,6 +82,11 @@ function showMenu(x: number, y: number, url: string) {
   ];
 
   for (const item of items) {
+    if (item.separator) {
+      const sep = document.createElement("div");
+      sep.className = "link-context-separator";
+      menu.appendChild(sep);
+    }
     const btn = document.createElement("button");
     btn.className = "link-context-item";
     btn.textContent = item.label;
@@ -95,6 +105,20 @@ function showMenu(x: number, y: number, url: string) {
   menu.style.left = `${Math.min(x, window.innerWidth - 200)}px`;
   menu.style.top = `${Math.min(y, window.innerHeight - 160)}px`;
   document.body.appendChild(menu);
+}
+
+async function getAsMarkdown(url: string) {
+  deps.statusEl.textContent = "Fetching page…";
+  try {
+    const workerUrl = getWorkerUrl() || null;
+    const { content, method } = await getUrlAsMarkdown(url, workerUrl, (msg) => {
+      deps.statusEl.textContent = msg;
+    });
+    deps.loadContentAsTab(content);
+    deps.statusEl.textContent = `Fetched (${method}): ${url}`;
+  } catch (e) {
+    deps.statusEl.textContent = `Fetch error: ${e}`;
+  }
 }
 
 async function fetchAsMarkdown(url: string) {

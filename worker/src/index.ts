@@ -110,13 +110,14 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     // If the server returned Markdown directly (Markdown for Agents), pass through
     if (contentType.includes("text/markdown")) {
       const markdown = await response.text();
-      return jsonResponse({ markdown, source: "markdown-for-agents" });
+      return jsonResponse({ markdown, source: "markdown-for-agents", spa_detected: false });
     }
 
     // Otherwise, convert HTML via AI.toMarkdown()
     const html = await response.text();
+    const spaDetected = detectSpa(html);
     const markdown = await htmlToMarkdown(html, env);
-    return jsonResponse({ markdown, source: "ai-to-markdown" });
+    return jsonResponse({ markdown, source: "ai-to-markdown", spa_detected: spaDetected });
   } catch (e) {
     return jsonResponse({ error: `Fetch failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
   }
@@ -434,6 +435,31 @@ async function validateUrlForSsrf(input: string): Promise<string | null> {
   }
 
   return null;
+}
+
+// --- SPA Detection ---
+
+function detectSpa(html: string): boolean {
+  // Empty SPA mount points
+  if (/<div\s+id=["'](root|app|__next|__nuxt)["'][^>]*>\s*<\/div>/i.test(html)) return true;
+
+  // Framework markers
+  if (/data-reactroot|ng-version=|data-server-rendered/i.test(html)) return true;
+
+  // Noscript with JS requirement
+  const noscript = html.match(/<noscript[^>]*>([\s\S]*?)<\/noscript>/i);
+  if (noscript && /javascript|enable|activate/i.test(noscript[1])) return true;
+
+  // Low text content ratio: strip tags, check visible text length
+  const textContent = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (html.length > 5000 && textContent.length < 200) return true;
+
+  return false;
 }
 
 // --- Unconverted HTML Detection ---

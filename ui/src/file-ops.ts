@@ -1,7 +1,7 @@
 import type { EditorView } from "@codemirror/view";
 import { basename, getExtension, IMAGE_EXTENSIONS, MD_EXTENSIONS } from "./path-utils.ts";
 import { ensureWorkerUrl, isImageConversionAllowed, isAutoSaveEnabled } from "./settings.ts";
-import { fetchUrlAsMarkdown, renderUrlAsMarkdown } from "./fetch-markdown.ts";
+import { getUrlAsMarkdown, fetchUrlAsMarkdown, renderUrlAsMarkdown } from "./fetch-markdown.ts";
 import { normalizeMarkdown } from "./normalize.ts";
 import { getRootPath, refreshTree } from "./sidebar.ts";
 import { getActiveTab, isTabDirty, markTabSaved, updateActiveTab } from "./tabs.ts";
@@ -129,6 +129,29 @@ export async function openFile() {
 }
 
 // --- URL fetch / render ---
+
+export async function getUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) {
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  urlBar.classList.add("loading");
+  urlInput.disabled = true;
+  statusEl.textContent = "Fetching page…";
+
+  try {
+    const workerUrl = await ensureWorkerUrl();
+    const { content, method } = await getUrlAsMarkdown(url, workerUrl, (msg) => {
+      statusEl.textContent = msg;
+    });
+    loadContentAsTab(content);
+    statusEl.textContent = `Fetched (${method}): ${url}`;
+  } catch (e) {
+    statusEl.textContent = `Fetch error: ${e}`;
+  } finally {
+    urlBar.classList.remove("loading");
+    urlInput.disabled = false;
+  }
+}
 
 export async function fetchUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) {
   const url = urlInput.value.trim();

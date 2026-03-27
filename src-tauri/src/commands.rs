@@ -275,12 +275,27 @@ pub async fn fetch_rendered_url_as_markdown(
 
 // --- Fetch URL via Worker (AI.toMarkdown() conversion) ---
 
+#[derive(Serialize, Deserialize)]
+pub struct WorkerFetchResult {
+    pub markdown: String,
+    pub source: String,
+    pub spa_detected: bool,
+}
+
+#[derive(Deserialize)]
+struct FetchWorkerResponse {
+    markdown: Option<String>,
+    source: Option<String>,
+    spa_detected: Option<bool>,
+    error: Option<String>,
+}
+
 #[tauri::command]
 pub async fn fetch_url_via_worker(
     url: String,
     worker_url: String,
     client: tauri::State<'_, reqwest::Client>,
-) -> Result<String, String> {
+) -> Result<WorkerFetchResult, String> {
     let fetch_url = format!("{}/fetch", worker_url.trim_end_matches('/'));
 
     let response = client
@@ -292,7 +307,7 @@ pub async fn fetch_url_via_worker(
         .map_err(|e| format!("Request failed: {e}"))?;
 
     let status = response.status();
-    let body: RenderWorkerResponse = response
+    let body: FetchWorkerResponse = response
         .json()
         .await
         .map_err(|e| format!("Failed to parse response: {e}"))?;
@@ -301,7 +316,11 @@ pub async fn fetch_url_via_worker(
         return Err(body.error.unwrap_or_else(|| format!("Worker returned {status}")));
     }
 
-    body.markdown.ok_or_else(|| "No markdown in response".to_string())
+    Ok(WorkerFetchResult {
+        markdown: body.markdown.ok_or_else(|| "No markdown in response".to_string())?,
+        source: body.source.unwrap_or_else(|| "ai-to-markdown".to_string()),
+        spa_detected: body.spa_detected.unwrap_or(false),
+    })
 }
 
 // --- Website Crawl via Browser Rendering /crawl API ---

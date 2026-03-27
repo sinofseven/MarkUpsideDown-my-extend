@@ -82,6 +82,7 @@ import {
   autoSave,
   scheduleAutoSave,
   openFile,
+  getUrl,
   fetchUrl,
   renderUrl,
   importFile,
@@ -362,11 +363,10 @@ document.addEventListener("visibilitychange", () => {
 const urlBar = document.getElementById("url-bar")!;
 const urlInput = document.getElementById("url-input")! as HTMLInputElement;
 
-document.getElementById("btn-fetch")!.addEventListener("click", () => fetchUrl(urlInput, urlBar));
-document.getElementById("btn-render")!.addEventListener("click", () => renderUrl(urlInput, urlBar));
+document.getElementById("btn-get")!.addEventListener("click", () => getUrl(urlInput, urlBar));
 document.getElementById("btn-crawl")!.addEventListener("click", () => crawlUrl(urlInput, urlBar));
 urlInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") fetchUrl(urlInput, urlBar);
+  if (e.key === "Enter") getUrl(urlInput, urlBar);
 });
 
 // --- Drag & Drop ---
@@ -934,8 +934,14 @@ registerCommands([
   },
   { id: "export.markdown", label: "Copy as Markdown", category: "Export", run: copyMarkdown },
   {
+    id: "convert.get",
+    label: "Get URL as Markdown",
+    category: "Convert",
+    run: () => getUrl(urlInput, urlBar),
+  },
+  {
     id: "convert.fetch",
-    label: "Fetch URL",
+    label: "Fetch URL (static only)",
     category: "Convert",
     run: () => fetchUrl(urlInput, urlBar),
   },

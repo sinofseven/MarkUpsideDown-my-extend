@@ -57,6 +57,10 @@ function markSetupDone() {
 let currentTestStatus: WorkerStatus | null = null; // cached last test result
 let lastTestedUrl: string | null = null; // URL that produced currentTestStatus
 
+export function isRenderAvailable(): boolean {
+  return Boolean(currentTestStatus?.render_available);
+}
+
 function featureRows(status: WorkerStatus | null) {
   const hasConvert = Boolean(status && status.convert_available);
   const hasRender = Boolean(status && status.render_available);
@@ -64,7 +68,11 @@ function featureRows(status: WorkerStatus | null) {
 
   return [
     { name: "Open / Save", ok: true, hint: "Always available" },
-    { name: "Fetch URL (standard)", ok: true, hint: "Always available" },
+    {
+      name: "Get URL as Markdown",
+      ok: true,
+      hint: "Always available (auto-renders JS pages if Worker configured)",
+    },
     { name: "Table Editor / Copy Rich Text", ok: true, hint: "Always available" },
     {
       name: "Import documents",
@@ -72,7 +80,7 @@ function featureRows(status: WorkerStatus | null) {
       hint: hasConvert ? "Ready" : "Needs Worker URL",
     },
     {
-      name: "Fetch URL (Render JS)",
+      name: "JS Rendering (auto-fallback)",
       ok: hasRender,
       hint: hasRender ? "Ready" : hasWorker ? "Needs Worker secrets" : "Needs Worker URL + secrets",
     },
