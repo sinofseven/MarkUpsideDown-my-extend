@@ -60,7 +60,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 
 ### AI Agent Integration
 
-- **MCP Server** — AI agents (Claude Desktop, Claude Code, Cowork) can read/write editor content, manage files, browse projects, crawl websites, and convert documents via [Model Context Protocol](https://modelcontextprotocol.io/) (41 tools). See [docs/ai-integration.md](docs/ai-integration.md) for setup.
+- **MCP Server** — AI agents (Claude Desktop, Claude Code, Cowork) can read/write editor content, manage files, browse projects, crawl websites, and convert documents via [Model Context Protocol](https://modelcontextprotocol.io/) (43 tools). See [docs/ai-integration.md](docs/ai-integration.md) for setup.
 - **File-watcher sync** — External edits by AI agents are automatically detected and reloaded in the editor
 
 ### Keyboard Shortcuts

@@ -67,7 +67,7 @@ The MCP server resolves the Worker URL in this order:
 
 The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420). The port file `~/.markupsidedown-bridge-port` is created on startup and removed on exit.
 
-## Available Tools (41)
+## Available Tools (43)
 
 <details>
 <summary><strong>Editor Tools</strong> — 8 tools (require the app to be running)</summary>
@@ -116,21 +116,25 @@ The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420).
 </details>
 
 <details>
-<summary><strong>Content & Asset Tools</strong> — 2 tools (require the app to be running)</summary>
+<summary><strong>Content & Asset Tools</strong> — 3 tools</summary>
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
+| `extract_json` | Extract structured JSON data from a web page using AI (Workers AI LLM) | `url: string`, `prompt?: string`, `response_format?: string` (JSON Schema) |
 | `download_image` | Download an image from URL to a local file | `url: string`, `dest_path: string` |
 | `fetch_page_title` | Extract `<title>` from a web page | `url: string` |
+
+`extract_json` requires at least one of `prompt` or `response_format`. Uses LLM inference per call. Requires Worker URL with `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 
 </details>
 
 <details>
-<summary><strong>Conversion Tools</strong> — 3 tools (require Worker URL)</summary>
+<summary><strong>Conversion Tools</strong> — 4 tools (require Worker URL)</summary>
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `fetch_markdown` | Fetch a URL as Markdown via Markdown for Agents | `url: string` |
+| `get_markdown` | Fetch a URL as Markdown with automatic SPA detection and fallback | `url: string` |
+| `fetch_markdown` | Fetch a URL as Markdown via Markdown for Agents (static only) | `url: string` |
 | `render_markdown` | Fetch a JS-rendered page as Markdown via Browser Rendering | `url: string` |
 | `convert_to_markdown` | Convert a local file to Markdown via Workers AI | `file_path: string` |
 
@@ -143,8 +147,8 @@ The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420).
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `crawl_website` | Start a website crawl job (returns `job_id`) | `url: string`, `depth?: number`, `limit?: number`, `render?: boolean`, `include_patterns?: string[]`, `exclude_patterns?: string[]` |
-| `crawl_status` | Poll crawl job status and retrieve Markdown pages | `job_id: string`, `cursor?: string` |
+| `crawl_website` | Start a website crawl job (returns `job_id`). Supports markdown and/or JSON output. | `url: string`, `depth?: number`, `limit?: number`, `render?: boolean`, `include_patterns?: string[]`, `exclude_patterns?: string[]`, `formats?: string[]`, `response_format?: string` (JSON Schema) |
+| `crawl_status` | Poll crawl job status and retrieve pages (markdown and/or JSON) | `job_id: string`, `cursor?: string` |
 | `crawl_save` | Save crawled pages as local Markdown files | `pages: {url, markdown}[]`, `base_dir: string` |
 
 </details>
