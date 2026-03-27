@@ -15,6 +15,7 @@ import { markdownLinter } from "./markdown-lint.ts";
 import { editorTheme } from "./theme.ts";
 import { editTableAtCursor } from "./table-editor.ts";
 import { showSettings, checkFirstRun } from "./settings.ts";
+import { checkForUpdate } from "./update-toast.ts";
 import {
   initSidebar,
   setSelectedPath,
@@ -1019,3 +1020,4 @@ window.addEventListener("beforeunload", () => {
 // --- First-run ---
 
 checkFirstRun();
+checkForUpdate();

@@ -23,3 +23,7 @@ export const KEY_SIDEBAR_PANEL = "markupsidedown:sidebarPanel";
 
 // --- Tabs ---
 export const KEY_TABS = "markupsidedown:tabs";
+
+// --- Update check ---
+export const KEY_UPDATE_LAST_CHECK = "markupsidedown:updateLastCheck";
+export const KEY_UPDATE_DISMISSED_VERSION = "markupsidedown:updateDismissedVersion";

@@ -144,6 +144,7 @@ fn main() {
             commands::git_log,
             commands::git_revert,
             commands::git_show,
+            commands::check_for_update,
             cloudflare::check_wrangler_status,
             cloudflare::wrangler_login,
             cloudflare::deploy_worker,

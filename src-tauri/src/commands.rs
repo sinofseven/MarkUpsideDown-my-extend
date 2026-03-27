@@ -1871,3 +1871,60 @@ This workspace is configured for use with MarkUpsideDown's MCP server.
 
     Ok(expanded.to_string_lossy().to_string())
 }
+
+// --- Update check ---
+
+#[derive(Serialize)]
+pub struct UpdateInfo {
+    pub version: String,
+    pub html_url: String,
+}
+
+#[tauri::command]
+pub async fn check_for_update(
+    client: tauri::State<'_, reqwest::Client>,
+    current_version: String,
+) -> Result<Option<UpdateInfo>, String> {
+    let resp = client
+        .get("https://api.github.com/repos/M-Igashi/markupsidedown/releases/latest")
+        .header("User-Agent", "markupsidedown")
+        .timeout(Duration::from_secs(5))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+
+    let body: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+    let tag = body["tag_name"].as_str().unwrap_or("");
+    let latest = tag.strip_prefix('v').unwrap_or(tag);
+    let html_url = body["html_url"].as_str().unwrap_or("").to_string();
+
+    if is_newer(latest, &current_version) {
+        Ok(Some(UpdateInfo {
+            version: latest.to_string(),
+            html_url,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+/// Compare dot-separated version strings (e.g. "0.1.104" > "0.1.103").
+fn is_newer(latest: &str, current: &str) -> bool {
+    let parse = |s: &str| -> Vec<u64> {
+        s.split('.').filter_map(|p| p.parse().ok()).collect()
+    };
+    let l = parse(latest);
+    let c = parse(current);
+    for i in 0..l.len().max(c.len()) {
+        let lv = l.get(i).copied().unwrap_or(0);
+        let cv = c.get(i).copied().unwrap_or(0);
+        if lv != cv {
+            return lv > cv;
+        }
+    }
+    false
+}
