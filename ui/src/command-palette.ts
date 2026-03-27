@@ -24,38 +24,29 @@ export function registerCommands(cmds: Command[]) {
   for (const cmd of cmds) registerCommand(cmd);
 }
 
-function fuzzyMatch(query: string, text: string): boolean {
+/** Returns 0 if no match, 1–3 for fuzzy/substring/prefix match. */
+function fuzzyScore(query: string, text: string): number {
   const q = query.toLowerCase();
   const t = text.toLowerCase();
-  if (t.includes(q)) return true;
+  if (t.startsWith(q)) return 3;
+  if (t.includes(q)) return 2;
   // Simple fuzzy: all query chars appear in order
   let qi = 0;
   for (let ti = 0; ti < t.length && qi < q.length; ti++) {
     if (t[ti] === q[qi]) qi++;
   }
-  return qi === q.length;
-}
-
-function fuzzyScore(query: string, text: string): number {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  // Exact prefix match scores highest
-  if (t.startsWith(q)) return 3;
-  // Contains as substring
-  if (t.includes(q)) return 2;
-  // Fuzzy match
-  return 1;
+  return qi === q.length ? 1 : 0;
 }
 
 function filterCommands(query: string): Command[] {
   if (!query) return commands.slice();
-  return commands
-    .filter((c) => fuzzyMatch(query, c.label) || fuzzyMatch(query, c.category))
-    .sort((a, b) => {
-      const sa = Math.max(fuzzyScore(query, a.label), fuzzyScore(query, a.category));
-      const sb = Math.max(fuzzyScore(query, b.label), fuzzyScore(query, b.category));
-      return sb - sa;
-    });
+  const scored: { cmd: Command; score: number }[] = [];
+  for (const cmd of commands) {
+    const score = Math.max(fuzzyScore(query, cmd.label), fuzzyScore(query, cmd.category));
+    if (score > 0) scored.push({ cmd, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map((s) => s.cmd);
 }
 
 function renderResults(list: HTMLElement, results: Command[]) {

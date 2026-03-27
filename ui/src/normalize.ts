@@ -67,10 +67,8 @@ function fixHeadingHierarchy(text: string): string {
   // Map each used level to a compact level preserving relative depth
   const levelMap = new Map<number, number>();
   const minLevel = usedLevels[0];
-  for (const level of usedLevels) {
-    // Find rank (0-based) and add minLevel
-    const rank = usedLevels.indexOf(level);
-    levelMap.set(level, minLevel + rank);
+  for (let i = 0; i < usedLevels.length; i++) {
+    levelMap.set(usedLevels[i], minLevel + i);
   }
 
   for (const h of headings) {
