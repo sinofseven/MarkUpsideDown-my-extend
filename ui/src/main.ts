@@ -110,6 +110,7 @@ import { registerCommands, toggle as toggleCommandPalette } from "./command-pale
 import { autoLinkTitle } from "./auto-link-title.ts";
 import { initLinkContextMenu } from "./link-context-menu.ts";
 import { smartTypography } from "./smart-typography.ts";
+import { todoAutocomplete } from "./todo-autocomplete.ts";
 import { initDownloadImages, downloadExternalImages } from "./download-images.ts";
 import { initNoteRefactor, extractToNewNote } from "./note-refactor.ts";
 import { initFrontmatterPanel, updateFrontmatterPanel } from "./frontmatter-panel.ts";
@@ -183,6 +184,7 @@ const editor = new EditorView({
       ]),
       autoLinkTitle,
       smartTypography,
+      todoAutocomplete,
       updatePreviewListener,
       EditorView.lineWrapping,
     ],
