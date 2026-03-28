@@ -140,12 +140,14 @@ export function showTableEditor(editor: EditorView, existingTable: TableRange | 
     };
   }
 
-  // Undo stack
+  // Undo stack (capped to prevent unbounded memory growth)
+  const MAX_UNDO = 50;
   const undoStack: TableData[] = [];
   const redoStack: TableData[] = [];
 
   function snapshot() {
-    undoStack.push(JSON.parse(JSON.stringify(table)));
+    undoStack.push(structuredClone(table));
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
     redoStack.length = 0;
   }
 
@@ -157,14 +159,14 @@ export function showTableEditor(editor: EditorView, existingTable: TableRange | 
 
   function undo() {
     if (undoStack.length === 0) return;
-    redoStack.push(JSON.parse(JSON.stringify(table)));
+    redoStack.push(structuredClone(table));
     restoreSnapshot(undoStack.pop()!);
     renderGrid();
   }
 
   function redo() {
     if (redoStack.length === 0) return;
-    undoStack.push(JSON.parse(JSON.stringify(table)));
+    undoStack.push(structuredClone(table));
     restoreSnapshot(redoStack.pop()!);
     renderGrid();
   }
