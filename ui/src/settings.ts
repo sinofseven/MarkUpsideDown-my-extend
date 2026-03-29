@@ -800,43 +800,70 @@ function renderClaudeCodeTerminalTab(
 }
 
 function renderCoworkTab(container: HTMLElement, binaryPath: string, workerUrl: string) {
-  const mcpJson = generateMcpConfigJson(binaryPath, workerUrl);
   container.innerHTML = `
     <div class="settings-mcp-instruction">
-      Cowork is folder-based — create a dedicated workspace folder and open it each session.
+      Cowork reads MCP servers from Claude Desktop's global config.
     </div>
     <div class="settings-mcp-cowork-steps">
       <div class="settings-mcp-cowork-step">
-        <strong>1.</strong> Click <em>Create workspace</em> below to generate a ready-to-use folder
+        <strong>1.</strong> Click <em>Install</em> to add MarkUpsideDown to Claude Desktop
       </div>
       <div class="settings-mcp-cowork-step">
-        <strong>2.</strong> In Cowork, open the created folder as your workspace
+        <strong>2.</strong> Restart Claude Desktop
       </div>
       <div class="settings-mcp-cowork-step">
-        <strong>3.</strong> Cowork will auto-detect the MCP config and CLAUDE.md context file
+        <strong>3.</strong> Optionally create a workspace folder with CLAUDE.md context
       </div>
     </div>
     <div class="settings-mcp-cowork-actions">
       <div class="settings-mcp-cowork-path-row">
-        <input type="text" id="settings-cowork-path" class="settings-mcp-cowork-path" placeholder="~/Claude-Workspace" value="~/Claude-Workspace" />
-        <button id="settings-cowork-browse">Browse</button>
-        <button id="settings-cowork-create" class="primary">Create workspace</button>
+        <button id="settings-cowork-install" class="primary">Install</button>
+        <span id="settings-cowork-install-result" class="settings-mcp-cowork-install-status"></span>
       </div>
-      <div id="settings-cowork-result" class="settings-test-result"></div>
     </div>
     <details class="settings-mcp-cowork-details">
-      <summary>What gets created</summary>
+      <summary>Workspace folder (optional)</summary>
       <div class="settings-mcp-cowork-detail-text">
-        <code>.mcp.json</code> — MCP server config (auto-detected by Cowork)<br>
-        <code>CLAUDE.md</code> — Context file with available tools and usage tips
+        Create a folder with <code>CLAUDE.md</code> listing available MCP tools as context for Cowork.
+      </div>
+      <div class="settings-mcp-cowork-actions">
+        <div class="settings-mcp-cowork-path-row">
+          <input type="text" id="settings-cowork-path" class="settings-mcp-cowork-path" placeholder="~/Claude-Workspace" value="~/Claude-Workspace" />
+          <button id="settings-cowork-browse">Browse</button>
+          <button id="settings-cowork-create">Create</button>
+        </div>
+        <div id="settings-cowork-result" class="settings-test-result"></div>
       </div>
     </details>
   `;
 
+  const installBtn = container.querySelector("#settings-cowork-install") as HTMLButtonElement;
+  const installResult = container.querySelector("#settings-cowork-install-result")!;
   const createBtn = container.querySelector("#settings-cowork-create") as HTMLButtonElement;
   const browseBtn = container.querySelector("#settings-cowork-browse") as HTMLButtonElement;
   const pathInput = container.querySelector("#settings-cowork-path") as HTMLInputElement;
   const resultEl = container.querySelector("#settings-cowork-result")!;
+
+  installBtn.addEventListener("click", async () => {
+    installBtn.disabled = true;
+    installBtn.textContent = "Installing\u2026";
+    try {
+      const configPath = await invoke<string>("install_mcp_to_claude_desktop", {
+        mcpBinaryPath: binaryPath,
+        workerUrl,
+      });
+      installResult.className = "settings-mcp-cowork-install-status test-ok";
+      installResult.textContent = `Installed \u2014 restart Claude Desktop to activate`;
+      installBtn.textContent = "Reinstall";
+      installBtn.title = configPath;
+    } catch (e) {
+      installResult.className = "settings-mcp-cowork-install-status test-error";
+      installResult.textContent = `Error: ${e}`;
+      installBtn.textContent = "Install";
+    } finally {
+      installBtn.disabled = false;
+    }
+  });
 
   browseBtn.addEventListener("click", async () => {
     const { open: openDialog } = window.__TAURI__.dialog;
@@ -853,14 +880,9 @@ function renderCoworkTab(container: HTMLElement, binaryPath: string, workerUrl: 
     }
     createBtn.disabled = true;
     createBtn.textContent = "Creating\u2026";
-    resultEl.className = "settings-test-result test-pending";
-    resultEl.textContent = "Creating workspace\u2026";
     try {
       const created = await invoke<string>("create_cowork_workspace", {
         folderPath,
-        mcpConfigJson: mcpJson,
-        mcpBinaryPath: binaryPath,
-        workerUrl,
       });
       resultEl.className = "settings-test-result test-ok";
       resultEl.textContent = `Created at ${created}`;
@@ -869,7 +891,7 @@ function renderCoworkTab(container: HTMLElement, binaryPath: string, workerUrl: 
       resultEl.textContent = `Error: ${e}`;
     } finally {
       createBtn.disabled = false;
-      createBtn.textContent = "Create workspace";
+      createBtn.textContent = "Create";
     }
   });
 }

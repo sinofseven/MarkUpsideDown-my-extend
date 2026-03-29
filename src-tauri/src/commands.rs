@@ -1879,13 +1879,57 @@ pub async fn git_init(repo_path: String) -> Result<String, String> {
     .map_err(|e| format!("Task error: {e}"))?
 }
 
+// --- Claude Desktop MCP Config ---
+
+#[tauri::command]
+pub fn install_mcp_to_claude_desktop(
+    mcp_binary_path: String,
+    worker_url: String,
+) -> Result<String, String> {
+    use std::fs;
+
+    let config_path = crate::util::home_dir()
+        .ok_or("Cannot resolve home directory")?
+        .join("Library/Application Support/Claude/claude_desktop_config.json");
+
+    // Read existing config or create new one
+    let mut config: serde_json::Value = if config_path.exists() {
+        let content = fs::read_to_string(&config_path)
+            .map_err(|e| format!("Failed to read config: {e}"))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse config: {e}"))?
+    } else {
+        serde_json::json!({})
+    };
+
+    // Build MCP server entry
+    let mut entry = serde_json::json!({ "command": mcp_binary_path });
+    if !worker_url.is_empty() {
+        entry["env"] = serde_json::json!({ "MARKUPSIDEDOWN_WORKER_URL": worker_url });
+    }
+
+    // Add/update markupsidedown entry
+    let servers = config
+        .as_object_mut()
+        .ok_or("Config is not a JSON object")?
+        .entry("mcpServers")
+        .or_insert_with(|| serde_json::json!({}));
+    servers["markupsidedown"] = entry;
+
+    fs::write(
+        &config_path,
+        serde_json::to_string_pretty(&config).unwrap(),
+    )
+    .map_err(|e| format!("Failed to write config: {e}"))?;
+
+    Ok(config_path.to_string_lossy().to_string())
+}
+
 // --- Cowork Workspace ---
 
 #[tauri::command]
 pub fn create_cowork_workspace(
     folder_path: String,
-    mcp_binary_path: String,
-    worker_url: String,
 ) -> Result<String, String> {
     use std::fs;
     use std::path::PathBuf;
@@ -1901,30 +1945,6 @@ pub fn create_cowork_workspace(
 
     fs::create_dir_all(&expanded)
         .map_err(|e| format!("Failed to create directory: {e}"))?;
-
-    // Generate .mcp.json
-    let mcp_server = serde_json::json!({
-        "command": mcp_binary_path,
-    });
-    let mcp_server_with_env = if worker_url.is_empty() {
-        mcp_server
-    } else {
-        serde_json::json!({
-            "command": mcp_binary_path,
-            "env": { "MARKUPSIDEDOWN_WORKER_URL": worker_url }
-        })
-    };
-    let mcp_config = serde_json::json!({
-        "mcpServers": {
-            "markupsidedown": mcp_server_with_env
-        }
-    });
-    let mcp_json_path = expanded.join(".mcp.json");
-    fs::write(
-        &mcp_json_path,
-        serde_json::to_string_pretty(&mcp_config).unwrap(),
-    )
-    .map_err(|e| format!("Failed to write .mcp.json: {e}"))?;
 
     // Generate CLAUDE.md
     let claude_md = r#"# MarkUpsideDown Workspace

@@ -119,6 +119,7 @@ fn main() {
             commands::download_image,
             commands::fetch_svg,
             commands::get_mcp_binary_path,
+            commands::install_mcp_to_claude_desktop,
             commands::create_cowork_workspace,
             commands::read_text_file,
             commands::list_directory,

@@ -2970,6 +2970,10 @@ body {
   color: var(--fg, #ccc);
 }
 
+.settings-mcp-cowork-install-status {
+  font-size: 11px;
+}
+
 .settings-mcp-cowork-details {
   font-size: 12px;
 }
