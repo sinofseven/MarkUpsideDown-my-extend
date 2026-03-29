@@ -16,7 +16,14 @@ import {
   KEY_SIDEBAR_PANEL,
   KEY_SIDEBAR_SHOW_DOTFILES,
 } from "./storage-keys.ts";
-import { loadTags, getFileTags, getTagDef, showTagPopover, removeTagPopover } from "./tags.ts";
+import {
+  loadTags,
+  getFileTags,
+  getTagDef,
+  getAllTagNames,
+  showTagPopover,
+  removeTagPopover,
+} from "./tags.ts";
 
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { open: openDialog, confirm, message } = window.__TAURI__.dialog;
@@ -327,6 +334,35 @@ function updateTagFilterBadge() {
   badge.appendChild(clearBtn);
 }
 
+function updateTagChipBar() {
+  const bar = document.getElementById("sidebar-tag-chips");
+  if (!bar) return;
+  const tagNames = getAllTagNames();
+  if (tagNames.length === 0) {
+    bar.style.display = "none";
+    bar.innerHTML = "";
+    return;
+  }
+  bar.style.display = "flex";
+  bar.innerHTML = "";
+  for (const t of tagNames) {
+    const def = getTagDef(t);
+    const chip = document.createElement("button");
+    chip.className = "sidebar-tag-chip";
+    if (tagFilter === t) chip.classList.add("active");
+    chip.style.setProperty("--tag-color", def?.color ?? "#888");
+    chip.textContent = t;
+    chip.title = tagFilter === t ? `Clear "${t}" filter` : `Filter by "${t}"`;
+    chip.addEventListener("click", () => {
+      tagFilter = tagFilter === t ? null : t;
+      updateTagFilterBadge();
+      updateTagChipBar();
+      refreshTree();
+    });
+    bar.appendChild(chip);
+  }
+}
+
 function findInFolder(dirPath: string) {
   filterScope = dirPath;
   updateFilterScopeBadge();
@@ -435,6 +471,13 @@ function render() {
   tagBadge.id = "sidebar-tag-filter";
   filesContainer.appendChild(tagBadge);
   updateTagFilterBadge();
+
+  // Tag chip bar (quick-access tag filter)
+  const tagChipBar = document.createElement("div");
+  tagChipBar.className = "sidebar-tag-chip-bar";
+  tagChipBar.id = "sidebar-tag-chips";
+  filesContainer.appendChild(tagChipBar);
+  updateTagChipBar();
 
   treeEl = document.createElement("div");
   treeEl.className = "sidebar-tree";
@@ -724,6 +767,8 @@ export async function refreshTree() {
   attachTreeListeners(newTree);
   treeEl.replaceWith(newTree);
   treeEl = newTree;
+
+  updateTagChipBar();
 }
 
 async function renderDirectory(

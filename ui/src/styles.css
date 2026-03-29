@@ -1110,6 +1110,37 @@ body {
   flex-shrink: 0;
 }
 
+/* Tag chip bar (quick filter) */
+.sidebar-tag-chip-bar {
+  display: none;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 8px;
+}
+
+.sidebar-tag-chip {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--tag-color, #888);
+  background: transparent;
+  border: 1.5px solid var(--tag-color, #888);
+  border-radius: 10px;
+  padding: 1px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 16px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sidebar-tag-chip:hover {
+  background: color-mix(in srgb, var(--tag-color, #888) 15%, transparent);
+}
+
+.sidebar-tag-chip.active {
+  background: var(--tag-color, #888);
+  color: #fff;
+}
+
 /* Tag popover */
 .tag-popover {
   position: fixed;
