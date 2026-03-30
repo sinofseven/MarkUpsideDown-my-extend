@@ -28,10 +28,25 @@ const SUPPORTED_TYPES = new Set([
 const RENDER_CACHE_TTL = 3600; // 1 hour
 
 // Bump this when adding/changing endpoints so the app can detect outdated Workers.
-const WORKER_VERSION = 2;
+const WORKER_VERSION = 3;
 
 function hasSecrets(env: Env): boolean {
   return Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
+}
+
+/** Wrap a raw JSON Schema into the format expected by Browser Rendering APIs. */
+function wrapJsonSchema(schema: unknown): unknown {
+  // Already in the correct { type: "json_schema", json_schema: ... } form
+  if (typeof schema === "object" && schema !== null && "type" in schema && (schema as Record<string, unknown>).type === "json_schema") {
+    return schema;
+  }
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: "extraction",
+      schema,
+    },
+  };
 }
 
 export default {
@@ -287,7 +302,9 @@ async function handleJson(request: Request, env: Env): Promise<Response> {
     rejectResourceTypes: ["image", "media", "font"],
   };
   if (body.prompt) jsonBody.prompt = body.prompt;
-  if (body.response_format) jsonBody.response_format = body.response_format;
+  if (body.response_format) {
+    jsonBody.response_format = wrapJsonSchema(body.response_format);
+  }
 
   try {
     const response = await fetch(jsonUrl, {
@@ -357,8 +374,12 @@ async function handleCrawlStart(request: Request, env: Env): Promise<Response> {
     render: body.render ?? true,
     rejectResourceTypes: ["image", "media", "font", "stylesheet"],
   };
-  if (formats.includes("json") && body.response_format) {
-    crawlBody.response_format = body.response_format;
+  if (formats.includes("json")) {
+    const jsonOptions: Record<string, unknown> = {};
+    if (body.response_format) {
+      jsonOptions.response_format = wrapJsonSchema(body.response_format);
+    }
+    crawlBody.jsonOptions = jsonOptions;
   }
 
   const options: Record<string, unknown> = {};

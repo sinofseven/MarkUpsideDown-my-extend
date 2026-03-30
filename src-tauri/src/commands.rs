@@ -123,7 +123,7 @@ pub fn sync_editor_state(
 // --- Worker Health Check ---
 
 /// Must match WORKER_VERSION in worker/src/index.ts.
-const EXPECTED_WORKER_VERSION: u32 = 2;
+const EXPECTED_WORKER_VERSION: u32 = 3;
 
 #[derive(Serialize)]
 pub struct WorkerStatus {
