@@ -2,11 +2,12 @@
 
 > For a high-level overview of AI integration, see the [AI Integration Guide](ai-integration.md).
 
-MarkUpsideDown uses a Cloudflare Worker for three features:
+MarkUpsideDown uses a Cloudflare Worker for four features:
 
 1. **Document Import** — Convert PDF, Office docs, images, etc. to Markdown via [Workers AI `AI.toMarkdown()`](https://developers.cloudflare.com/workers-ai/markdown-conversion/)
 2. **Rendered Fetch** — Fetch JavaScript-rendered pages as Markdown via [Browser Rendering](https://developers.cloudflare.com/browser-rendering/rest-api/markdown-endpoint/)
-3. **Website Crawl** — Crawl an entire website and save all pages as Markdown files via [Browser Rendering `/crawl` API](https://developers.cloudflare.com/browser-rendering/rest-api/crawl-endpoint/)
+3. **Structured Extraction** — Extract structured JSON data from web pages using AI (Browser Rendering + Workers AI LLM)
+4. **Website Crawl** — Crawl an entire website and save all pages as Markdown files via [Browser Rendering `/crawl` API](https://developers.cloudflare.com/browser-rendering/rest-api/crawl-endpoint/)
 
 Each user deploys their own Worker instance.
 
@@ -148,11 +149,25 @@ If you skip this step, the Worker is still deployed and Document Import works �
 
 ### Updating the Worker
 
+The app shows an **"Update available"** badge in Settings when your deployed Worker is older than the version bundled with the app. To update:
+
 ```bash
 cd worker && wrangler deploy
 ```
 
-No app-side changes needed — the URL stays the same. Secrets persist across deploys.
+No app-side changes needed — the URL stays the same. Secrets persist across deploys. Click **Test** in Settings to verify the new version.
+
+**When to update:** After installing a new version of MarkUpsideDown, check Settings → Worker Status. If it shows "Update available", redeploy the Worker. New MCP tools (e.g., `extract_json`) may require Worker endpoints that don't exist in older versions.
+
+### Worker version
+
+The Worker exposes its version via `GET /health`:
+
+```json
+{ "status": "ok", "version": 4, "capabilities": { "fetch": true, "convert": true, "render": true, "json": true, "crawl": true } }
+```
+
+The `capabilities` object shows which features are available. `render`, `json`, and `crawl` require Worker secrets (`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`). If capabilities show `false`, see [Set Worker Secrets](#set-worker-secrets).
 
 ### CORS
 

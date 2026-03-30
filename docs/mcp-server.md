@@ -66,6 +66,16 @@ The MCP server resolves the Worker URL in this order:
 1. `MARKUPSIDEDOWN_WORKER_URL` environment variable (set in MCP config)
 2. Worker URL configured in the app's Settings (read via bridge `/editor/state`)
 
+### Worker Version Compatibility
+
+The MCP server's conversion and crawl tools require a compatible Worker. If tools like `extract_json` or `crawl_website` return endpoint errors, your Worker may need redeployment:
+
+```bash
+cd worker && wrangler deploy
+```
+
+Check Worker health and version: `curl https://your-worker-url/health`
+
 ### Bridge Port
 
 The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420). The port file `~/.markupsidedown-bridge-port` is created on startup and removed on exit.

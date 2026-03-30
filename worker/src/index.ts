@@ -28,7 +28,7 @@ const SUPPORTED_TYPES = new Set([
 const RENDER_CACHE_TTL = 3600; // 1 hour
 
 // Bump this when adding/changing endpoints so the app can detect outdated Workers.
-const WORKER_VERSION = 3;
+const WORKER_VERSION = 4;
 
 function hasSecrets(env: Env): boolean {
   return Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
