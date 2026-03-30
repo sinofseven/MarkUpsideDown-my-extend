@@ -552,18 +552,12 @@ function makeDraggable(handle: HTMLElement, onDrag: (clientX: number) => void, o
   });
 }
 
-let dragEditorLeft = 0;
-let dragAvailableWidth = 0;
-
-divider.addEventListener("mousedown", () => {
-  dragEditorLeft = editorContainer.getBoundingClientRect().left;
-  dragAvailableWidth = previewWrapper.getBoundingClientRect().right - dragEditorLeft;
-});
 makeDraggable(divider, (clientX) => {
-  const ratio = (clientX - dragEditorLeft) / dragAvailableWidth;
+  const editorLeft = editorContainer.getBoundingClientRect().left;
+  const totalWidth = previewWrapper.getBoundingClientRect().right - editorLeft;
+  const ratio = (clientX - editorLeft) / totalWidth;
   const clamped = Math.max(0.2, Math.min(0.8, ratio));
   editorContainer.style.flex = `${clamped}`;
-  previewWrapper.style.flex = `${1 - clamped}`;
 });
 
 // --- Sidebar ---
@@ -710,19 +704,26 @@ previewUnfoldBtn.title = "Expand Preview (⌘3)";
 previewUnfoldBtn.innerHTML = SVG_CHEVRON_LEFT;
 appEl.appendChild(previewUnfoldBtn);
 
+function updateDividerVisibility() {
+  const eitherCollapsed =
+    editorContainer.classList.contains("collapsed") ||
+    previewWrapper.classList.contains("collapsed");
+  divider.classList.toggle("hidden", eitherCollapsed);
+}
+
 function toggleEditor() {
   preservePreviewScroll(() => {
     const collapsed = editorContainer.classList.toggle("collapsed");
-    divider.classList.toggle("hidden", collapsed);
     editorUnfoldBtn.classList.toggle("visible", collapsed);
+    updateDividerVisibility();
     setStorageBool(KEY_EDITOR_COLLAPSED, collapsed);
   });
 }
 
 function togglePreview() {
   const collapsed = previewWrapper.classList.toggle("collapsed");
-  divider.classList.toggle("hidden", collapsed);
   previewUnfoldBtn.classList.toggle("visible", collapsed);
+  updateDividerVisibility();
   setStorageBool(KEY_PREVIEW_COLLAPSED, collapsed);
 }
 
