@@ -131,6 +131,43 @@ const mathExtension = {
 
 marked.use(mathExtension);
 
+// --- CJK emphasis fix ---
+// CommonMark delimiter-flanking rules fail for CJK text: ** between CJK
+// characters is both left- and right-flanking, preventing it from opening
+// or closing emphasis. Insert hair spaces (U+200A, Unicode Zs category =
+// CommonMark whitespace) at the outer boundaries of **...** spans so
+// delimiters pass the flanking checks without visible layout impact.
+
+const CJK_RE = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Hangul}]/u;
+const HAIR = "\u200A";
+
+function fixCjkEmphasis(source: string): string {
+  let inFence = false;
+  return source
+    .split("\n")
+    .map((line) => {
+      if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
+        inFence = !inFence;
+        return line;
+      }
+      if (inFence) return line;
+
+      // Capture the original line for offset-based character lookup,
+      // then replace each **...** span, inserting hair spaces at CJK boundaries.
+      const orig = line;
+      line = line.replace(/\*\*((?:[^*]|\*(?!\*))+?)\*\*/g, (m, content, offset) => {
+        const before = offset > 0 ? orig[offset - 1] : "";
+        const afterPos = offset + m.length;
+        const after = afterPos < orig.length ? orig[afterPos] : "";
+        const pre = before && CJK_RE.test(before) ? HAIR : "";
+        const post = after && CJK_RE.test(after) ? HAIR : "";
+        return `${pre}**${content}**${post}`;
+      });
+      return line;
+    })
+    .join("\n");
+}
+
 // --- Source line annotation helpers ---
 
 function countNewlines(str: string, from: number, to: number) {
@@ -324,7 +361,7 @@ export async function renderPreview(source: string) {
 
   let mermaidRenderCount = 0;
 
-  const tokens = marked.lexer(source);
+  const tokens = marked.lexer(fixCjkEmphasis(source));
   annotateTokensWithSourceLines(tokens);
 
   const html = marked.parser(tokens, { renderer: previewRenderer });
