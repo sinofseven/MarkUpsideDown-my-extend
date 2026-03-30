@@ -112,6 +112,8 @@ pub struct CrawlStatusParams {
     pub job_id: String,
     #[schemars(description = "Pagination cursor from a previous crawl_status response")]
     pub cursor: Option<String>,
+    #[schemars(description = "Max number of records per page (default 10, max 100)")]
+    pub limit: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -901,8 +903,9 @@ impl McpTools {
     ) -> Result<CallToolResult, rmcp::ErrorData> {
         let result = async {
             let worker_url = self.resolve_worker_url().await?;
+            let limit = params.limit.unwrap_or(10);
             let mut status_url = format!(
-                "{}/crawl/{}?limit=100&status=completed",
+                "{}/crawl/{}?limit={limit}&status=completed",
                 worker_url.trim_end_matches('/'),
                 params.job_id,
             );
@@ -913,7 +916,7 @@ impl McpTools {
             let response = self
                 .http
                 .get(&status_url)
-                .timeout(std::time::Duration::from_secs(30))
+                .timeout(std::time::Duration::from_secs(120))
                 .send()
                 .await
                 .map_err(|e| format!("Request failed: {e}"))?;
@@ -943,7 +946,8 @@ impl McpTools {
                 result: Option<ResultInner>,
                 error: Option<String>,
             }
-            let data: Resp = response.json().await.map_err(|e| format!("Failed to parse response: {e}"))?;
+            let body = response.bytes().await.map_err(|e| format!("Failed to read response: {e}"))?;
+            let data: Resp = serde_json::from_slice(&body).map_err(|e| format!("Failed to parse response: {e}"))?;
             if let Some(err) = data.error {
                 return Err(err);
             }

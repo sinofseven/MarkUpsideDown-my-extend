@@ -10,6 +10,10 @@ interface WorkerStatus {
   reachable: boolean;
   convert_available: boolean;
   render_available: boolean;
+  json_available: boolean;
+  crawl_available: boolean;
+  worker_version: number | null;
+  update_available: boolean;
   error?: string;
 }
 
@@ -65,6 +69,8 @@ export function isRenderAvailable(): boolean {
 function featureRows(status: WorkerStatus | null) {
   const hasConvert = Boolean(status && status.convert_available);
   const hasRender = Boolean(status && status.render_available);
+  const hasJson = Boolean(status && status.json_available);
+  const hasCrawl = Boolean(status && status.crawl_available);
   const hasWorker = Boolean(status && status.reachable);
 
   return [
@@ -84,6 +90,16 @@ function featureRows(status: WorkerStatus | null) {
       name: "JS Rendering (auto-fallback)",
       ok: hasRender,
       hint: hasRender ? "Ready" : hasWorker ? "Needs Worker secrets" : "Needs Worker URL + secrets",
+    },
+    {
+      name: "Extract JSON (AI)",
+      ok: hasJson,
+      hint: hasJson ? "Ready" : hasWorker ? "Needs Worker secrets" : "Needs Worker URL + secrets",
+    },
+    {
+      name: "Website Crawl",
+      ok: hasCrawl,
+      hint: hasCrawl ? "Ready" : hasWorker ? "Needs Worker secrets" : "Needs Worker URL + secrets",
     },
   ];
 }
@@ -387,6 +403,8 @@ export function showSettings({
 
         <div class="settings-auto-setup">
           <button id="settings-auto-setup-btn" class="settings-setup-btn">Setup with Cloudflare</button>
+          <button id="settings-update-worker-btn" class="settings-update-btn" style="display:none">Update Worker</button>
+          <div id="settings-update-result" class="settings-test-result" style="display:none"></div>
           <div id="settings-setup-progress" class="settings-setup-progress" style="display:none"></div>
         </div>
 
@@ -559,10 +577,24 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   const featureList = document.getElementById("settings-feature-list")!;
   const secretsHelp = document.getElementById("settings-secrets-help") as HTMLElement;
   const autoSetupBtn = document.getElementById("settings-auto-setup-btn") as HTMLButtonElement;
+  const updateWorkerBtn = document.getElementById(
+    "settings-update-worker-btn",
+  ) as HTMLButtonElement;
+  const updateResult = document.getElementById("settings-update-result")!;
   const setupProgress = document.getElementById("settings-setup-progress")!;
+
+  function showUpdateButton(status: WorkerStatus | null) {
+    if (status?.reachable && status.update_available) {
+      updateWorkerBtn.style.display = "";
+    } else {
+      updateWorkerBtn.style.display = "none";
+      updateResult.style.display = "none";
+    }
+  }
 
   // Initial feature list
   renderFeatureList(featureList, currentTestStatus);
+  showUpdateButton(currentTestStatus);
   if (currentTestStatus?.reachable && !currentTestStatus?.render_available) {
     secretsHelp.style.display = "";
   }
@@ -596,12 +628,46 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     startAutoSetup(setupProgress, urlInput, (workerUrl, testStatus) => {
       if (testStatus) {
         renderFeatureList(featureList, testStatus);
+        showUpdateButton(testStatus);
         secretsHelp.style.display =
           testStatus.reachable && !testStatus.render_available ? "" : "none";
       }
       autoSetupBtn.disabled = false;
       autoSetupBtn.textContent = "Setup with Cloudflare";
     });
+  });
+
+  // Update Worker (re-deploy only, no login/secrets)
+  updateWorkerBtn.addEventListener("click", async () => {
+    updateWorkerBtn.disabled = true;
+    updateWorkerBtn.textContent = "Updating\u2026";
+    updateResult.style.display = "";
+    updateResult.className = "settings-test-result test-pending";
+    updateResult.textContent = "Re-deploying Worker\u2026";
+
+    try {
+      const newUrl = await invoke<string>("deploy_worker", { accountId: null });
+      updateResult.className = "settings-test-result test-ok";
+      updateResult.textContent = `Worker updated successfully: ${newUrl}`;
+      urlInput.value = newUrl;
+      // Re-test to refresh capabilities
+      const status = await invoke<WorkerStatus>("test_worker_url", { workerUrl: newUrl });
+      currentTestStatus = status;
+      lastTestedUrl = newUrl;
+      renderFeatureList(featureList, status);
+      showUpdateButton(status);
+      secretsHelp.style.display = status.reachable && !status.render_available ? "" : "none";
+      if (status.reachable && !status.update_available) {
+        updateResult.className = "settings-test-result test-ok";
+        updateResult.textContent = "Worker updated and verified \u2014 all features refreshed";
+      }
+    } catch (e) {
+      updateResult.className = "settings-test-result test-error";
+      updateResult.textContent = `Update failed: ${e}`;
+    } finally {
+      updateWorkerBtn.disabled = false;
+      updateWorkerBtn.textContent = "Update Worker";
+    }
   });
 
   // Test connection
@@ -626,6 +692,10 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       if (!status.reachable) {
         testResult.className = "settings-test-result test-error";
         testResult.textContent = status.error || "Cannot reach Worker";
+      } else if (status.update_available) {
+        testResult.className = "settings-test-result test-warn";
+        testResult.textContent =
+          "Worker update available \u2014 click Update Worker to get new features";
       } else if (status.render_available) {
         testResult.className = "settings-test-result test-ok";
         testResult.textContent = "Fully configured \u2014 all features available";
@@ -638,12 +708,14 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       }
 
       renderFeatureList(featureList, status);
+      showUpdateButton(status);
       secretsHelp.style.display = status.reachable && !status.render_available ? "" : "none";
     } catch (e) {
       testResult.className = "settings-test-result test-error";
       testResult.textContent = `Error: ${e}`;
       currentTestStatus = null;
       renderFeatureList(featureList, null);
+      showUpdateButton(null);
       secretsHelp.style.display = "none";
     } finally {
       testBtn.disabled = false;

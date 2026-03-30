@@ -122,11 +122,18 @@ pub fn sync_editor_state(
 
 // --- Worker Health Check ---
 
+/// Must match WORKER_VERSION in worker/src/index.ts.
+const EXPECTED_WORKER_VERSION: u32 = 2;
+
 #[derive(Serialize)]
 pub struct WorkerStatus {
     pub reachable: bool,
     pub convert_available: bool,
     pub render_available: bool,
+    pub json_available: bool,
+    pub crawl_available: bool,
+    pub worker_version: Option<u32>,
+    pub update_available: bool,
     pub error: Option<String>,
 }
 
@@ -136,6 +143,10 @@ impl WorkerStatus {
             reachable: false,
             convert_available: false,
             render_available: false,
+            json_available: false,
+            crawl_available: false,
+            worker_version: None,
+            update_available: false,
             error: Some(error),
         }
     }
@@ -145,11 +156,14 @@ impl WorkerStatus {
 struct HealthCapabilities {
     convert: Option<bool>,
     render: Option<bool>,
+    json: Option<bool>,
+    crawl: Option<bool>,
 }
 
 #[derive(Deserialize)]
 struct HealthResponse {
     _status: Option<String>,
+    version: Option<u32>,
     capabilities: Option<HealthCapabilities>,
 }
 
@@ -167,11 +181,22 @@ pub async fn test_worker_url(
                     let caps = body.capabilities.unwrap_or(HealthCapabilities {
                         convert: None,
                         render: None,
+                        json: None,
+                        crawl: None,
                     });
+                    let version = body.version;
+                    let update_available = match version {
+                        Some(v) => v < EXPECTED_WORKER_VERSION,
+                        None => true, // No version field means old Worker
+                    };
                     WorkerStatus {
                         reachable: true,
                         convert_available: caps.convert.unwrap_or(false),
                         render_available: caps.render.unwrap_or(false),
+                        json_available: caps.json.unwrap_or(false),
+                        crawl_available: caps.crawl.unwrap_or(false),
+                        worker_version: version,
+                        update_available,
                         error: None,
                     }
                 }
@@ -179,6 +204,10 @@ pub async fn test_worker_url(
                     reachable: true,
                     convert_available: false,
                     render_available: false,
+                    json_available: false,
+                    crawl_available: false,
+                    worker_version: None,
+                    update_available: true,
                     error: Some(format!("Unexpected response format: {e}")),
                 }
             }
@@ -187,6 +216,10 @@ pub async fn test_worker_url(
             reachable: true,
             convert_available: false,
             render_available: false,
+            json_available: false,
+            crawl_available: false,
+            worker_version: None,
+            update_available: false,
             error: Some(format!("Worker returned status {}", resp.status())),
         },
         Err(e) => WorkerStatus::unreachable(format!("Cannot reach worker: {e}")),
