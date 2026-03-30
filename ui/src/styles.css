@@ -3568,7 +3568,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 10000;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.92);
   display: flex;
   flex-direction: column;
 }
@@ -3592,6 +3592,8 @@ body {
   max-width: none;
   max-height: none;
   display: block;
+  background: #fff;
+  border-radius: 8px;
 }
 
 .mermaid-viewer-toolbar {
