@@ -33,6 +33,7 @@ The MCP server can run **without the desktop app** for conversion and crawl work
 |------|-------------------|
 | `fetch_markdown` | Yes (calls URL directly, no Worker needed) |
 | `render_markdown`, `convert_to_markdown` | Yes (calls Worker directly via env var) |
+| `extract_json` | Yes (calls Worker directly via env var) |
 | `crawl_website`, `crawl_status` | Yes (calls Worker directly via env var) |
 | `crawl_save` | No (saves files via the app bridge) |
 | Editor, file, git, content tools | No (require the running app) |
@@ -43,7 +44,7 @@ The MCP server can run **without the desktop app** for conversion and crawl work
 {
   "mcpServers": {
     "markupsidedown": {
-      "command": "/Applications/MarkUpsideDown.app/Contents/Resources/binaries/markupsidedown-mcp-aarch64-apple-darwin",
+      "command": "/Applications/MarkUpsideDown.app/Contents/MacOS/markupsidedown-mcp",
       "env": {
         "MARKUPSIDEDOWN_WORKER_URL": "https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev"
       }
@@ -51,6 +52,8 @@ The MCP server can run **without the desktop app** for conversion and crawl work
   }
 }
 ```
+
+> **Tip:** You can verify the binary version with `markupsidedown-mcp --version`.
 
 When `MARKUPSIDEDOWN_WORKER_URL` is set, the MCP server uses it directly without contacting the app bridge. Editor/file/git tools will return an error if the app is not running, but conversion and crawl tools work normally.
 
@@ -205,6 +208,26 @@ Conversion tools need a Worker URL. Either:
 ### Bridge port conflict
 
 If port 31415 is occupied, the app tries 31416–31420. The MCP server reads the actual port from `~/.markupsidedown-bridge-port`, so no manual configuration is needed.
+
+### MCP tools not working after app update
+
+MCP server processes are started when a Claude Code session begins and run for the duration of that session. **Updating the app does not replace running MCP server processes.** After updating MarkUpsideDown:
+
+1. Restart Zed (or your IDE) to start a new Claude Code session
+2. Or start a new Claude Code session in the terminal
+
+You can verify the running binary version with:
+
+```bash
+/Applications/MarkUpsideDown.app/Contents/MacOS/markupsidedown-mcp --version
+```
+
+### `extract_json` timeout
+
+`extract_json` with `response_format` on JS-heavy pages can take over 60 seconds due to Browser Rendering + LLM inference. The MCP server uses a 120-second timeout. If you encounter timeouts:
+
+- Try without `response_format` (prompt-only mode is faster)
+- Use `get_markdown` as a fallback and let the AI agent parse the Markdown
 
 ### Conversion tool errors
 
