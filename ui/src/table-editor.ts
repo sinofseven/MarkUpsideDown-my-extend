@@ -1,6 +1,7 @@
 import type { Text } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import { escapeHtml } from "./html-utils.ts";
+import { splitTableCells } from "./normalize.ts";
 
 // --- Markdown Table Parser ---
 
@@ -21,11 +22,7 @@ function parseMarkdownTable(text: string): TableData | null {
   if (lines.length < 2) return null;
 
   const parseRow = (line: string): string[] =>
-    line
-      .replace(/^\|/, "")
-      .replace(/\|$/, "")
-      .split("|")
-      .map((c) => c.trim());
+    splitTableCells(line).map((c) => c.replace(/\\\|/g, "|"));
 
   const header = parseRow(lines[0]);
   const sepLine = lines[1].trim();
@@ -58,9 +55,13 @@ function generateMarkdownTable(table: TableData): string {
   const { headers, alignments, rows } = table;
   const colCount = headers.length;
 
+  // Escape pipes in cell content for Markdown output
+  const escapeCell = (s: string): string => s.replace(/\|/g, "\\|");
+
   const widths = Array.from({ length: colCount }, (_, i) => {
     const cells = [headers[i], ...rows.map((r) => r[i] || "")];
-    return Math.max(3, ...cells.map((c) => c.length));
+    // Use escaped length for width calculation (display width matches escaped form)
+    return Math.max(3, ...cells.map((c) => escapeCell(c).length));
   });
 
   const pad = (str: string, width: number, align: string): string => {
@@ -76,7 +77,7 @@ function generateMarkdownTable(table: TableData): string {
   };
 
   const formatRow = (cells: string[]): string =>
-    "| " + cells.map((c, i) => pad(c, widths[i], alignments[i])).join(" | ") + " |";
+    "| " + cells.map((c, i) => pad(escapeCell(c), widths[i], alignments[i])).join(" | ") + " |";
 
   const sepRow =
     "| " +

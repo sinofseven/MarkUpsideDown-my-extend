@@ -97,6 +97,7 @@ import {
   toggleItalic,
   toggleStrikethrough,
   toggleInlineCode,
+  insertCodeBlock,
   insertLink,
 } from "./markdown-commands.ts";
 import { basename, buildRelativePath } from "./path-utils.ts";
@@ -177,6 +178,7 @@ const editor = new EditorView({
         { key: "Mod-i", run: toggleItalic },
         { key: "Mod-Shift-x", run: toggleStrikethrough },
         { key: "Mod-`", run: toggleInlineCode },
+        { key: "Mod-Shift-`", run: insertCodeBlock },
         ...searchKeymap,
         ...defaultKeymap,
         ...historyKeymap,
@@ -928,6 +930,13 @@ registerCommands([
     shortcut: "⌘`",
     category: "Edit",
     run: () => toggleInlineCode(editor),
+  },
+  {
+    id: "edit.codeBlock",
+    label: "Insert Code Block",
+    shortcut: "⌘⇧`",
+    category: "Edit",
+    run: () => insertCodeBlock(editor),
   },
   {
     id: "edit.insertLink",

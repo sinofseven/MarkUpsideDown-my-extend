@@ -135,7 +135,7 @@ function normalizeListMarkers(text: string): string {
 // --- Table reformatting ---
 
 /** Split a table row on unescaped `|` outside of inline code spans. */
-function splitTableCells(line: string): string[] {
+export function splitTableCells(line: string): string[] {
   // Strip leading/trailing pipes
   let s = line.replace(/^\s*\|/, "").replace(/\|\s*$/, "");
 
