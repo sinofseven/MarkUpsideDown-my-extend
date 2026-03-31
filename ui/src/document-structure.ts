@@ -309,7 +309,7 @@ export function getDocumentStructure(text: string): DocumentStructure {
   const lists = parseLists(lines, codeRanges);
   const frontmatter = parseFrontmatter(lines);
 
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  const wordCount = text.match(/\S+/g)?.length ?? 0;
 
   return {
     headings,

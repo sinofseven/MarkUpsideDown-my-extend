@@ -45,13 +45,29 @@ export function updateTocPanel(content: string) {
   const lines = content.split("\n");
   const codeRanges = findCodeBlockRanges(lines);
   const headings = parseHeadings(lines, codeRanges);
-  lastHeadings = headings;
 
   if (headings.length === 0) {
-    panelEl.style.display = "none";
+    if (lastHeadings.length > 0) {
+      lastHeadings = headings;
+      panelEl.style.display = "none";
+    }
     return;
   }
 
+  // Skip re-render if headings are unchanged
+  if (
+    headings.length === lastHeadings.length &&
+    headings.every(
+      (h, i) =>
+        h.level === lastHeadings[i].level &&
+        h.text === lastHeadings[i].text &&
+        h.line === lastHeadings[i].line,
+    )
+  ) {
+    return;
+  }
+
+  lastHeadings = headings;
   panelEl.style.display = "";
   render();
 }

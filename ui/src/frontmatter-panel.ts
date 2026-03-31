@@ -2,12 +2,13 @@
 // showing parsed key-value pairs from the document frontmatter.
 
 import type { EditorView } from "@codemirror/view";
-import { parseFrontmatter } from "./document-structure.ts";
+import { parseFrontmatter, type FrontmatterInfo } from "./document-structure.ts";
 import { escapeHtml } from "./html-utils.ts";
 
 let panelEl: HTMLElement | null = null;
 let editor: EditorView;
-let lastFm: { startLine: number } | null = null;
+let lastFm: FrontmatterInfo | null = null;
+let lastFmRaw: string | null = null;
 
 export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
   editor = ed;
@@ -23,7 +24,7 @@ export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
     const toggle = (e.target as HTMLElement).closest(".frontmatter-toggle");
     if (toggle) {
       panelEl!.dataset.collapsed = panelEl!.dataset.collapsed === "true" ? "false" : "true";
-      updateFrontmatterPanel(editor.state.doc.toString());
+      renderPanel();
       return;
     }
     const row = (e.target as HTMLElement).closest(".frontmatter-row");
@@ -45,26 +46,38 @@ export function updateFrontmatterPanel(content: string) {
   const fm = parseFrontmatter(lines);
 
   if (!fm || !fm.parsed || Object.keys(fm.parsed).length === 0) {
-    panelEl.style.display = "none";
-    lastFm = null;
+    if (lastFm !== null) {
+      panelEl.style.display = "none";
+      lastFm = null;
+      lastFmRaw = null;
+    }
     return;
   }
 
-  lastFm = fm;
+  // Skip re-render if frontmatter raw content is unchanged
+  if (fm.raw === lastFmRaw && fm.valid === lastFm?.valid) return;
 
+  lastFm = fm;
+  lastFmRaw = fm.raw;
   panelEl.style.display = "";
+  renderPanel();
+}
+
+function renderPanel() {
+  if (!panelEl || !lastFm?.parsed) return;
+
   const collapsed = panelEl.dataset.collapsed === "true";
 
   let html = `<div class="frontmatter-header">`;
   html += `<button class="frontmatter-toggle" title="Toggle frontmatter">${collapsed ? "\u25B6" : "\u25BC"} Frontmatter</button>`;
-  if (!fm.valid) {
+  if (!lastFm.valid) {
     html += `<span class="frontmatter-warning">Invalid YAML</span>`;
   }
   html += `</div>`;
 
   if (!collapsed) {
     html += `<div class="frontmatter-body">`;
-    for (const [key, value] of Object.entries(fm.parsed)) {
+    for (const [key, value] of Object.entries(lastFm.parsed)) {
       html += `<div class="frontmatter-row">`;
       html += `<span class="frontmatter-key">${escapeHtml(key)}</span>`;
       html += `<span class="frontmatter-value">${escapeHtml(value)}</span>`;

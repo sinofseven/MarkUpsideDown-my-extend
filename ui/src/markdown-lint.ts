@@ -23,6 +23,7 @@ export const markdownLinter = linter(
 
     const doc = view.state.doc;
     const text = doc.toString();
+    const lines = text.split("\n");
     const structure = getDocumentStructure(text);
 
     const diagnostics: Diagnostic[] = [];
@@ -32,11 +33,11 @@ export const markdownLinter = linter(
     checkTables(structure, doc, diagnostics);
     checkFrontmatter(structure, doc, diagnostics);
     checkLists(structure, doc, diagnostics);
-    checkEmphasis(text, doc, diagnostics);
-    checkCodeBlocks(text, doc, diagnostics);
-    checkFootnotes(text, doc, diagnostics);
-    checkHtmlComments(text, doc, diagnostics);
-    checkBlankLines(text, doc, diagnostics, structure);
+    checkEmphasis(lines, doc, diagnostics);
+    checkCodeBlocks(lines, doc, diagnostics);
+    checkFootnotes(lines, doc, diagnostics);
+    checkHtmlComments(lines, doc, diagnostics);
+    checkBlankLines(lines, doc, diagnostics, structure);
 
     return diagnostics;
   },
@@ -210,11 +211,10 @@ function checkLists(
 // Reference: https://zenn.dev/miyabitti/articles/594fdb7373a3a8
 
 function checkEmphasis(
-  text: string,
+  lines: string[],
   doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
-  const lines = text.split("\n");
   let inFence = false;
 
   for (let i = 0; i < lines.length; i++) {
@@ -273,11 +273,10 @@ function checkEmphasis(
 // --- Code block language specifier check (#132) ---
 
 function checkCodeBlocks(
-  text: string,
+  lines: string[],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
 ) {
-  const lines = text.split("\n");
   let inFence = false;
   let fenceChar = "";
 
@@ -312,11 +311,10 @@ function checkCodeBlocks(
 // --- Footnote reference/definition mismatch check (#133) ---
 
 function checkFootnotes(
-  text: string,
+  lines: string[],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
 ) {
-  const lines = text.split("\n");
   let inFence = false;
 
   const refs = new Map<string, { line: number; col: number }[]>();
@@ -384,11 +382,10 @@ function checkFootnotes(
 const COMMENT_KEYWORDS = /\b(TODO|FIXME|HACK|XXX|BUG|NOTE)\b/i;
 
 function checkHtmlComments(
-  text: string,
+  lines: string[],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
 ) {
-  const lines = text.split("\n");
   let inFence = false;
 
   for (let i = 0; i < lines.length; i++) {
@@ -421,12 +418,11 @@ function checkHtmlComments(
 // --- Block element blank line separation check (#135) ---
 
 function checkBlankLines(
-  text: string,
+  lines: string[],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
   structure: DocumentStructure,
 ) {
-  const lines = text.split("\n");
   let inFence = false;
 
   // Determine frontmatter end line (0-based index)

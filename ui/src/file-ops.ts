@@ -130,71 +130,66 @@ export async function openFile() {
 
 // --- URL fetch / render ---
 
-export async function getUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) {
+async function withUrlLoading(
+  urlInput: HTMLInputElement,
+  urlBar: HTMLElement,
+  action: (url: string) => Promise<void>,
+) {
   const url = urlInput.value.trim();
   if (!url) return;
-
   urlBar.classList.add("loading");
   urlInput.disabled = true;
-  statusEl.textContent = "Fetching page…";
-
   try {
-    const workerUrl = await ensureWorkerUrl();
-    const { content, method } = await getUrlAsMarkdown(url, workerUrl, (msg) => {
-      statusEl.textContent = msg;
-    });
-    loadContentAsTab(content);
-    statusEl.textContent = `Fetched (${method}): ${url}`;
-  } catch (e) {
-    statusEl.textContent = `Fetch error: ${e}`;
+    await action(url);
   } finally {
     urlBar.classList.remove("loading");
     urlInput.disabled = false;
   }
+}
+
+export async function getUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) {
+  await withUrlLoading(urlInput, urlBar, async (url) => {
+    statusEl.textContent = "Fetching page…";
+    try {
+      const workerUrl = await ensureWorkerUrl();
+      const { content, method } = await getUrlAsMarkdown(url, workerUrl, (msg) => {
+        statusEl.textContent = msg;
+      });
+      loadContentAsTab(content);
+      statusEl.textContent = `Fetched (${method}): ${url}`;
+    } catch (e) {
+      statusEl.textContent = `Fetch error: ${e}`;
+    }
+  });
 }
 
 export async function fetchUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) {
-  const url = urlInput.value.trim();
-  if (!url) return;
-
-  urlBar.classList.add("loading");
-  urlInput.disabled = true;
-  statusEl.textContent = "Fetching page…";
-
-  try {
-    const workerUrl = await ensureWorkerUrl();
-    const { content, method } = await fetchUrlAsMarkdown(url, workerUrl);
-    loadContentAsTab(content);
-    statusEl.textContent = `Fetched (${method}): ${url}`;
-  } catch (e) {
-    statusEl.textContent = `Fetch error: ${e}`;
-  } finally {
-    urlBar.classList.remove("loading");
-    urlInput.disabled = false;
-  }
+  await withUrlLoading(urlInput, urlBar, async (url) => {
+    statusEl.textContent = "Fetching page…";
+    try {
+      const workerUrl = await ensureWorkerUrl();
+      const { content, method } = await fetchUrlAsMarkdown(url, workerUrl);
+      loadContentAsTab(content);
+      statusEl.textContent = `Fetched (${method}): ${url}`;
+    } catch (e) {
+      statusEl.textContent = `Fetch error: ${e}`;
+    }
+  });
 }
 
 export async function renderUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) {
-  const url = urlInput.value.trim();
-  if (!url) return;
-
   const workerUrl = await ensureWorkerUrl();
   if (!workerUrl) return;
-
-  urlBar.classList.add("loading");
-  urlInput.disabled = true;
-  statusEl.textContent = "Rendering page (this may take a moment)…";
-
-  try {
-    const markdown = await renderUrlAsMarkdown(url, workerUrl);
-    loadContentAsTab(markdown);
-    statusEl.textContent = "Rendered: " + url;
-  } catch (e) {
-    statusEl.textContent = `Render error: ${e}`;
-  } finally {
-    urlBar.classList.remove("loading");
-    urlInput.disabled = false;
-  }
+  await withUrlLoading(urlInput, urlBar, async (url) => {
+    statusEl.textContent = "Rendering page (this may take a moment)…";
+    try {
+      const markdown = await renderUrlAsMarkdown(url, workerUrl);
+      loadContentAsTab(markdown);
+      statusEl.textContent = "Rendered: " + url;
+    } catch (e) {
+      statusEl.textContent = `Render error: ${e}`;
+    }
+  });
 }
 
 // --- Import / Convert ---
