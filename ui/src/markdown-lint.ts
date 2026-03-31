@@ -33,6 +33,10 @@ export const markdownLinter = linter(
     checkFrontmatter(structure, doc, diagnostics);
     checkLists(structure, doc, diagnostics);
     checkEmphasis(text, doc, diagnostics);
+    checkCodeBlocks(text, doc, diagnostics);
+    checkFootnotes(text, doc, diagnostics);
+    checkHtmlComments(text, doc, diagnostics);
+    checkBlankLines(text, doc, diagnostics, structure);
 
     return diagnostics;
   },
@@ -264,6 +268,240 @@ function checkEmphasis(
       diagnostics,
     );
   }
+}
+
+// --- Code block language specifier check (#132) ---
+
+function checkCodeBlocks(
+  text: string,
+  doc: { line: (n: number) => { from: number; to: number } },
+  diagnostics: Diagnostic[],
+) {
+  const lines = text.split("\n");
+  let inFence = false;
+  let fenceChar = "";
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trimStart();
+    const fenceMatch = trimmed.match(/^(`{3,}|~{3,})(.*)?$/);
+    if (!fenceMatch) continue;
+
+    const char = fenceMatch[1][0];
+
+    if (!inFence) {
+      inFence = true;
+      fenceChar = char;
+      const lang = (fenceMatch[2] || "").trim();
+      if (!lang) {
+        const lineObj = doc.line(i + 1);
+        diagnostics.push({
+          from: lineObj.from,
+          to: lineObj.to,
+          severity: "info",
+          message:
+            "Code block without language specifier — consider adding a language for syntax highlighting",
+        });
+      }
+    } else if (char === fenceChar) {
+      inFence = false;
+      fenceChar = "";
+    }
+  }
+}
+
+// --- Footnote reference/definition mismatch check (#133) ---
+
+function checkFootnotes(
+  text: string,
+  doc: { line: (n: number) => { from: number; to: number } },
+  diagnostics: Diagnostic[],
+) {
+  const lines = text.split("\n");
+  let inFence = false;
+
+  const refs = new Map<string, { line: number; col: number }[]>();
+  const defs = new Map<string, { line: number; col: number }>();
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    // Mask inline code
+    const noCode = line.replace(/`[^`]*`/g, (m) => " ".repeat(m.length));
+
+    // Definitions: [^id]: ... (at start of line)
+    const defMatch = noCode.match(/^\[\^([^\]]+)\]:\s/);
+    if (defMatch) {
+      defs.set(defMatch[1], { line: i + 1, col: 0 });
+      continue;
+    }
+
+    // References: [^id] (inline)
+    let m;
+    const refRe = /\[\^([^\]]+)\](?!:)/g;
+    while ((m = refRe.exec(noCode)) !== null) {
+      const id = m[1];
+      if (!refs.has(id)) refs.set(id, []);
+      refs.get(id)!.push({ line: i + 1, col: m.index });
+    }
+  }
+
+  // Referenced but not defined → warning
+  for (const [id, positions] of refs) {
+    if (!defs.has(id)) {
+      for (const pos of positions) {
+        const lineObj = doc.line(pos.line);
+        diagnostics.push({
+          from: lineObj.from + pos.col,
+          to: lineObj.from + pos.col + `[^${id}]`.length,
+          severity: "warning",
+          message: `Footnote [^${id}] referenced but not defined`,
+        });
+      }
+    }
+  }
+
+  // Defined but not referenced → info
+  for (const [id, pos] of defs) {
+    if (!refs.has(id)) {
+      const lineObj = doc.line(pos.line);
+      diagnostics.push({
+        from: lineObj.from,
+        to: lineObj.from + `[^${id}]:`.length,
+        severity: "info",
+        message: `Footnote [^${id}] defined but never referenced`,
+      });
+    }
+  }
+}
+
+// --- HTML comment TODO/FIXME/HACK check (#134) ---
+
+const COMMENT_KEYWORDS = /\b(TODO|FIXME|HACK|XXX|BUG|NOTE)\b/i;
+
+function checkHtmlComments(
+  text: string,
+  doc: { line: (n: number) => { from: number; to: number } },
+  diagnostics: Diagnostic[],
+) {
+  const lines = text.split("\n");
+  let inFence = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    // Single-line comments: <!-- ... -->
+    const commentRe = /<!--([\s\S]*?)-->/g;
+    let m;
+    while ((m = commentRe.exec(line)) !== null) {
+      const content = m[1];
+      const kwMatch = content.match(COMMENT_KEYWORDS);
+      if (kwMatch) {
+        const lineObj = doc.line(i + 1);
+        diagnostics.push({
+          from: lineObj.from + m.index,
+          to: lineObj.from + m.index + m[0].length,
+          severity: "info",
+          message: `HTML comment contains ${kwMatch[1].toUpperCase()} — consider resolving before publishing`,
+        });
+      }
+    }
+  }
+}
+
+// --- Block element blank line separation check (#135) ---
+
+function checkBlankLines(
+  text: string,
+  doc: { line: (n: number) => { from: number; to: number } },
+  diagnostics: Diagnostic[],
+  structure: DocumentStructure,
+) {
+  const lines = text.split("\n");
+  let inFence = false;
+
+  // Determine frontmatter end line (0-based index)
+  const fmEndIdx = structure.frontmatter ? structure.frontmatter.endLine - 1 : -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trimStart();
+
+    // Track fenced code blocks
+    if (/^(`{3,}|~{3,})/.test(trimmed)) {
+      if (!inFence) {
+        // Opening fence — check blank line before it
+        checkNeedsBlankBefore(i, lines, fmEndIdx, "Fenced code block", doc, diagnostics);
+        inFence = true;
+      } else {
+        inFence = false;
+      }
+      continue;
+    }
+    if (inFence) continue;
+
+    // Standalone image (full-line image only)
+    if (/^!\[[^\]]*\]\([^)]*\)\s*$/.test(trimmed)) {
+      checkNeedsBlankBefore(i, lines, fmEndIdx, "Image", doc, diagnostics);
+      continue;
+    }
+
+    // Table start (first | line not preceded by another | line)
+    if (trimmed.startsWith("|") && (i === 0 || !lines[i - 1].trimStart().startsWith("|"))) {
+      checkNeedsBlankBefore(i, lines, fmEndIdx, "Table", doc, diagnostics);
+      continue;
+    }
+
+    // Blockquote start (first > line not preceded by another > line)
+    if (trimmed.startsWith(">") && (i === 0 || !lines[i - 1].trimStart().startsWith(">"))) {
+      checkNeedsBlankBefore(i, lines, fmEndIdx, "Blockquote", doc, diagnostics);
+      continue;
+    }
+
+    // Math block
+    if (trimmed.startsWith("$$")) {
+      checkNeedsBlankBefore(i, lines, fmEndIdx, "Math block", doc, diagnostics);
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^([-_*])\1{2,}\s*$/.test(trimmed) && trimmed !== "---") {
+      checkNeedsBlankBefore(i, lines, fmEndIdx, "Horizontal rule", doc, diagnostics);
+    }
+  }
+}
+
+function checkNeedsBlankBefore(
+  i: number,
+  lines: string[],
+  fmEndIdx: number,
+  label: string,
+  doc: { line: (n: number) => { from: number; to: number } },
+  diagnostics: Diagnostic[],
+) {
+  if (i === 0) return;
+  // Skip if previous line is frontmatter closing ---
+  if (i - 1 === fmEndIdx) return;
+  const prev = lines[i - 1];
+  if (prev.trim() === "") return;
+  // Skip if previous line is a heading (headings naturally separate)
+  if (/^#{1,6}\s/.test(prev.trimStart())) return;
+
+  const lineObj = doc.line(i + 1);
+  diagnostics.push({
+    from: lineObj.from,
+    to: lineObj.to,
+    severity: "info",
+    message: `${label} not separated by blank line above — add a blank line for consistent rendering`,
+  });
 }
 
 function checkEmphasisPattern(
