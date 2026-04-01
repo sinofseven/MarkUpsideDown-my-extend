@@ -18,6 +18,10 @@ interface WorkerStatus {
   render_available: boolean;
   json_available: boolean;
   crawl_available: boolean;
+  cache_available: boolean;
+  batch_available: boolean;
+  publish_available: boolean;
+  search_available: boolean;
   worker_version: number | null;
   update_available: boolean;
   error?: string;
@@ -77,6 +81,7 @@ function featureRows(status: WorkerStatus | null) {
   const hasRender = Boolean(status && status.render_available);
   const hasJson = Boolean(status && status.json_available);
   const hasCrawl = Boolean(status && status.crawl_available);
+  const hasCache = Boolean(status && status.cache_available);
   const hasWorker = Boolean(status && status.reachable);
 
   return [
@@ -106,6 +111,38 @@ function featureRows(status: WorkerStatus | null) {
       name: "Website Crawl",
       ok: hasCrawl,
       hint: hasCrawl ? "Ready" : hasWorker ? "Needs Worker secrets" : "Needs Worker URL + secrets",
+    },
+    {
+      name: "Conversion Cache (KV)",
+      ok: hasCache,
+      hint: hasCache ? "Ready" : hasWorker ? "Needs KV namespace" : "Needs Worker URL + KV",
+    },
+    {
+      name: "Batch Import (Queue)",
+      ok: Boolean(status && status.batch_available),
+      hint: status?.batch_available
+        ? "Ready"
+        : hasWorker
+          ? "Needs Queue + KV"
+          : "Needs Worker URL + Queue",
+    },
+    {
+      name: "Publish to R2",
+      ok: Boolean(status && status.publish_available),
+      hint: status?.publish_available
+        ? "Ready"
+        : hasWorker
+          ? "Needs R2 bucket"
+          : "Needs Worker URL + R2",
+    },
+    {
+      name: "Semantic Search (Vectorize)",
+      ok: Boolean(status && status.search_available),
+      hint: status?.search_available
+        ? "Ready"
+        : hasWorker
+          ? "Needs Vectorize index"
+          : "Needs Worker URL + Vectorize",
     },
   ];
 }

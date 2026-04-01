@@ -2,6 +2,10 @@ interface Env {
   AI: Ai;
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN: string;
+  CACHE?: KVNamespace;
+  CONVERT_QUEUE?: Queue;
+  PUBLISH_BUCKET?: R2Bucket;
+  VECTORS?: VectorizeIndex;
 }
 
 const IMAGE_TYPES = new Set([
@@ -23,12 +27,30 @@ const SUPPORTED_TYPES = new Set([
 ]);
 
 const RENDER_CACHE_TTL = 3600; // 1 hour
+const FETCH_KV_TTL = 86400; // 24 hours
+const RENDER_KV_TTL = 3600; // 1 hour
 
 // Bump this when adding/changing endpoints so the app can detect outdated Workers.
-const WORKER_VERSION = 4;
+const WORKER_VERSION = 5;
 
 function hasSecrets(env: Env): boolean {
   return Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN);
+}
+
+function hasCache(env: Env): boolean {
+  return Boolean(env.CACHE);
+}
+
+function hasBatch(env: Env): boolean {
+  return Boolean(env.CONVERT_QUEUE && env.CACHE);
+}
+
+function hasPublish(env: Env): boolean {
+  return Boolean(env.PUBLISH_BUCKET);
+}
+
+function hasSearch(env: Env): boolean {
+  return Boolean(env.VECTORS);
 }
 
 /** Wrap a raw JSON Schema into the format expected by Browser Rendering APIs. */
@@ -83,7 +105,74 @@ export default {
       return handleCrawlStatus(crawlMatch[1], url, env);
     }
 
-    return jsonResponse({ error: "GET /health, POST /fetch, POST /convert, GET /render?url=, POST /json, POST /crawl, or GET /crawl/:job_id" }, 404);
+    if (request.method === "POST" && url.pathname === "/batch") {
+      return handleBatchSubmit(request, env);
+    }
+
+    const batchMatch = url.pathname.match(/^\/batch\/([a-zA-Z0-9_-]+)$/);
+    if (request.method === "GET" && batchMatch) {
+      return handleBatchStatus(batchMatch[1], env);
+    }
+
+    const batchFileMatch = url.pathname.match(/^\/batch\/([a-zA-Z0-9_-]+)\/(\d+)$/);
+    if (request.method === "GET" && batchFileMatch) {
+      return handleBatchFile(batchFileMatch[1], parseInt(batchFileMatch[2]), env);
+    }
+
+    if (request.method === "PUT" && url.pathname === "/publish") {
+      return handlePublish(request, env);
+    }
+
+    if (request.method === "GET" && url.pathname === "/published") {
+      return handlePublishedList(env);
+    }
+
+    const publishKeyMatch = url.pathname.match(/^\/p\/(.+)$/);
+    if (request.method === "GET" && publishKeyMatch) {
+      return handleServePublished(publishKeyMatch[1], env);
+    }
+
+    const deletePublishMatch = url.pathname.match(/^\/publish\/(.+)$/);
+    if (request.method === "DELETE" && deletePublishMatch) {
+      return handleUnpublish(deletePublishMatch[1], env);
+    }
+
+    if (request.method === "POST" && url.pathname === "/embed") {
+      return handleEmbed(request, env);
+    }
+
+    if (request.method === "POST" && url.pathname === "/search") {
+      return handleSearch(request, env);
+    }
+
+    const embedDeleteMatch = url.pathname.match(/^\/embed\/(.+)$/);
+    if (request.method === "DELETE" && embedDeleteMatch) {
+      return handleEmbedDelete(embedDeleteMatch[1], env);
+    }
+
+    return jsonResponse({ error: "Not found" }, 404);
+  },
+  async queue(batch: MessageBatch<ConvertMessage>, env: Env): Promise<void> {
+    for (const msg of batch.messages) {
+      const { batchId, index, name, content } = msg.body;
+      const statusKey = `batch:${batchId}`;
+      try {
+        const blob = base64ToBlob(content, name);
+        const result = await env.AI.toMarkdown([{ name, blob }]);
+        const markdown = result
+          .filter((r) => r.format === "markdown")
+          .map((r) => r.data)
+          .join("\n\n");
+        // Store result
+        await kvPut(env, `batch:${batchId}:${index}`, markdown, 3600, { name });
+        // Update job status
+        await updateBatchFileStatus(env, statusKey, index, "done");
+        msg.ack();
+      } catch (e) {
+        await updateBatchFileStatus(env, statusKey, index, "failed", e instanceof Error ? e.message : "Unknown error");
+        msg.retry();
+      }
+    }
   },
 } satisfies ExportedHandler<Env>;
 
@@ -97,8 +186,34 @@ function handleHealth(env: Env): Response {
       render: hasSecrets(env),
       json: hasSecrets(env),
       crawl: hasSecrets(env),
+      cache: hasCache(env),
+      batch: hasBatch(env),
+      publish: hasPublish(env),
+      search: hasSearch(env),
     },
   });
+}
+
+// --- KV Cache helpers ---
+
+async function sha256(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function shouldBypassCache(request: Request): boolean {
+  return request.headers.get("cache-control") === "no-cache";
+}
+
+async function kvGet(env: Env, key: string): Promise<string | null> {
+  if (!env.CACHE) return null;
+  return env.CACHE.get(key);
+}
+
+async function kvPut(env: Env, key: string, value: string, ttl: number, metadata: Record<string, string>): Promise<void> {
+  if (!env.CACHE) return;
+  await env.CACHE.put(key, value, { expirationTtl: ttl, metadata });
 }
 
 // --- Fetch URL → AI.toMarkdown() ---
@@ -120,6 +235,17 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     return jsonResponse({ error: ssrfError }, 400);
   }
 
+  // KV cache lookup
+  const bypass = shouldBypassCache(request);
+  if (!bypass) {
+    const cacheKey = `md:fetch:${await sha256(body.url)}`;
+    const cached = await kvGet(env, cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      return jsonResponse({ ...parsed, cache: "hit" });
+    }
+  }
+
   try {
     const response = await fetch(body.url, {
       headers: { "Accept": "text/markdown, text/html;q=0.9, */*;q=0.8" },
@@ -135,14 +261,21 @@ async function handleFetch(request: Request, env: Env): Promise<Response> {
     // If the server returned Markdown directly (Markdown for Agents), pass through
     if (contentType.includes("text/markdown")) {
       const markdown = await response.text();
-      return jsonResponse({ markdown, source: "markdown-for-agents", spa_detected: false });
+      const result = { markdown, source: "markdown-for-agents", spa_detected: false };
+      // Cache Markdown-for-Agents responses too
+      const cacheKey = `md:fetch:${await sha256(body.url)}`;
+      await kvPut(env, cacheKey, JSON.stringify(result), FETCH_KV_TTL, { url: body.url, endpoint: "fetch" });
+      return jsonResponse({ ...result, cache: "miss" });
     }
 
     // Otherwise, convert HTML via AI.toMarkdown()
     const html = await response.text();
     const spaDetected = detectSpa(html);
     const markdown = await htmlToMarkdown(html, env);
-    return jsonResponse({ markdown, source: "ai-to-markdown", spa_detected: spaDetected });
+    const result = { markdown, source: "ai-to-markdown", spa_detected: spaDetected };
+    const cacheKey = `md:fetch:${await sha256(body.url)}`;
+    await kvPut(env, cacheKey, JSON.stringify(result), FETCH_KV_TTL, { url: body.url, endpoint: "fetch" });
+    return jsonResponse({ ...result, cache: "miss" });
   } catch (e) {
     return jsonResponse({ error: `Fetch failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
   }
@@ -211,15 +344,32 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
   }
 
   const skipCache = url.searchParams.get("nocache") === "1";
-  const cacheKey = new Request(`${url.origin}/render?url=${encodeURIComponent(targetUrl)}`);
+  const edgeCacheKey = new Request(`${url.origin}/render?url=${encodeURIComponent(targetUrl)}`);
   const cache = caches.default;
 
   if (!skipCache) {
-    const cached = await cache.match(cacheKey);
+    // Layer 1: Edge Cache API (fast)
+    const cached = await cache.match(edgeCacheKey);
     if (cached) {
       const headers = new Headers(cached.headers);
       headers.set("x-cache", "HIT");
       return new Response(cached.body, { status: cached.status, headers });
+    }
+    // Layer 2: KV cache (persistent)
+    const kvKey = `md:render:${await sha256(targetUrl)}`;
+    const kvCached = await kvGet(env, kvKey);
+    if (kvCached) {
+      const parsed = JSON.parse(kvCached);
+      // Re-populate edge cache from KV
+      ctx.waitUntil(
+        cache.put(
+          edgeCacheKey,
+          new Response(kvCached, {
+            headers: { ...CORS_HEADERS, "content-type": "application/json", "cache-control": `public, max-age=${RENDER_CACHE_TTL}` },
+          }),
+        ),
+      );
+      return jsonResponse({ ...parsed, cache: "hit" });
     }
   }
 
@@ -258,19 +408,26 @@ async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<
 
     // Step 2: Convert rendered HTML to Markdown via AI.toMarkdown()
     const markdown = await htmlToMarkdown(contentData.result, env);
+    const result = { markdown };
 
-    const response = jsonResponse({ markdown }, 200, { "x-cache": "MISS" });
-
+    // Populate both edge cache and KV cache
+    const resultJson = JSON.stringify(result);
     ctx.waitUntil(
-      cache.put(
-        cacheKey,
-        new Response(JSON.stringify({ markdown }), {
-          headers: { ...CORS_HEADERS, "content-type": "application/json", "cache-control": `public, max-age=${RENDER_CACHE_TTL}` },
-        })
-      )
+      Promise.all([
+        cache.put(
+          edgeCacheKey,
+          new Response(resultJson, {
+            headers: { ...CORS_HEADERS, "content-type": "application/json", "cache-control": `public, max-age=${RENDER_CACHE_TTL}` },
+          }),
+        ),
+        (async () => {
+          const kvKey = `md:render:${await sha256(targetUrl)}`;
+          await kvPut(env, kvKey, resultJson, RENDER_KV_TTL, { url: targetUrl, endpoint: "render" });
+        })(),
+      ]),
     );
 
-    return response;
+    return jsonResponse({ ...result, cache: "miss" });
   } catch (e) {
     return jsonResponse({ error: `Render failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
   }
@@ -467,6 +624,375 @@ async function handleCrawlStatus(jobId: string, url: URL, env: Env): Promise<Res
   } catch (e) {
     return jsonResponse({ error: `Crawl status failed: ${e instanceof Error ? e.message : "Unknown error"}` }, 500);
   }
+}
+
+// --- Batch Conversion (Queue-based) ---
+
+interface ConvertMessage {
+  batchId: string;
+  index: number;
+  name: string;
+  content: string; // base64
+}
+
+interface BatchJobStatus {
+  total: number;
+  files: { name: string; status: string; error?: string }[];
+}
+
+function base64ToBlob(b64: string, name: string): Blob {
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  const mimeMap: Record<string, string> = {
+    pdf: "application/pdf",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    html: "text/html",
+    csv: "text/csv",
+    xml: "application/xml",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+  };
+  const mime = mimeMap[ext] ?? "application/octet-stream";
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+async function handleBatchSubmit(request: Request, env: Env): Promise<Response> {
+  if (!env.CONVERT_QUEUE || !env.CACHE) {
+    return jsonResponse({ error: "Batch conversion requires Queue and KV bindings" }, 500);
+  }
+
+  let body: { files: { name: string; content: string }[] };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (!body.files?.length) {
+    return jsonResponse({ error: "Missing 'files' array" }, 400);
+  }
+
+  const batchId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const jobStatus: BatchJobStatus = {
+    total: body.files.length,
+    files: body.files.map((f) => ({ name: f.name, status: "queued" })),
+  };
+
+  // Store initial job status in KV
+  await env.CACHE.put(`batch:${batchId}`, JSON.stringify(jobStatus), { expirationTtl: 3600 });
+
+  // Enqueue each file
+  const messages: { body: ConvertMessage }[] = body.files.map((f, i) => ({
+    body: { batchId, index: i, name: f.name, content: f.content },
+  }));
+
+  // Queue.sendBatch has a max of 100 messages
+  for (let i = 0; i < messages.length; i += 100) {
+    await env.CONVERT_QUEUE.sendBatch(messages.slice(i, i + 100));
+  }
+
+  return jsonResponse({ batch_id: batchId, total: body.files.length, status: "queued" });
+}
+
+async function handleBatchStatus(batchId: string, env: Env): Promise<Response> {
+  if (!env.CACHE) {
+    return jsonResponse({ error: "KV binding required" }, 500);
+  }
+
+  const raw = await env.CACHE.get(`batch:${batchId}`);
+  if (!raw) {
+    return jsonResponse({ error: "Batch not found" }, 404);
+  }
+
+  const job: BatchJobStatus = JSON.parse(raw);
+  const completed = job.files.filter((f) => f.status === "done").length;
+  const failed = job.files.filter((f) => f.status === "failed").length;
+
+  return jsonResponse({
+    batch_id: batchId,
+    total: job.total,
+    completed,
+    failed,
+    files: job.files.map((f, i) => ({ index: i, name: f.name, status: f.status, error: f.error })),
+  });
+}
+
+async function handleBatchFile(batchId: string, index: number, env: Env): Promise<Response> {
+  if (!env.CACHE) {
+    return jsonResponse({ error: "KV binding required" }, 500);
+  }
+
+  const markdown = await env.CACHE.get(`batch:${batchId}:${index}`);
+  if (markdown === null) {
+    return jsonResponse({ error: "Result not found" }, 404);
+  }
+
+  return jsonResponse({ markdown });
+}
+
+async function updateBatchFileStatus(
+  env: Env,
+  statusKey: string,
+  index: number,
+  status: string,
+  error?: string,
+): Promise<void> {
+  if (!env.CACHE) return;
+  const raw = await env.CACHE.get(statusKey);
+  if (!raw) return;
+  const job: BatchJobStatus = JSON.parse(raw);
+  if (index < job.files.length) {
+    job.files[index].status = status;
+    if (error) job.files[index].error = error;
+  }
+  await env.CACHE.put(statusKey, JSON.stringify(job), { expirationTtl: 3600 });
+}
+
+// --- R2 Publish ---
+
+interface PublishRequest {
+  key: string;
+  content: string;
+  filename: string;
+  expires_in?: number; // seconds (0 or omitted = permanent)
+}
+
+async function handlePublish(request: Request, env: Env): Promise<Response> {
+  if (!env.PUBLISH_BUCKET) {
+    return jsonResponse({ error: "R2 bucket not configured" }, 500);
+  }
+
+  let body: PublishRequest;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (!body.key || !body.content) {
+    return jsonResponse({ error: "Missing 'key' and 'content' fields" }, 400);
+  }
+
+  const now = new Date();
+  const expiresAt = body.expires_in ? new Date(now.getTime() + body.expires_in * 1000).toISOString() : null;
+
+  await env.PUBLISH_BUCKET.put(body.key, body.content, {
+    customMetadata: {
+      filename: body.filename || "untitled.md",
+      publishedAt: now.toISOString(),
+      ...(expiresAt ? { expiresAt } : {}),
+    },
+  });
+
+  const url = new URL(request.url);
+  const publicUrl = `${url.origin}/p/${body.key}`;
+
+  return jsonResponse({
+    key: body.key,
+    url: publicUrl,
+    publishedAt: now.toISOString(),
+    expiresAt,
+  });
+}
+
+async function handleServePublished(key: string, env: Env): Promise<Response> {
+  if (!env.PUBLISH_BUCKET) {
+    return jsonResponse({ error: "R2 bucket not configured" }, 500);
+  }
+
+  const obj = await env.PUBLISH_BUCKET.get(key);
+  if (!obj) {
+    return new Response("Not Found", { status: 404, headers: CORS_HEADERS });
+  }
+
+  // Check expiry
+  const expiresAt = obj.customMetadata?.expiresAt;
+  if (expiresAt && new Date(expiresAt) < new Date()) {
+    await env.PUBLISH_BUCKET.delete(key);
+    return new Response("Gone — this content has expired", { status: 410, headers: CORS_HEADERS });
+  }
+
+  const markdown = await obj.text();
+  return new Response(markdown, {
+    headers: {
+      ...CORS_HEADERS,
+      "content-type": "text/markdown; charset=utf-8",
+      ...(expiresAt ? { "x-expires-at": expiresAt } : {}),
+    },
+  });
+}
+
+async function handleUnpublish(key: string, env: Env): Promise<Response> {
+  if (!env.PUBLISH_BUCKET) {
+    return jsonResponse({ error: "R2 bucket not configured" }, 500);
+  }
+
+  await env.PUBLISH_BUCKET.delete(key);
+  return jsonResponse({ deleted: key });
+}
+
+async function handlePublishedList(env: Env): Promise<Response> {
+  if (!env.PUBLISH_BUCKET) {
+    return jsonResponse({ error: "R2 bucket not configured" }, 500);
+  }
+
+  const listed = await env.PUBLISH_BUCKET.list({ limit: 1000 });
+  const files = listed.objects.map((obj) => ({
+    key: obj.key,
+    size: obj.size,
+    uploaded: obj.uploaded.toISOString(),
+  }));
+
+  return jsonResponse({ files });
+}
+
+// --- Semantic Search (Vectorize + Workers AI Embeddings) ---
+
+const EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5";
+const MAX_CHUNK_TOKENS = 512; // approximate, split by chars
+const MAX_CHUNK_CHARS = MAX_CHUNK_TOKENS * 4; // ~4 chars per token
+
+interface EmbedDocument {
+  id: string;
+  content: string;
+  metadata?: Record<string, string>;
+}
+
+/** Split a Markdown document into heading-based chunks. */
+function chunkDocument(id: string, content: string): { chunkId: string; text: string }[] {
+  const lines = content.split("\n");
+  const chunks: { chunkId: string; text: string }[] = [];
+  let current = "";
+  let headingPrefix = "";
+  let chunkIndex = 0;
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
+    if (headingMatch) {
+      // Flush current chunk
+      if (current.trim()) {
+        chunks.push({ chunkId: `${id}#${chunkIndex}`, text: `${headingPrefix}\n${current}`.trim() });
+        chunkIndex++;
+      }
+      headingPrefix = line;
+      current = "";
+    } else {
+      current += line + "\n";
+      // Split if too long
+      if (current.length > MAX_CHUNK_CHARS) {
+        chunks.push({ chunkId: `${id}#${chunkIndex}`, text: `${headingPrefix}\n${current}`.trim() });
+        chunkIndex++;
+        current = "";
+      }
+    }
+  }
+  // Flush remainder
+  if (current.trim()) {
+    chunks.push({ chunkId: `${id}#${chunkIndex}`, text: `${headingPrefix}\n${current}`.trim() });
+  }
+
+  return chunks.length > 0 ? chunks : [{ chunkId: `${id}#0`, text: content.slice(0, MAX_CHUNK_CHARS) }];
+}
+
+async function getEmbeddings(texts: string[], env: Env): Promise<number[][]> {
+  const result = await env.AI.run(EMBEDDING_MODEL, { text: texts });
+  return (result as { data: number[][] }).data;
+}
+
+async function handleEmbed(request: Request, env: Env): Promise<Response> {
+  if (!env.VECTORS) {
+    return jsonResponse({ error: "Vectorize index not configured" }, 500);
+  }
+
+  let body: { documents: EmbedDocument[] };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (!body.documents?.length) {
+    return jsonResponse({ error: "Missing 'documents' array" }, 400);
+  }
+
+  let totalChunks = 0;
+  // Process in batches to respect embedding API limits
+  for (const doc of body.documents) {
+    const chunks = chunkDocument(doc.id, doc.content);
+    const texts = chunks.map((c) => c.text);
+    const embeddings = await getEmbeddings(texts, env);
+
+    const vectors = chunks.map((c, i) => ({
+      id: c.chunkId,
+      values: embeddings[i],
+      metadata: {
+        docId: doc.id,
+        ...(doc.metadata ?? {}),
+      },
+    }));
+
+    // Vectorize upsert max 1000 vectors at a time
+    for (let i = 0; i < vectors.length; i += 1000) {
+      await env.VECTORS.upsert(vectors.slice(i, i + 1000));
+    }
+    totalChunks += chunks.length;
+  }
+
+  return jsonResponse({ indexed: body.documents.length, chunks: totalChunks });
+}
+
+async function handleSearch(request: Request, env: Env): Promise<Response> {
+  if (!env.VECTORS) {
+    return jsonResponse({ error: "Vectorize index not configured" }, 500);
+  }
+
+  let body: { query: string; limit?: number };
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (!body.query) {
+    return jsonResponse({ error: "Missing 'query' field" }, 400);
+  }
+
+  const [queryEmbedding] = await getEmbeddings([body.query], env);
+  const results = await env.VECTORS.query(queryEmbedding, {
+    topK: body.limit ?? 10,
+    returnMetadata: "all",
+  });
+
+  return jsonResponse({
+    results: results.matches.map((m) => ({
+      id: m.id,
+      score: m.score,
+      metadata: m.metadata,
+    })),
+  });
+}
+
+async function handleEmbedDelete(docId: string, env: Env): Promise<Response> {
+  if (!env.VECTORS) {
+    return jsonResponse({ error: "Vectorize index not configured" }, 500);
+  }
+
+  // Delete all chunk vectors for this document.
+  // Vectorize doesn't support metadata-based deletion, so we delete by known chunk IDs.
+  // The caller should know the chunk count, or we delete a reasonable range.
+  const ids: string[] = [];
+  for (let i = 0; i < 100; i++) {
+    ids.push(`${docId}#${i}`);
+  }
+  await env.VECTORS.deleteByIds(ids);
+
+  return jsonResponse({ deleted: docId });
 }
 
 // --- SSRF Prevention ---

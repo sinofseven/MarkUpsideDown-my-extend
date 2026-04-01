@@ -144,7 +144,7 @@ pub fn sync_editor_state(
 // --- Worker Health Check ---
 
 /// Must match WORKER_VERSION in worker/src/index.ts.
-const EXPECTED_WORKER_VERSION: u32 = 4;
+const EXPECTED_WORKER_VERSION: u32 = 5;
 
 #[derive(Serialize)]
 pub struct WorkerStatus {
@@ -153,6 +153,10 @@ pub struct WorkerStatus {
     pub render_available: bool,
     pub json_available: bool,
     pub crawl_available: bool,
+    pub cache_available: bool,
+    pub batch_available: bool,
+    pub publish_available: bool,
+    pub search_available: bool,
     pub worker_version: Option<u32>,
     pub update_available: bool,
     pub error: Option<String>,
@@ -166,6 +170,10 @@ impl WorkerStatus {
             render_available: false,
             json_available: false,
             crawl_available: false,
+            cache_available: false,
+            batch_available: false,
+            publish_available: false,
+            search_available: false,
             worker_version: None,
             update_available: false,
             error: Some(error),
@@ -179,6 +187,10 @@ struct HealthCapabilities {
     render: Option<bool>,
     json: Option<bool>,
     crawl: Option<bool>,
+    cache: Option<bool>,
+    batch: Option<bool>,
+    publish: Option<bool>,
+    search: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -204,6 +216,10 @@ pub async fn test_worker_url(
                         render: None,
                         json: None,
                         crawl: None,
+                        cache: None,
+                        batch: None,
+                        publish: None,
+                        search: None,
                     });
                     let version = body.version;
                     let update_available = match version {
@@ -216,6 +232,10 @@ pub async fn test_worker_url(
                         render_available: caps.render.unwrap_or(false),
                         json_available: caps.json.unwrap_or(false),
                         crawl_available: caps.crawl.unwrap_or(false),
+                        cache_available: caps.cache.unwrap_or(false),
+                        batch_available: caps.batch.unwrap_or(false),
+                        publish_available: caps.publish.unwrap_or(false),
+                        search_available: caps.search.unwrap_or(false),
                         worker_version: version,
                         update_available,
                         error: None,
@@ -227,6 +247,10 @@ pub async fn test_worker_url(
                     render_available: false,
                     json_available: false,
                     crawl_available: false,
+                    cache_available: false,
+                    batch_available: false,
+                    publish_available: false,
+                    search_available: false,
                     worker_version: None,
                     update_available: true,
                     error: Some(format!("Unexpected response format: {e}")),
@@ -239,6 +263,10 @@ pub async fn test_worker_url(
             render_available: false,
             json_available: false,
             crawl_available: false,
+            cache_available: false,
+            batch_available: false,
+            publish_available: false,
+            search_available: false,
             worker_version: None,
             update_available: false,
             error: Some(format!("Worker returned status {}", resp.status())),

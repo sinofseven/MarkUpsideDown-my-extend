@@ -5,6 +5,23 @@
   "ai": {
     "binding": "AI"
   },
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "" }
+  ],
+  "r2_buckets": [
+    { "binding": "PUBLISH_BUCKET", "bucket_name": "markupsidedown-publish" }
+  ],
+  "queues": {
+    "producers": [
+      { "binding": "CONVERT_QUEUE", "queue": "markupsidedown-convert" }
+    ],
+    "consumers": [
+      { "queue": "markupsidedown-convert", "max_batch_size": 5, "max_retries": 2 }
+    ]
+  },
+  "vectorize": [
+    { "binding": "VECTORS", "index_name": "markupsidedown-docs" }
+  ],
   "observability": {
     "enabled": true
   }
