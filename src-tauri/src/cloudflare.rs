@@ -391,7 +391,7 @@ fn create_queue(account_id: &str) -> Result<(), String> {
         None, 30, &env,
     ) {
         Ok(_) => Ok(()),
-        Err(e) if e.contains("already exists") => Ok(()),
+        Err(e) if e.contains("already exists") || e.contains("already taken") || e.contains("already been taken") => Ok(()),
         Err(e) => Err(e),
     }
 }
@@ -406,7 +406,7 @@ fn create_vectorize_index(account_id: &str) -> Result<(), String> {
         None, 30, &env,
     ) {
         Ok(_) => Ok(()),
-        Err(e) if e.contains("already exists") => Ok(()),
+        Err(e) if e.contains("already exists") || e.contains("duplicate_name") => Ok(()),
         Err(e) => Err(e),
     }
 }
