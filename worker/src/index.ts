@@ -154,22 +154,32 @@ export default {
   },
   async queue(batch: MessageBatch<ConvertMessage>, env: Env): Promise<void> {
     for (const msg of batch.messages) {
-      const { batchId, index, name, content } = msg.body;
-      const statusKey = `batch:${batchId}`;
+      const { batchId, index, name } = msg.body;
       try {
+        // Read file content from KV (stored during batch submission)
+        const dataKey = `batch:${batchId}:data:${index}`;
+        const content = await env.CACHE!.get(dataKey);
+        if (!content) {
+          await updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "failed", "File data expired or missing");
+          msg.ack();
+          continue;
+        }
         const blob = base64ToBlob(content, name);
         const result = await env.AI.toMarkdown([{ name, blob }]);
         const markdown = result
           .filter((r) => r.format === "markdown")
           .map((r) => r.data)
           .join("\n\n");
-        // Store result
-        await kvPut(env, `batch:${batchId}:${index}`, markdown, 3600, { name });
-        // Update job status
-        await updateBatchFileStatus(env, statusKey, index, "done");
+        // Store result and per-file status atomically
+        await Promise.all([
+          kvPut(env, `batch:${batchId}:${index}`, markdown, 3600, { name }),
+          updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "done"),
+        ]);
+        // Clean up source data
+        await env.CACHE!.delete(dataKey);
         msg.ack();
       } catch (e) {
-        await updateBatchFileStatus(env, statusKey, index, "failed", e instanceof Error ? e.message : "Unknown error");
+        await updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "failed", e instanceof Error ? e.message : "Unknown error");
         msg.retry();
       }
     }
@@ -632,12 +642,6 @@ interface ConvertMessage {
   batchId: string;
   index: number;
   name: string;
-  content: string; // base64
-}
-
-interface BatchJobStatus {
-  total: number;
-  files: { name: string; status: string; error?: string }[];
 }
 
 function base64ToBlob(b64: string, name: string): Blob {
@@ -679,20 +683,28 @@ async function handleBatchSubmit(request: Request, env: Env): Promise<Response> 
   }
 
   const batchId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-  const jobStatus: BatchJobStatus = {
-    total: body.files.length,
-    files: body.files.map((f) => ({ name: f.name, status: "queued" })),
-  };
 
-  // Store initial job status in KV
-  await env.CACHE.put(`batch:${batchId}`, JSON.stringify(jobStatus), { expirationTtl: 3600 });
+  // Store job metadata (file names + count) — does NOT contain per-file status.
+  // Per-file status is stored in individual KV keys to avoid race conditions
+  // when multiple queue consumers process the same batch concurrently.
+  const jobMeta = { total: body.files.length, files: body.files.map((f) => f.name) };
+  await env.CACHE.put(`batch:${batchId}`, JSON.stringify(jobMeta), { expirationTtl: 3600 });
 
-  // Enqueue each file
+  // Store file contents in KV to avoid Queue 128KB message size limit.
+  // Also initialize per-file status keys as "queued".
+  await Promise.all(
+    body.files.flatMap((f, i) => [
+      env.CACHE!.put(`batch:${batchId}:data:${i}`, f.content, { expirationTtl: 3600, metadata: { name: f.name } }),
+      env.CACHE!.put(`batch:${batchId}:status:${i}`, JSON.stringify({ status: "queued" }), { expirationTtl: 3600 }),
+    ]),
+  );
+
+  // Enqueue lightweight references only
   const messages: { body: ConvertMessage }[] = body.files.map((f, i) => ({
-    body: { batchId, index: i, name: f.name, content: f.content },
+    body: { batchId, index: i, name: f.name },
   }));
 
-  // Queue.sendBatch has a max of 100 messages
+  // Queue.sendBatch: max 100 messages, max 256KB total
   for (let i = 0; i < messages.length; i += 100) {
     await env.CONVERT_QUEUE.sendBatch(messages.slice(i, i + 100));
   }
@@ -710,17 +722,22 @@ async function handleBatchStatus(batchId: string, env: Env): Promise<Response> {
     return jsonResponse({ error: "Batch not found" }, 404);
   }
 
-  const job: BatchJobStatus = JSON.parse(raw);
-  const completed = job.files.filter((f) => f.status === "done").length;
-  const failed = job.files.filter((f) => f.status === "failed").length;
+  const jobMeta: { total: number; files: string[] } = JSON.parse(raw);
 
-  return jsonResponse({
-    batch_id: batchId,
-    total: job.total,
-    completed,
-    failed,
-    files: job.files.map((f, i) => ({ index: i, name: f.name, status: f.status, error: f.error })),
+  // Read per-file status from individual KV keys (race-condition-safe)
+  const statusPromises = jobMeta.files.map((_, i) => env.CACHE!.get(`batch:${batchId}:status:${i}`));
+  const statuses = await Promise.all(statusPromises);
+
+  let completed = 0;
+  let failed = 0;
+  const files = jobMeta.files.map((name, i) => {
+    const s = statuses[i] ? JSON.parse(statuses[i]!) : { status: "queued" };
+    if (s.status === "done") completed++;
+    if (s.status === "failed") failed++;
+    return { index: i, name, status: s.status as string, error: s.error as string | undefined };
   });
+
+  return jsonResponse({ batch_id: batchId, total: jobMeta.total, completed, failed, files });
 }
 
 async function handleBatchFile(batchId: string, index: number, env: Env): Promise<Response> {
@@ -736,22 +753,17 @@ async function handleBatchFile(batchId: string, index: number, env: Env): Promis
   return jsonResponse({ markdown });
 }
 
+/** Write per-file status to its own KV key to avoid read-modify-write races
+ *  across concurrent queue consumers. */
 async function updateBatchFileStatus(
   env: Env,
-  statusKey: string,
-  index: number,
+  statusKey: string, // e.g. "batch:<id>:status:<index>"
   status: string,
   error?: string,
 ): Promise<void> {
   if (!env.CACHE) return;
-  const raw = await env.CACHE.get(statusKey);
-  if (!raw) return;
-  const job: BatchJobStatus = JSON.parse(raw);
-  if (index < job.files.length) {
-    job.files[index].status = status;
-    if (error) job.files[index].error = error;
-  }
-  await env.CACHE.put(statusKey, JSON.stringify(job), { expirationTtl: 3600 });
+  const value = JSON.stringify({ status, ...(error ? { error } : {}) });
+  await env.CACHE.put(statusKey, value, { expirationTtl: 3600 });
 }
 
 // --- R2 Publish ---
@@ -1153,6 +1165,6 @@ function jsonResponse(body: unknown, status = 200, extraHeaders: Record<string, 
 
 const CORS_HEADERS: Record<string, string> = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
-  "access-control-allow-headers": "content-type",
+  "access-control-allow-methods": "GET, POST, PUT, DELETE, OPTIONS",
+  "access-control-allow-headers": "content-type, cache-control",
 };
