@@ -17,11 +17,14 @@ On first launch, MarkUpsideDown opens the Settings panel with a **Setup with Clo
 
 1. Checks that `wrangler` is installed globally
 2. Runs `wrangler login` (opens browser for Cloudflare OAuth)
-3. Deploys the Worker to your account
-4. **(Optional)** Configures secrets for Render JS — you can skip this step
-5. Verifies the deployment
+3. **Creates Cloudflare resources** — KV namespace (cache), R2 bucket (publish), Queue (batch conversion), Vectorize index (semantic search). Each is optional and created in parallel; failures are non-fatal
+4. Deploys the Worker with a **randomized URL** (e.g. `markupsidedown-a3f8k2.example.workers.dev`) to prevent third-party URL guessing
+5. **(Optional)** Configures secrets for Render JS — you can skip this step
+6. Verifies the deployment
 
-After step 3, Document Import is ready to use. Step 4 (secrets) is only needed for Render JS (fetching JavaScript-rendered pages). If the auto-token detection fails, you'll be asked to paste an API token or skip. You can always add secrets later.
+After step 4, Document Import is ready to use. Step 5 (secrets) is only needed for Render JS (fetching JavaScript-rendered pages). If the auto-token detection fails, you'll be asked to paste an API token or skip. You can always add secrets later.
+
+Resources created in step 3 enable additional features (see [Feature Status](#feature-status)). If a resource fails to create, the Worker still deploys without that binding — features degrade gracefully.
 
 If you have multiple Cloudflare accounts, you'll be prompted to select one.
 
@@ -74,7 +77,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN    # paste the same API token
 ### Configure the App
 
 1. Open Settings in the toolbar (or wait for the first-launch prompt)
-2. Paste your Worker URL (e.g. `https://markupsidedown-converter.example.workers.dev`)
+2. Paste your Worker URL (e.g. `https://markupsidedown-XXXXXX.example.workers.dev`)
 3. Click **Test** to verify the connection
 4. Check **Feature Status** to see which capabilities are ready
 5. Click **Save**
@@ -164,10 +167,17 @@ No app-side changes needed — the URL stays the same. Secrets persist across de
 The Worker exposes its version via `GET /health`:
 
 ```json
-{ "status": "ok", "version": 4, "capabilities": { "fetch": true, "convert": true, "render": true, "json": true, "crawl": true } }
+{ "status": "ok", "version": 5, "capabilities": { "fetch": true, "convert": true, "render": true, "json": true, "crawl": true, "cache": true, "batch": true, "publish": true, "search": true } }
 ```
 
-The `capabilities` object shows which features are available. `render`, `json`, and `crawl` require Worker secrets (`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`). If capabilities show `false`, see [Set Worker Secrets](#set-worker-secrets).
+The `capabilities` object shows which features are available:
+- `render`, `json`, `crawl` — require Worker secrets (`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`)
+- `cache` — requires KV namespace binding
+- `batch` — requires Queue + KV bindings
+- `publish` — requires R2 bucket binding
+- `search` — requires Vectorize index binding
+
+If capabilities show `false`, the corresponding resource was not created during setup. Re-run setup or create resources manually.
 
 ### CORS
 

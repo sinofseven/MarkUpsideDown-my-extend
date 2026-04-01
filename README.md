@@ -90,7 +90,7 @@ brew install M-Igashi/tap/markupsidedown
 
 The Worker powers document import and JS-rendered page fetching.
 
-**Automatic setup (recommended):** On first launch, click **Setup with Cloudflare** in the Settings panel. This runs `wrangler login`, deploys the Worker, and configures secrets — all from within the app.
+**Automatic setup (recommended):** On first launch, click **Setup with Cloudflare** in the Settings panel. This runs `wrangler login`, creates Cloudflare resources (KV, R2, Queue, Vectorize), deploys the Worker with a randomized URL, and configures secrets — all from within the app.
 
 **Manual setup:** See [docs/worker-deployment.md](docs/worker-deployment.md) for step-by-step instructions.
 

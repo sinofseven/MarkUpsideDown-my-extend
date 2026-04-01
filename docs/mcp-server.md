@@ -46,7 +46,7 @@ The MCP server can run **without the desktop app** for conversion and crawl work
     "markupsidedown": {
       "command": "/Applications/MarkUpsideDown.app/Contents/MacOS/markupsidedown-mcp",
       "env": {
-        "MARKUPSIDEDOWN_WORKER_URL": "https://markupsidedown-converter.YOUR_SUBDOMAIN.workers.dev"
+        "MARKUPSIDEDOWN_WORKER_URL": "https://markupsidedown-XXXXXX.YOUR_SUBDOMAIN.workers.dev"
       }
     }
   }

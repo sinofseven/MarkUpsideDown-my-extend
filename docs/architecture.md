@@ -88,12 +88,20 @@ MCP Server (mcp-server-rs/)
 
 | Endpoint | Purpose | Cloudflare Service |
 |----------|---------|-------------------|
-| `GET /health` | Capability check (reports fetch/convert/render/crawl availability) | — |
+| `GET /health` | Capability check (all feature availability) | — |
 | `POST /fetch` | Fetch URL → Markdown | Workers AI `AI.toMarkdown()` |
 | `POST /convert` | Document/image → Markdown | Workers AI `AI.toMarkdown()` |
 | `GET /render?url=` | JS-rendered page → Markdown | Browser Rendering `/content` API + Workers AI `AI.toMarkdown()` |
 | `POST /crawl` | Start website crawl (returns `job_id`) | Browser Rendering `/crawl` REST API |
 | `GET /crawl/:job_id` | Poll crawl status and retrieve results | Browser Rendering `/crawl` REST API |
+| `POST /batch` | Submit batch conversion job | Queue + KV |
+| `GET /batch/:id` | Poll batch status | KV |
+| `PUT /publish` | Publish Markdown to R2 | R2 |
+| `GET /p/:key` | Serve published Markdown | R2 |
+| `DELETE /publish/:key` | Unpublish | R2 |
+| `POST /embed` | Index documents as vectors | Vectorize + Workers AI |
+| `POST /search` | Semantic search query | Vectorize + Workers AI |
+| `DELETE /embed/:id` | Remove document from index | Vectorize |
 
 The `/render` endpoint pipeline:
 
