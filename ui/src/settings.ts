@@ -13,13 +13,13 @@ import { escapeHtml } from "./html-utils.ts";
 
 const { invoke } = window.__TAURI__.core;
 
-/** Get or create a stable 6-char random suffix for the Worker name.
- *  This makes the Worker URL non-guessable (e.g. markupsidedown-a3f8k2). */
+/** Get or create a stable 13-char random suffix for the Worker name.
+ *  This makes the Worker URL non-guessable (e.g. markupsidedown-a3f8k2xp7m9qb). */
 function getWorkerSuffix(): string {
   let suffix = localStorage.getItem(KEY_WORKER_SUFFIX);
-  if (!suffix) {
+  if (!suffix || suffix.length < 13) {
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    const arr = crypto.getRandomValues(new Uint8Array(6));
+    const arr = crypto.getRandomValues(new Uint8Array(13));
     suffix = Array.from(arr, (b) => chars[b % chars.length]).join("");
     localStorage.setItem(KEY_WORKER_SUFFIX, suffix);
   }
@@ -196,9 +196,9 @@ interface ResourceSetupResult {
 const SETUP_STEPS = [
   { id: "wrangler", label: "Check wrangler" },
   { id: "login", label: "Cloudflare login" },
-  { id: "resources", label: "Create resources" },
+  { id: "resources", label: "Create resources (KV, R2, Queue, Vectorize)" },
   { id: "deploy", label: "Deploy Worker" },
-  { id: "secrets", label: "Configure secrets" },
+  { id: "secrets", label: "Configure secrets (via OAuth)" },
   { id: "verify", label: "Verify" },
 ];
 
@@ -291,7 +291,7 @@ async function startAutoSetup(
   // Persist account ID for future Worker updates
   localStorage.setItem(KEY_ACCOUNT_ID, accountId);
 
-  // Generate a stable, non-guessable Worker name (e.g. "markupsidedown-a3f8k2")
+  // Generate a stable, non-guessable Worker name (e.g. "markupsidedown-a3f8k2xp7m9qb")
   const workerName = `markupsidedown-${getWorkerSuffix()}`;
 
   // Step 3: Create resources (KV, R2, Queue, Vectorize) — all optional, failures are non-fatal
@@ -339,24 +339,21 @@ async function startAutoSetup(
   update("deploy", "done");
 
   // Step 5: Secrets (optional — only needed for Render JS)
+  // Uses wrangler login OAuth session to create a scoped API token automatically.
   update("secrets", "running");
   let secretsOk = false;
   try {
     await invoke("setup_worker_secrets", { accountId, workerName });
     secretsOk = true;
-  } catch {
-    // Auto-setup failed — ask user for API token
-    try {
-      const userToken = await showApiTokenInput(progressContainer);
-      await invoke("setup_worker_secrets_with_token", {
-        accountId,
-        apiToken: userToken,
-        workerName,
-      });
-      secretsOk = true;
-    } catch {
-      // User skipped or manual entry failed — continue without secrets
-    }
+  } catch (e) {
+    // OAuth token creation failed — show guidance instead of manual input
+    showSetupMessage(
+      progressContainer,
+      "setup-info",
+      `Render JS secrets could not be configured automatically.\n` +
+        `You can set them later via: wrangler secret put CLOUDFLARE_API_TOKEN --name ${workerName ?? "markupsidedown-converter"}\n` +
+        `Required token scopes: Workers AI (Read) + Browser Rendering (Edit)`,
+    );
   }
   update("secrets", secretsOk ? "done" : "skipped");
 
@@ -438,53 +435,6 @@ function showAccountPicker(
 
     pickerDiv.append(label, select, btn);
     container.appendChild(pickerDiv);
-  });
-}
-
-function showApiTokenInput(container: HTMLElement): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const div = document.createElement("div");
-    div.className = "setup-token-input";
-    div.innerHTML = `
-      <div class="setup-token-label">
-        <strong>Optional:</strong> Add an API token to enable Render JS (JS-rendered page fetching).<br>
-        You can skip this — document import will work without it.
-      </div>
-      <input type="password" class="setup-token-field" placeholder="API Token" />
-      <div class="setup-token-actions">
-        <button class="setup-token-skip">Skip for now</button>
-        <button class="setup-token-confirm primary">Set Secrets</button>
-      </div>
-      <div class="setup-token-hint">
-        Create a token at <em>dash.cloudflare.com/profile/api-tokens</em> with
-        "Edit Cloudflare Workers" template + Workers AI Read + Browser Rendering Edit.
-      </div>
-    `;
-    container.appendChild(div);
-
-    const input = div.querySelector<HTMLInputElement>(".setup-token-field")!;
-    input.focus();
-
-    div.querySelector(".setup-token-confirm")!.addEventListener("click", () => {
-      const val = input.value.trim();
-      if (!val) return;
-      div.remove();
-      resolve(val);
-    });
-
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        const val = input.value.trim();
-        if (!val) return;
-        div.remove();
-        resolve(val);
-      }
-    });
-
-    div.querySelector(".setup-token-skip")!.addEventListener("click", () => {
-      div.remove();
-      reject("Skipped — secrets not configured");
-    });
   });
 }
 

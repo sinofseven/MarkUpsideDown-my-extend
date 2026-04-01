@@ -18,11 +18,11 @@ On first launch, MarkUpsideDown opens the Settings panel with a **Setup with Clo
 1. Checks that `wrangler` is installed globally
 2. Runs `wrangler login` (opens browser for Cloudflare OAuth)
 3. **Creates Cloudflare resources** — KV namespace (cache), R2 bucket (publish), Queue (batch conversion), Vectorize index (semantic search). Each is optional and created in parallel; failures are non-fatal
-4. Deploys the Worker with a **randomized URL** (e.g. `markupsidedown-a3f8k2.example.workers.dev`) to prevent third-party URL guessing
-5. **(Optional)** Configures secrets for Render JS — you can skip this step
+4. Deploys the Worker with a **randomized URL** (e.g. `markupsidedown-a3f8k2xp7m9qb.example.workers.dev`) to prevent third-party URL guessing
+5. **(Optional)** Configures secrets for Render JS via OAuth — creates a scoped API token automatically
 6. Verifies the deployment
 
-After step 4, Document Import is ready to use. Step 5 (secrets) is only needed for Render JS (fetching JavaScript-rendered pages). If the auto-token detection fails, you'll be asked to paste an API token or skip. You can always add secrets later.
+After step 4, Document Import is ready to use. Step 5 (secrets) is only needed for Render JS (fetching JavaScript-rendered pages). If OAuth token creation fails, you can add secrets later via `wrangler secret put`.
 
 Resources created in step 3 enable additional features (see [Feature Status](#feature-status)). If a resource fails to create, the Worker still deploys without that binding — features degrade gracefully.
 
