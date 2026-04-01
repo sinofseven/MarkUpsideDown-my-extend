@@ -305,18 +305,25 @@ async function startAutoSetup(
   try {
     const result = await invoke<ResourceSetupResult>("setup_cloudflare_resources", { accountId });
     resourceFlags = result.resources;
-    const errors = [
-      result.kv_error,
-      result.r2_error,
-      result.queue_error,
-      result.vectorize_error,
-    ].filter(Boolean);
-    if (errors.length === 4) {
-      // All failed — warn but continue (Worker still works for basic fetch/convert)
+    const failed: string[] = [];
+    if (result.kv_error) failed.push(`KV: ${result.kv_error}`);
+    if (result.r2_error) failed.push(`R2: ${result.r2_error}`);
+    if (result.queue_error) failed.push(`Queue: ${result.queue_error}`);
+    if (result.vectorize_error) failed.push(`Vectorize: ${result.vectorize_error}`);
+    if (failed.length === 4) {
       update("resources", "error");
-      showSetupMessage(progressContainer, "setup-info", `Optional resources failed: ${errors[0]}`);
-    } else if (errors.length > 0) {
+      showSetupMessage(
+        progressContainer,
+        "setup-error",
+        `All resources failed:\n${failed.join("\n")}`,
+      );
+    } else if (failed.length > 0) {
       update("resources", "done");
+      showSetupMessage(
+        progressContainer,
+        "setup-info",
+        `Some resources failed (features will be limited):\n${failed.join("\n")}`,
+      );
     } else {
       update("resources", "done");
     }
@@ -346,12 +353,15 @@ async function startAutoSetup(
     await invoke("setup_worker_secrets", { accountId, workerName });
     secretsOk = true;
   } catch (e) {
-    // OAuth token creation failed — show guidance instead of manual input
+    // OAuth token creation failed — show the actual error for debugging
+    const reason = typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
     showSetupMessage(
       progressContainer,
       "setup-info",
-      `Render JS secrets could not be configured automatically.\n` +
-        `You can set them later via: wrangler secret put CLOUDFLARE_API_TOKEN --name ${workerName ?? "markupsidedown-converter"}\n` +
+      `Secrets could not be configured: ${reason}\n` +
+        `You can set them later via:\n` +
+        `  wrangler secret put CLOUDFLARE_API_TOKEN --name ${workerName ?? "markupsidedown-converter"}\n` +
+        `  wrangler secret put CLOUDFLARE_ACCOUNT_ID --name ${workerName ?? "markupsidedown-converter"}\n` +
         `Required token scopes: Workers AI (Read) + Browser Rendering (Edit)`,
     );
   }

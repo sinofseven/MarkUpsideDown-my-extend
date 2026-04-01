@@ -324,7 +324,7 @@ pub struct ResourceSetupResult {
 fn create_kv_namespace(account_id: &str) -> Result<String, String> {
     let env = [("CLOUDFLARE_ACCOUNT_ID", account_id)];
     match run_wrangler(
-        &["kv", "namespace", "create", "CACHE", "--name", "markupsidedown-converter"],
+        &["kv", "namespace", "create", "markupsidedown-cache"],
         None, 30, &env,
     ) {
         Ok(output) => parse_kv_namespace_id(&output)
@@ -358,13 +358,13 @@ fn find_existing_kv_namespace(account_id: &str) -> Result<String, String> {
 
     for ns in &namespaces {
         let title = ns["title"].as_str().unwrap_or("");
-        if title.contains("CACHE") && title.contains("markupsidedown") {
+        if title.contains("markupsidedown") {
             if let Some(id) = ns["id"].as_str() {
                 return Ok(id.to_string());
             }
         }
     }
-    Err("KV namespace exists but could not find its ID".to_string())
+    Err("KV namespace exists but could not find its ID in namespace list".to_string())
 }
 
 fn create_r2_bucket(account_id: &str) -> Result<(), String> {
