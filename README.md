@@ -128,7 +128,7 @@ cargo tauri build      # production build
 | Document | Contents |
 |----------|----------|
 | [docs/ai-integration.md](docs/ai-integration.md) | AI agent setup guide (quick start) |
-| [docs/mcp-server.md](docs/mcp-server.md) | MCP server reference (48 tools, standalone mode) |
+| [docs/mcp-server.md](docs/mcp-server.md) | MCP server reference (49 tools, standalone mode) |
 | [docs/worker-deployment.md](docs/worker-deployment.md) | Worker deployment, API tokens, pricing |
 | [docs/architecture.md](docs/architecture.md) | Data flow, components, IPC/bridge API reference |
 | [docs/keyboard-shortcuts.md](docs/keyboard-shortcuts.md) | All keyboard shortcuts |
