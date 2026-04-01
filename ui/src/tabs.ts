@@ -258,7 +258,7 @@ export function updateTabPath(oldPath: string, newPath: string): void {
     } else if (tab.path.startsWith(oldPath + "/")) {
       // Directory rename — update child paths
       tab.path = newPath + tab.path.substring(oldPath.length);
-      tab.name = tab.path.split("/").pop() || tab.name;
+      tab.name = basename(tab.path) || tab.name;
       renderTabs();
       saveState();
     }

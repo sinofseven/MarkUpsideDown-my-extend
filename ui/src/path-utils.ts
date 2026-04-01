@@ -48,6 +48,16 @@ export function dirname(path: string): string {
   return path.substring(0, path.lastIndexOf("/"));
 }
 
+/** Get the assets directory for a given file path. */
+export function getAssetsDir(filePath: string): string {
+  return `${dirname(filePath)}/assets`;
+}
+
+/** Sanitize a string for use as a filename (keep only alphanumeric, dot, hyphen, underscore). */
+export function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 /** Compute a relative path from one file to another. */
 export function buildRelativePath(fromFile: string, toFile: string): string {
   const fromDir = dirname(fromFile);

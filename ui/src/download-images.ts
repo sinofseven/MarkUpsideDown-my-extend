@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { basename, dirname } from "./path-utils.ts";
+import { basename, getAssetsDir, sanitizeFilename } from "./path-utils.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -17,16 +17,12 @@ export function initDownloadImages(d: DownloadImagesDeps) {
   deps = d;
 }
 
-function getAssetsDir(filePath: string): string {
-  return `${dirname(filePath)}/assets`;
-}
-
 function urlToFilename(url: string): string {
   try {
     const pathname = new URL(url).pathname;
     const last = basename(pathname) || "image";
     // Sanitize filename
-    const clean = last.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const clean = sanitizeFilename(last);
     // Ensure it has an extension
     if (!/\.(jpg|jpeg|png|gif|webp|svg|bmp|tiff?)$/i.test(clean)) {
       return `${clean}.png`;

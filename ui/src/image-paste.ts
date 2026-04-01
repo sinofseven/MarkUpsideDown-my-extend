@@ -1,5 +1,5 @@
 import type { EditorView } from "@codemirror/view";
-import { dirname, basename } from "./path-utils.ts";
+import { basename, getAssetsDir, getExtension, sanitizeFilename } from "./path-utils.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -17,10 +17,6 @@ export function initImagePaste(d: ImagePasteDeps) {
   deps = d;
 }
 
-function getAssetsDir(filePath: string): string {
-  return `${dirname(filePath)}/assets`;
-}
-
 function formatTimestamp(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -34,10 +30,6 @@ function extensionForMime(mime: string): string {
   if (mime === "image/webp") return "webp";
   if (mime === "image/bmp") return "bmp";
   return "png";
-}
-
-function sanitizeFilename(name: string): string {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 async function saveAndInsert(data: Uint8Array, filename: string, pos: number) {
@@ -96,7 +88,7 @@ export async function handleImageDrop(e: DragEvent) {
   e.stopPropagation();
 
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const ext = getExtension(file.name) || "png";
   const stem = sanitizeFilename(basename(file.name).replace(/\.[^.]+$/, "") || "image");
   const filename = `${stem}-${formatTimestamp()}.${ext}`;
 
