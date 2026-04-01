@@ -203,7 +203,14 @@ const SETUP_STEPS = [
 ];
 
 function renderSetupProgress(container: HTMLElement, stepStates: Record<string, string>) {
-  container.innerHTML = SETUP_STEPS.map((step) => {
+  // Render steps into a dedicated sub-container so appended messages survive
+  let stepsDiv = container.querySelector<HTMLElement>(".setup-steps");
+  if (!stepsDiv) {
+    stepsDiv = document.createElement("div");
+    stepsDiv.className = "setup-steps";
+    container.prepend(stepsDiv);
+  }
+  stepsDiv.innerHTML = SETUP_STEPS.map((step) => {
     const state = stepStates[step.id] || "pending";
     let icon, cls;
     if (state === "done") {
