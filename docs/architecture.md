@@ -54,7 +54,7 @@ MCP Server (mcp-server-rs/)
 | Git panel | Status, stage/unstage, commit, push/pull with ahead/behind, fetch | `ui/src/git-panel.ts` |
 | Clone panel | Repository clone UI (HTTPS/SSH) | `ui/src/clone-panel.ts` |
 | Table editor | Spreadsheet grid with undo/redo, paste TSV/CSV | `ui/src/table-editor.ts` |
-| Formatting | Markdown shortcuts (bold, italic, link, strikethrough, code) | `ui/src/markdown-commands.ts` |
+| Formatting | Markdown shortcuts (bold `__`, italic, link, strikethrough, code, smart code fences) | `ui/src/markdown-commands.ts` |
 | Auto link title | Paste URL → auto-fetch title → `[Title](url)` | `ui/src/auto-link-title.ts` |
 | Link context menu | Right-click links in preview for Fetch/Render/Crawl | `ui/src/link-context-menu.ts` |
 | Smart typography | Auto-convert `...`, `--`, `---` to typographic chars | `ui/src/smart-typography.ts` |
@@ -65,9 +65,11 @@ MCP Server (mcp-server-rs/)
 | MCP sync | Editor state sync for MCP bridge | `ui/src/mcp-sync.ts` |
 | Download images | Download external images to `./assets/` | `ui/src/download-images.ts` |
 | Note refactor | Extract selection into new linked file | `ui/src/note-refactor.ts` |
-| Normalize | Post-conversion Markdown normalization | `ui/src/normalize.ts` |
+| Normalize | Post-conversion Markdown normalization (CJK emphasis spacing, table alignment, heading hierarchy) | `ui/src/normalize.ts` |
+| CJK emphasis | Shared CJK emphasis spacing utility (normalize + preview) | `ui/src/cjk-emphasis.ts` |
 | Document structure | Heading tree, links, tables, stats parser | `ui/src/document-structure.ts` |
-| Markdown lint | Structural linting (headings, links, tables) | `ui/src/markdown-lint.ts` |
+| Markdown lint | Structural linting (11 checks: headings, links, tables, emphasis flanking, code blocks, footnotes, etc.) | `ui/src/markdown-lint.ts` |
+| Image paste | Clipboard paste / drag-drop images to `./assets/` | `ui/src/image-paste.ts` |
 | Command palette | Fuzzy search over all commands (Cmd+K) | `ui/src/command-palette.ts` |
 | Frontmatter panel | Collapsible YAML frontmatter display | `ui/src/frontmatter-panel.ts` |
 | TOC panel | Heading navigation with active tracking (Cmd+4) | `ui/src/toc-panel.ts` |
@@ -106,7 +108,7 @@ Security: SSRF prevention validates URLs and blocks private/reserved IP ranges v
 | Component | Role |
 |-----------|------|
 | `main.rs` | Entry point, stdio transport |
-| `tools.rs` | 41 MCP tools (editor, project context, file ops, conversion, crawl, git) |
+| `tools.rs` | 49 MCP tools (editor, project context, file ops, conversion, crawl, git, tags) |
 | `bridge.rs` | HTTP client to Tauri bridge (auto-discovers port) |
 
 Communication: MCP server (Rust sidecar binary) reads the bridge port from `~/.markupsidedown-bridge-port` and sends HTTP requests to the Tauri backend's axum server.
@@ -219,6 +221,7 @@ The Tauri backend runs an axum HTTP server on `localhost:31415` (fallback: 31416
 | `/editor/save-file` | POST | Save editor content to file |
 | `/editor/structure` | GET | Get document structure as JSON |
 | `/editor/normalize` | POST | Normalize document |
+| `/editor/lint` | GET | Get cached lint diagnostics |
 | `/editor/tabs` | GET | List open tabs |
 | `/editor/root` | GET | Get project root path |
 | `/editor/dirty-files` | GET | List files with unsaved changes |

@@ -22,6 +22,7 @@ pub struct EditorStateInner {
     pub cursor_column: usize,
     pub worker_url: Option<String>,
     pub document_structure: Option<String>, // JSON string from frontend
+    pub lint_diagnostics: Option<String>,   // JSON string from frontend
     pub root_path: Option<String>,
     pub tabs: Vec<TabInfo>,
 }
@@ -105,6 +106,7 @@ pub fn sync_editor_state(
     cursor_column: Option<usize>,
     worker_url: Option<String>,
     document_structure: Option<String>,
+    lint_diagnostics: Option<String>,
     root_path: Option<String>,
     tabs: Option<Vec<TabInfo>>,
     state: tauri::State<'_, std::sync::Arc<EditorStates>>,
@@ -126,6 +128,9 @@ pub fn sync_editor_state(
     s.worker_url = worker_url;
     if let Some(ds) = document_structure {
         s.document_structure = Some(ds);
+    }
+    if let Some(ld) = lint_diagnostics {
+        s.lint_diagnostics = Some(ld);
     }
     if let Some(rp) = root_path {
         s.root_path = Some(rp);
@@ -2035,7 +2040,7 @@ pub fn create_cowork_workspace(
 This workspace is configured for use with MarkUpsideDown's MCP server.
 MarkUpsideDown must be running for editor/file/git tools to work.
 
-## Available MCP Tools (48)
+## Available MCP Tools (49)
 
 ### Editor
 | Tool | Description |
@@ -2050,7 +2055,8 @@ MarkUpsideDown must be running for editor/file/git tools to work.
 | Tool | Description |
 |------|-------------|
 | `get_document_structure` | Get document structure (headings, links, stats) as JSON |
-| `normalize_document` | Normalize headings, tables, list markers, whitespace |
+| `normalize_document` | Normalize headings, tables, list markers, whitespace, CJK emphasis spacing |
+| `lint_document` | Run structural lint checks (headings, links, emphasis, code blocks, etc.) |
 
 ### File Operations
 | Tool | Description |
@@ -2120,6 +2126,8 @@ MarkUpsideDown must be running for editor/file/git tools to work.
 - Use `crawl_website` + `crawl_status` for multi-page site crawls with markdown and/or json output
 - Use `extract_json` to extract structured data from web pages via AI
 - Use `get_document_structure` instead of parsing raw Markdown for structural analysis
+- Use `lint_document` to check for structural issues before committing
+- Use `normalize_document` after editing to clean up formatting (includes CJK emphasis spacing)
 "#;
     let claude_md_path = expanded.join("CLAUDE.md");
     if !claude_md_path.exists() {

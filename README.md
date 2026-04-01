@@ -20,6 +20,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 | **Crawl website** | [Browser Rendering `/crawl` API](https://developers.cloudflare.com/browser-rendering/rest-api/crawl-endpoint/) — crawl entire sites to Markdown files |
 | **Import documents** | [Workers AI `AI.toMarkdown()`](https://developers.cloudflare.com/workers-ai/markdown-conversion/) — PDF, DOCX, XLSX, HTML, CSV, XML |
 | **Import images** | Workers AI OCR — JPG, PNG, WebP, SVG |
+| **Paste / Drop images** | Paste from clipboard or drag & drop — saves to `./assets/` with Markdown link |
 | **Drag & Drop** | Drop any supported file onto the editor to import |
 
 ### Editor
@@ -29,8 +30,8 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 - **CodeMirror 6** — Syntax highlighting, line numbers, bracket matching, search & replace
 - **Command palette** — Fuzzy search over all commands (<kbd>Cmd</kbd>+<kbd>K</kbd>)
 - **Formatting shortcuts** — Bold, italic, strikethrough, inline code, link insertion
-- **Document cleanup** — Normalize headings, tables, list markers, whitespace in one click
-- **Markdown linting** — Structural warnings for heading hierarchy, broken links, table formatting
+- **Document cleanup** — Normalize headings, tables, list markers, whitespace, CJK emphasis spacing in one click
+- **Markdown linting** — 11 structural checks: heading hierarchy, broken links, table formatting, CommonMark emphasis flanking, code blocks, footnotes, blank lines
 - **Code highlighting** — 24 languages via highlight.js (lazy-loaded), copy button on hover
 - **KaTeX math** — Inline `$...$` and display `$$...$$` rendering
 - **Mermaid diagrams** — Flowcharts, sequence diagrams, etc. Click to open zoom/pan viewer with Copy as PNG
@@ -60,7 +61,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 
 ### AI Agent Integration
 
-- **MCP Server** — AI agents (Claude Desktop, Claude Code, Cowork) can read/write editor content, manage files, browse projects, crawl websites, and convert documents via [Model Context Protocol](https://modelcontextprotocol.io/) (48 tools). See [docs/ai-integration.md](docs/ai-integration.md) for setup.
+- **MCP Server** — AI agents (Claude Desktop, Claude Code, Cowork) can read/write editor content, manage files, browse projects, crawl websites, lint/normalize documents, and convert documents via [Model Context Protocol](https://modelcontextprotocol.io/) (49 tools). See [docs/ai-integration.md](docs/ai-integration.md) for setup.
 - **File-watcher sync** — External edits by AI agents are automatically detected and reloaded in the editor
 
 ### Keyboard Shortcuts

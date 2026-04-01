@@ -80,10 +80,10 @@ Check Worker health and version: `curl https://your-worker-url/health`
 
 The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420). The port file `~/.markupsidedown-bridge-port` is created on startup and removed on exit.
 
-## Available Tools (48)
+## Available Tools (49)
 
 <details>
-<summary><strong>Editor Tools</strong> — 8 tools (require the app to be running)</summary>
+<summary><strong>Editor Tools</strong> — 9 tools (require the app to be running)</summary>
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
@@ -92,7 +92,8 @@ The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420).
 | `insert_text` | Insert text at cursor, start, or end | `text: string`, `position?: "cursor" \| "start" \| "end"` |
 | `get_editor_state` | Get editor state (file path, cursor position/line/column, Worker URL) | — |
 | `get_document_structure` | Get document structure (headings, links, stats) as JSON | — |
-| `normalize_document` | Normalize headings, tables, list markers, whitespace | — |
+| `normalize_document` | Normalize headings, tables, list markers, whitespace, CJK emphasis spacing | — |
+| `lint_document` | Run structural lint checks (headings, links, tables, emphasis, code blocks, footnotes, blank lines) | — |
 | `open_file` | Open a Markdown file in the editor | `path: string` |
 | `save_file` | Save content to a file | `path?: string` (uses current file if omitted) |
 
@@ -161,7 +162,7 @@ The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420).
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `crawl_website` | Start a website crawl job (returns `job_id`). Supports markdown and/or JSON output. | `url: string`, `depth?: number`, `limit?: number`, `render?: boolean`, `include_patterns?: string[]`, `exclude_patterns?: string[]`, `formats?: string[]`, `response_format?: string` (JSON Schema) |
-| `crawl_status` | Poll crawl job status and retrieve pages (markdown and/or JSON) | `job_id: string`, `cursor?: string` |
+| `crawl_status` | Poll crawl job status and retrieve pages (markdown and/or JSON) | `job_id: string`, `cursor?: string`, `limit?: number` (default 10, max 100) |
 | `crawl_save` | Save crawled pages as local Markdown files | `pages: {url, markdown}[]`, `base_dir: string` |
 
 </details>
@@ -181,7 +182,7 @@ The Tauri app listens on `localhost:31415` by default (fallback: 31416–31420).
 | `git_discard` | Discard changes for a specific file | `path: string` |
 | `git_discard_all` | Discard all uncommitted changes | — |
 | `git_log` | Get recent commit history | `limit?: number` |
-| `git_revert` | Revert a commit by creating a new revert commit | `hash: string` |
+| `git_revert` | Revert a commit by creating a new revert commit | `commit_hash: string` |
 
 </details>
 

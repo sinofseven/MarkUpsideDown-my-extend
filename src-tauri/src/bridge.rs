@@ -60,6 +60,7 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorStates>) {
         .route("/editor/save-file", post(save_file))
         .route("/editor/structure", get(get_structure))
         .route("/editor/normalize", post(normalize_document))
+        .route("/editor/lint", get(get_lint))
         .route("/editor/tabs", get(get_tabs))
         .route("/editor/root", get(get_root))
         .route("/editor/dirty-files", get(get_dirty_files))
@@ -218,6 +219,20 @@ async fn save_file(
 async fn normalize_document(State(state): State<Arc<BridgeState>>) -> StatusCode {
     state.emit_to_focused("bridge:normalize", ());
     StatusCode::OK
+}
+
+async fn get_lint(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
+    let s = state.editor.get_focused_state();
+    match s.and_then(|s| s.lint_diagnostics) {
+        Some(json_str) => {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                Json(serde_json::json!({ "diagnostics": val }))
+            } else {
+                Json(serde_json::json!({ "diagnostics": [] }))
+            }
+        }
+        None => Json(serde_json::json!({ "diagnostics": [] })),
+    }
 }
 
 async fn get_structure(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {

@@ -586,10 +586,25 @@ impl McpTools {
         }
     }
 
-    #[tool(name = "normalize_document", description = "Normalize the current editor content: fix heading hierarchy, reformat tables, clean up whitespace, remove broken links, and standardize list markers", annotations(read_only_hint = false, open_world_hint = false))]
+    #[tool(name = "normalize_document", description = "Normalize the current editor content: fix heading hierarchy, reformat tables, clean up whitespace, remove broken links, standardize list markers, and add CJK emphasis spacing", annotations(read_only_hint = false, open_world_hint = false))]
     async fn normalize_document(&self) -> Result<CallToolResult, rmcp::ErrorData> {
         match self.bridge.normalize_document().await {
             Ok(()) => Ok(CallToolResult::success(vec![Content::text("Document normalized")])),
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
+
+    #[tool(name = "lint_document", description = "Run structural lint checks on the current editor content. Returns diagnostics with line number, severity (error/warning/info), and message. Checks: headings, links, tables, frontmatter, lists, emphasis (CommonMark flanking), code blocks, footnotes, HTML comments, blank lines.", annotations(read_only_hint = true, open_world_hint = false))]
+    async fn lint_document(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.lint_document().await {
+            Ok(diagnostics) => {
+                let json = serde_json::to_string_pretty(&diagnostics).unwrap_or_default();
+                if diagnostics.as_array().map_or(true, |a| a.is_empty()) {
+                    Ok(CallToolResult::success(vec![Content::text("No lint issues found")]))
+                } else {
+                    Ok(CallToolResult::success(vec![Content::text(json)]))
+                }
+            }
             Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
         }
     }

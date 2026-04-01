@@ -17,6 +17,56 @@ export function setLintEnabled(enabled: boolean) {
   setStorageBool(KEY_LINT_ENABLED, enabled);
 }
 
+export interface LintDiagnostic {
+  line: number;
+  severity: "error" | "warning" | "info";
+  message: string;
+}
+
+export function getLintDiagnostics(text: string): LintDiagnostic[] {
+  const lines = text.split("\n");
+  const structure = getDocumentStructure(text);
+
+  // Build line offset table for byte offset → line number conversion
+  const lineStarts: number[] = [0];
+  for (let i = 0; i < lines.length; i++) {
+    lineStarts.push(lineStarts[i] + lines[i].length + 1);
+  }
+
+  const doc = {
+    line: (n: number) => ({
+      from: lineStarts[n - 1] ?? 0,
+      to: (lineStarts[n - 1] ?? 0) + (lines[n - 1]?.length ?? 0),
+    }),
+  };
+
+  const diagnostics: Diagnostic[] = [];
+
+  checkHeadings(structure, doc, diagnostics);
+  checkLinks(structure, doc, diagnostics);
+  checkTables(structure, doc, diagnostics);
+  checkFrontmatter(structure, doc, diagnostics);
+  checkLists(structure, doc, diagnostics);
+  checkEmphasis(lines, doc, diagnostics);
+  checkCodeBlocks(lines, doc, diagnostics);
+  checkFootnotes(lines, doc, diagnostics);
+  checkHtmlComments(lines, doc, diagnostics);
+  checkBlankLines(lines, doc, diagnostics, structure);
+
+  function offsetToLine(offset: number): number {
+    for (let i = 0; i < lineStarts.length - 1; i++) {
+      if (offset < lineStarts[i + 1]) return i + 1;
+    }
+    return lines.length;
+  }
+
+  return diagnostics.map((d) => ({
+    line: offsetToLine(d.from),
+    severity: d.severity as LintDiagnostic["severity"],
+    message: d.message,
+  }));
+}
+
 export const markdownLinter = linter(
   (view) => {
     if (!isLintEnabled()) return [];

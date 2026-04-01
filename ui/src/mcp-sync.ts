@@ -15,6 +15,7 @@ import { suppressNext } from "./file-watcher.ts";
 import { getDocumentStructure } from "./document-structure.ts";
 import { normalizeMarkdown } from "./normalize.ts";
 import { reloadTags } from "./tags.ts";
+import { getLintDiagnostics, isLintEnabled } from "./markdown-lint.ts";
 
 const { invoke } = window.__TAURI__.core;
 
@@ -32,6 +33,8 @@ let lastSyncedFilePath: string | null = null;
 let lastSyncedCursorPos: number | null = null;
 let cachedStructureContent: string | null = null;
 let cachedStructureJson: string | null = null;
+let cachedLintContent: string | null = null;
+let cachedLintJson: string | null = null;
 
 let refreshTree: () => void;
 
@@ -93,6 +96,11 @@ export function syncEditorState(cachedContent?: string) {
       });
       cachedStructureContent = content;
     }
+    if (content !== cachedLintContent) {
+      const diagnostics = isLintEnabled() ? getLintDiagnostics(content) : [];
+      cachedLintJson = JSON.stringify(diagnostics);
+      cachedLintContent = content;
+    }
     const tabInfos = getTabs().map((t) => ({
       id: t.id,
       path: t.path,
@@ -107,6 +115,7 @@ export function syncEditorState(cachedContent?: string) {
       cursorColumn,
       workerUrl: getWorkerUrl() || null,
       documentStructure: cachedStructureJson,
+      lintDiagnostics: cachedLintJson,
       rootPath: getRootPath() || null,
       tabs: tabInfos,
     }).catch(() => {});

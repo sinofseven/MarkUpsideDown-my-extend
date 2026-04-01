@@ -515,14 +515,15 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
           <div id="settings-mcp-tab-content" class="settings-mcp-tab-content"></div>
         </div>
         <details class="settings-mcp-tools-details">
-          <summary>Available tools (48)</summary>
+          <summary>Available tools (49)</summary>
           <div class="settings-mcp-tools-list">
             <div class="settings-mcp-tool"><code>get_editor_content</code> &mdash; Get current Markdown from the editor</div>
             <div class="settings-mcp-tool"><code>set_editor_content</code> &mdash; Replace editor content</div>
             <div class="settings-mcp-tool"><code>insert_text</code> &mdash; Insert text at cursor, start, or end</div>
             <div class="settings-mcp-tool"><code>get_editor_state</code> &mdash; Get editor state (file path, cursor, Worker URL)</div>
             <div class="settings-mcp-tool"><code>get_document_structure</code> &mdash; Get document structure (headings, links, stats) as JSON</div>
-            <div class="settings-mcp-tool"><code>normalize_document</code> &mdash; Normalize headings, tables, list markers, whitespace</div>
+            <div class="settings-mcp-tool"><code>normalize_document</code> &mdash; Normalize headings, tables, list markers, whitespace, CJK emphasis spacing</div>
+            <div class="settings-mcp-tool"><code>lint_document</code> &mdash; Run structural lint checks on the current document</div>
             <div class="settings-mcp-tool"><code>open_file</code> &mdash; Open a Markdown file</div>
             <div class="settings-mcp-tool"><code>save_file</code> &mdash; Save content to a file</div>
             <div class="settings-mcp-tool"><code>get_markdown</code> &mdash; Fetch URL as Markdown (auto-detects JS-rendered pages)</div>

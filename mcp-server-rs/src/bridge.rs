@@ -121,6 +121,12 @@ impl BridgeClient {
         Ok(())
     }
 
+    pub async fn lint_document(&self) -> Result<serde_json::Value, String> {
+        let val = self.request("GET", "/editor/lint", None).await?;
+        let json = val.unwrap_or_default();
+        Ok(json.get("diagnostics").cloned().unwrap_or(serde_json::json!([])))
+    }
+
     pub async fn get_document_structure(&self) -> Result<serde_json::Value, String> {
         let val = self.request("GET", "/editor/structure", None).await?;
         let json = val.unwrap_or_default();
