@@ -4,7 +4,11 @@
 import { basename } from "./path-utils.ts";
 import { workerFetch } from "./worker-fetch.ts";
 
-const { readTextFile, writeTextFile } = window.__TAURI__.fs;
+const { invoke } = window.__TAURI__.core;
+
+function writeTextFile(path: string, content: string): Promise<void> {
+  return invoke("write_text_file", { path, content });
+}
 const { join } = window.__TAURI__.path;
 
 // --- Types ---
@@ -38,7 +42,7 @@ export async function loadPublishState(): Promise<void> {
   const path = await statePath();
   if (!path) return;
   try {
-    const raw = await readTextFile(path);
+    const raw = await invoke<string>("read_text_file", { path });
     state = JSON.parse(raw);
   } catch {
     state = { files: {} };

@@ -1169,6 +1169,22 @@ pub async fn read_text_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    let path = validate_path(&path)?;
+    tokio::fs::write(&path, content.as_bytes())
+        .await
+        .map_err(|e| format!("Failed to write file: {e}"))
+}
+
+#[tauri::command]
+pub async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    let path = validate_path(&path)?;
+    tokio::fs::read(&path)
+        .await
+        .map_err(|e| format!("Failed to read file: {e}"))
+}
+
+#[tauri::command]
 pub async fn list_directory(path: String) -> Result<Vec<FileEntry>, String> {
     let path = validate_path(&path)?;
     let mut entries = Vec::new();

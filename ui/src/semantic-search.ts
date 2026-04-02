@@ -4,7 +4,7 @@ import { escapeHtml } from "./html-utils.ts";
 import { basename, dirname } from "./path-utils.ts";
 import { workerFetch } from "./worker-fetch.ts";
 
-const { readTextFile } = window.__TAURI__.fs;
+const { invoke } = window.__TAURI__.core;
 
 // --- Index ---
 
@@ -62,7 +62,7 @@ export async function indexProjectFiles(
     const batch = filePaths.slice(i, i + batchSize);
     const docs = await Promise.all(
       batch.map(async (fp) => {
-        const content = await readTextFile(fp);
+        const content = await invoke<string>("read_text_file", { path: fp });
         const relativePath = fp.startsWith(rootPath) ? fp.slice(rootPath.length + 1) : fp;
         return {
           id: relativePath,

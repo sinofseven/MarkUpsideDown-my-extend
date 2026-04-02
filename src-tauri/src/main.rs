@@ -122,6 +122,8 @@ fn main() {
             commands::install_mcp_to_claude_desktop,
             commands::create_cowork_workspace,
             commands::read_text_file,
+            commands::write_text_file,
+            commands::read_file_bytes,
             commands::list_directory,
             commands::create_file,
             commands::create_directory,

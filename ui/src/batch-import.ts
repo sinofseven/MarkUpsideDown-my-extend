@@ -4,7 +4,11 @@ import { normalizeMarkdown } from "./normalize.ts";
 import { basename } from "./path-utils.ts";
 import { workerFetch } from "./worker-fetch.ts";
 
-const { readFile, writeTextFile } = window.__TAURI__.fs;
+const { invoke } = window.__TAURI__.core;
+
+function writeTextFile(path: string, content: string): Promise<void> {
+  return invoke("write_text_file", { path, content });
+}
 
 interface BatchFile {
   name: string;
@@ -50,8 +54,8 @@ export async function submitBatch(
 ): Promise<{ batchId: string; total: number }> {
   const files: BatchFile[] = [];
   for (const fp of filePaths) {
-    const data = await readFile(fp);
-    const b64 = arrayBufferToBase64(data instanceof ArrayBuffer ? data : data.buffer);
+    const bytes = await invoke<number[]>("read_file_bytes", { path: fp });
+    const b64 = arrayBufferToBase64(new Uint8Array(bytes).buffer);
     files.push({ name: basename(fp), content: b64 });
   }
 

@@ -126,7 +126,9 @@ export function initBridgeListeners() {
   if (!window.__TAURI__?.event) return;
 
   const { listen } = window.__TAURI__.event;
-  const { writeTextFile } = window.__TAURI__.fs;
+  const { invoke } = window.__TAURI__.core;
+  const writeTextFile = (path: string, content: string) =>
+    invoke("write_text_file", { path, content });
 
   listen<string>("bridge:set-content", (event) => {
     loadContentAsTab(event.payload);
