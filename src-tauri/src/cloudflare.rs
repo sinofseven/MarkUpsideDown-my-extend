@@ -5,7 +5,21 @@ use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 use std::time::Duration;
 
+// All worker source files embedded at compile time
 const WORKER_INDEX_TS: &str = include_str!("../../worker/src/index.ts");
+const WORKER_TYPES_TS: &str = include_str!("../../worker/src/types.ts");
+const WORKER_UTILS_TS: &str = include_str!("../../worker/src/utils.ts");
+const WORKER_SSRF_TS: &str = include_str!("../../worker/src/ssrf.ts");
+const WORKER_CONFIG_TS: &str = include_str!("../../worker/src/config.ts");
+const WORKER_HANDLER_HEALTH_TS: &str = include_str!("../../worker/src/handlers/health.ts");
+const WORKER_HANDLER_FETCH_TS: &str = include_str!("../../worker/src/handlers/fetch.ts");
+const WORKER_HANDLER_CONVERT_TS: &str = include_str!("../../worker/src/handlers/convert.ts");
+const WORKER_HANDLER_RENDER_TS: &str = include_str!("../../worker/src/handlers/render.ts");
+const WORKER_HANDLER_JSON_TS: &str = include_str!("../../worker/src/handlers/json.ts");
+const WORKER_HANDLER_CRAWL_TS: &str = include_str!("../../worker/src/handlers/crawl.ts");
+const WORKER_HANDLER_BATCH_TS: &str = include_str!("../../worker/src/handlers/batch.ts");
+const WORKER_HANDLER_PUBLISH_TS: &str = include_str!("../../worker/src/handlers/publish.ts");
+const WORKER_HANDLER_EMBED_TS: &str = include_str!("../../worker/src/handlers/embed.ts");
 const WORKER_WRANGLER_JSONC: &str = include_str!("../../worker/wrangler.jsonc");
 
 #[derive(Serialize, Clone)]
@@ -294,11 +308,38 @@ fn write_temp_worker_files(
     worker_name: Option<&str>,
 ) -> Result<(), String> {
     let src_dir = dir.join("src");
-    std::fs::create_dir_all(&src_dir)
+    let handlers_dir = src_dir.join("handlers");
+    std::fs::create_dir_all(&handlers_dir)
         .map_err(|e| format!("Failed to create temp directory: {e}"))?;
 
-    std::fs::write(src_dir.join("index.ts"), WORKER_INDEX_TS)
-        .map_err(|e| format!("Failed to write index.ts: {e}"))?;
+    // Write all worker source files
+    let root_files: &[(&str, &str)] = &[
+        ("index.ts", WORKER_INDEX_TS),
+        ("types.ts", WORKER_TYPES_TS),
+        ("utils.ts", WORKER_UTILS_TS),
+        ("ssrf.ts", WORKER_SSRF_TS),
+        ("config.ts", WORKER_CONFIG_TS),
+    ];
+    for (name, content) in root_files {
+        std::fs::write(src_dir.join(name), content)
+            .map_err(|e| format!("Failed to write {name}: {e}"))?;
+    }
+
+    let handler_files: &[(&str, &str)] = &[
+        ("health.ts", WORKER_HANDLER_HEALTH_TS),
+        ("fetch.ts", WORKER_HANDLER_FETCH_TS),
+        ("convert.ts", WORKER_HANDLER_CONVERT_TS),
+        ("render.ts", WORKER_HANDLER_RENDER_TS),
+        ("json.ts", WORKER_HANDLER_JSON_TS),
+        ("crawl.ts", WORKER_HANDLER_CRAWL_TS),
+        ("batch.ts", WORKER_HANDLER_BATCH_TS),
+        ("publish.ts", WORKER_HANDLER_PUBLISH_TS),
+        ("embed.ts", WORKER_HANDLER_EMBED_TS),
+    ];
+    for (name, content) in handler_files {
+        std::fs::write(handlers_dir.join(name), content)
+            .map_err(|e| format!("Failed to write handlers/{name}: {e}"))?;
+    }
 
     let config = build_wrangler_config(resources, worker_name);
     std::fs::write(dir.join("wrangler.jsonc"), config)
