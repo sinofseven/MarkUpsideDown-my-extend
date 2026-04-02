@@ -57,6 +57,7 @@ import {
   closeTabsUnderDir,
   setTabsProjectRoot,
   switchProjectTabs,
+  getDirtyFileTabs,
 } from "./tabs.ts";
 import {
   initFileWatcher,
@@ -625,7 +626,17 @@ initSidebar(sidebarEl, {
   onOpen: (content: string, filePath: string) => {
     loadContentAsTab(content, filePath);
   },
-  onFolder: (rootPath: string) => {
+  onFolder: async (rootPath: string) => {
+    // Warn if there are unsaved changes before switching projects
+    const dirty = getDirtyFileTabs();
+    if (dirty.length > 0) {
+      const names = dirty.map((t) => t.name).join(", ");
+      const ok = await window.__TAURI__.dialog.confirm(
+        `Unsaved changes in: ${names}\n\nSwitch project without saving?`,
+        { title: "Unsaved Changes", kind: "warning" },
+      );
+      if (!ok) return;
+    }
     // Save current tabs, restore tabs for the new project
     switchProjectTabs(rootPath, reloadTab);
     // Stop watchers for old tabs, start watchers for new tabs

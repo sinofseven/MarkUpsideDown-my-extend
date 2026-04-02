@@ -284,6 +284,11 @@ body {
   box-shadow: inset -2px 0 0 var(--accent);
 }
 
+.tab-item.external .tab-name {
+  font-style: italic;
+  opacity: 0.75;
+}
+
 #divider {
   width: 1px;
   background: var(--border);

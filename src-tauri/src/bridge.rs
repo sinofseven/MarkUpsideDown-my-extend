@@ -32,6 +32,33 @@ impl BridgeState {
         // Fallback: broadcast to all windows
         let _ = self.app.emit(event, payload);
     }
+
+    /// Emit an event to a specific window (or focused if None).
+    #[allow(dead_code)]
+    fn emit_to_window<S: serde::Serialize + Clone>(&self, window: Option<&str>, event: &str, payload: S) {
+        if let Some(label) = window {
+            if let Some(win) = self.app.webview_windows().get(label) {
+                let _ = win.emit(event, payload);
+                return;
+            }
+        }
+        self.emit_to_focused(event, payload);
+    }
+
+    /// Get state for a specific window, or fall back to focused.
+    fn get_state_for(&self, window: Option<&str>) -> Option<commands::EditorStateInner> {
+        if let Some(label) = window {
+            if let Some(state) = self.editor.get_window_state(label) {
+                return Some(state);
+            }
+        }
+        self.editor.get_focused_state()
+    }
+
+    /// Get root path for a specific window, or fall back to focused.
+    fn get_root_for(&self, window: Option<&str>) -> Option<String> {
+        self.get_state_for(window).and_then(|s| s.root_path)
+    }
 }
 
 fn port_file_path() -> PathBuf {
@@ -53,6 +80,7 @@ pub fn start(app: AppHandle, editor_state: Arc<EditorStates>) {
 
     let router = Router::new()
         .route("/health", get(health))
+        .route("/windows", get(get_windows))
         .route("/editor/content", get(get_content).post(set_content))
         .route("/editor/insert", post(insert_text))
         .route("/editor/state", get(get_state))
@@ -118,14 +146,33 @@ fn find_available_port() -> Option<u16> {
 
 // --- Handlers ---
 
+/// Common query parameter for targeting a specific window.
+#[derive(Deserialize, Default)]
+struct WindowQuery {
+    window: Option<String>,
+}
+
 async fn health() -> Json<serde_json::Value> {
     Json(serde_json::json!({ "status": "ok" }))
 }
 
-async fn get_content(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
-    let content = state
+async fn get_windows(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
+    let windows: Vec<serde_json::Value> = state
         .editor
-        .get_focused_state()
+        .get_all_windows()
+        .into_iter()
+        .map(|(label, root)| serde_json::json!({ "label": label, "root": root }))
+        .collect();
+    let focused = state.editor.get_focused_label();
+    Json(serde_json::json!({ "windows": windows, "focused": focused }))
+}
+
+async fn get_content(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<serde_json::Value> {
+    let content = state
+        .get_state_for(wq.window.as_deref())
         .map(|s| s.content)
         .unwrap_or_default();
     Json(serde_json::json!({ "content": content }))
@@ -183,8 +230,11 @@ struct EditorStateResponse {
     cursor_column: usize,
 }
 
-async fn get_state(State(state): State<Arc<BridgeState>>) -> Json<EditorStateResponse> {
-    let s = state.editor.get_focused_state().unwrap_or_default();
+async fn get_state(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<EditorStateResponse> {
+    let s = state.get_state_for(wq.window.as_deref()).unwrap_or_default();
     Json(EditorStateResponse {
         file_path: s.file_path,
         worker_url: s.worker_url,
@@ -225,8 +275,11 @@ async fn normalize_document(State(state): State<Arc<BridgeState>>) -> StatusCode
     StatusCode::OK
 }
 
-async fn get_lint(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
-    let s = state.editor.get_focused_state();
+async fn get_lint(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<serde_json::Value> {
+    let s = state.get_state_for(wq.window.as_deref());
     match s.and_then(|s| s.lint_diagnostics) {
         Some(json_str) => {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
@@ -239,8 +292,11 @@ async fn get_lint(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Val
     }
 }
 
-async fn get_structure(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
-    let s = state.editor.get_focused_state();
+async fn get_structure(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<serde_json::Value> {
+    let s = state.get_state_for(wq.window.as_deref());
     match s.and_then(|s| s.document_structure) {
         Some(json_str) => {
             if let Ok(val) = serde_json::from_str::<serde_json::Value>(&json_str) {
@@ -255,10 +311,12 @@ async fn get_structure(State(state): State<Arc<BridgeState>>) -> Json<serde_json
 
 // --- Project context handlers ---
 
-async fn get_tabs(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
+async fn get_tabs(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<serde_json::Value> {
     let tabs: Vec<serde_json::Value> = state
-        .editor
-        .get_focused_state()
+        .get_state_for(wq.window.as_deref())
         .map(|s| {
             s.tabs
                 .iter()
@@ -276,14 +334,19 @@ async fn get_tabs(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Val
     Json(serde_json::json!({ "tabs": tabs }))
 }
 
-async fn get_root(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
-    Json(serde_json::json!({ "root_path": state.editor.get_focused_root_path() }))
+async fn get_root(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "root_path": state.get_root_for(wq.window.as_deref()) }))
 }
 
-async fn get_dirty_files(State(state): State<Arc<BridgeState>>) -> Json<serde_json::Value> {
+async fn get_dirty_files(
+    State(state): State<Arc<BridgeState>>,
+    Query(wq): Query<WindowQuery>,
+) -> Json<serde_json::Value> {
     let dirty: Vec<serde_json::Value> = state
-        .editor
-        .get_focused_state()
+        .get_state_for(wq.window.as_deref())
         .map(|s| {
             s.tabs
                 .iter()

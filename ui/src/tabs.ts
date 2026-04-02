@@ -1,5 +1,5 @@
 import { KEY_TABS, windowKey } from "./storage-keys.ts";
-import { basename } from "./path-utils.ts";
+import { basename, buildRelativePath } from "./path-utils.ts";
 
 // --- Types ---
 
@@ -125,29 +125,38 @@ export function switchProjectTabs(newRoot: string, onReload?: (tab: Tab) => void
   // Save current tabs under the current project key
   saveState();
 
+  // Carry over untitled (non-file-backed) tabs to the new project
+  const untitled = tabs.filter((t) => t.path === null);
+
   // Switch to new project
   currentProjectRoot = newRoot;
 
   // Try to restore tabs for the new project (per-window scoped)
   const saved = localStorage.getItem(windowKey(tabsKey(newRoot)));
+  let restoredTabs: Tab[] = [];
+  let restoredActiveId: string | null = null;
   if (saved) {
     try {
       const state = JSON.parse(saved);
-      tabs = state.tabs || [];
-      activeTabId = state.activeTabId || null;
-      for (const tab of tabs) {
-        const num = parseInt(tab.id?.replace("tab-", ""), 10);
-        if (num >= nextId) nextId = num + 1;
-        tab.savedContent = null;
-      }
+      restoredTabs = state.tabs || [];
+      restoredActiveId = state.activeTabId || null;
     } catch {
-      tabs = [];
-      activeTabId = null;
+      // ignore
     }
-  } else {
-    tabs = [];
-    activeTabId = null;
   }
+
+  // Merge: restored tabs + carried-over untitled tabs
+  tabs = [...restoredTabs, ...untitled];
+
+  // Reset ID counter based on all merged tabs to avoid collisions
+  nextId = 1;
+  for (const tab of tabs) {
+    const num = parseInt(tab.id?.replace("tab-", ""), 10);
+    if (num >= nextId) nextId = num + 1;
+    tab.savedContent = null;
+  }
+
+  activeTabId = restoredActiveId;
 
   renderTabs();
 
@@ -465,8 +474,20 @@ function renderTabs(): void {
 
     const nameEl = document.createElement("span");
     nameEl.className = "tab-name";
-    nameEl.textContent = tab.name;
-    nameEl.title = tab.path || tab.name;
+    const isExternal =
+      tab.path !== null &&
+      currentProjectRoot !== null &&
+      !tab.path.startsWith(currentProjectRoot + "/");
+    if (isExternal) {
+      el.classList.add("external");
+      // Show parent dir name to distinguish external files
+      const rel = buildRelativePath(currentProjectRoot!, tab.path!);
+      nameEl.textContent = tab.name;
+      nameEl.title = rel || tab.path!;
+    } else {
+      nameEl.textContent = tab.name;
+      nameEl.title = tab.path || tab.name;
+    }
     el.appendChild(nameEl);
 
     el.addEventListener("click", () => {

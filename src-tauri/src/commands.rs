@@ -94,6 +94,20 @@ impl EditorStates {
     pub fn get_focused_root_path(&self) -> Option<String> {
         self.get_focused_field(|s| s.root_path.clone()).flatten()
     }
+
+    /// Get the state for a specific window by label.
+    pub fn get_window_state(&self, label: &str) -> Option<EditorStateInner> {
+        let map = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        map.get(label).cloned()
+    }
+
+    /// Get all window labels and their root paths.
+    pub fn get_all_windows(&self) -> Vec<(String, Option<String>)> {
+        let map = self.map.lock().unwrap_or_else(|e| e.into_inner());
+        map.iter()
+            .map(|(label, state)| (label.clone(), state.root_path.clone()))
+            .collect()
+    }
 }
 
 

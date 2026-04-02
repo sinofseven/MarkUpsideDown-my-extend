@@ -93,7 +93,7 @@ let expandedDirs = new Set<string>();
 let selectedPaths = new Set<string>();
 let anchorPath: string | null = null;
 let onFileOpen: ((content: string, filePath: string) => void) | null = null;
-let onFolderChange: ((rootPath: string) => void) | null = null;
+let onFolderChange: ((rootPath: string) => void | Promise<void>) | null = null;
 let onSidebarFold: (() => void) | null = null;
 let onExternalChange: (() => void) | null = null;
 let onEntryRename: ((oldPath: string, newPath: string) => void) | null = null;
@@ -193,7 +193,7 @@ export function initSidebar(
     skipRestore,
   }: {
     onOpen: (content: string, filePath: string) => void;
-    onFolder: (rootPath: string) => void;
+    onFolder: (rootPath: string) => void | Promise<void>;
     onFold?: () => void;
     onDirChange?: () => void;
     onRename?: (oldPath: string, newPath: string) => void;
