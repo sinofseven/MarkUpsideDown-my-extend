@@ -25,9 +25,30 @@ export interface LintDiagnostic {
   message: string;
 }
 
-export function getLintDiagnostics(text: string): LintDiagnostic[] {
+function runAllChecks(
+  text: string,
+  doc: { line: (n: number) => { from: number; to: number } },
+): Diagnostic[] {
   const lines = text.split("\n");
   const structure = getDocumentStructure(text);
+  const diagnostics: Diagnostic[] = [];
+
+  checkHeadings(structure, doc, diagnostics);
+  checkLinks(structure, doc, diagnostics);
+  checkTables(structure, doc, diagnostics);
+  checkFrontmatter(structure, doc, diagnostics);
+  checkLists(structure, doc, diagnostics);
+  checkEmphasis(lines, doc, diagnostics);
+  checkCodeBlocks(lines, doc, diagnostics);
+  checkFootnotes(lines, doc, diagnostics);
+  checkHtmlComments(lines, doc, diagnostics);
+  checkBlankLines(lines, doc, diagnostics, structure);
+
+  return diagnostics;
+}
+
+export function getLintDiagnostics(text: string): LintDiagnostic[] {
+  const lines = text.split("\n");
 
   // Build line offset table for byte offset → line number conversion
   const lineStarts: number[] = [0];
@@ -42,18 +63,7 @@ export function getLintDiagnostics(text: string): LintDiagnostic[] {
     }),
   };
 
-  const diagnostics: Diagnostic[] = [];
-
-  checkHeadings(structure, doc, diagnostics);
-  checkLinks(structure, doc, diagnostics);
-  checkTables(structure, doc, diagnostics);
-  checkFrontmatter(structure, doc, diagnostics);
-  checkLists(structure, doc, diagnostics);
-  checkEmphasis(lines, doc, diagnostics);
-  checkCodeBlocks(lines, doc, diagnostics);
-  checkFootnotes(lines, doc, diagnostics);
-  checkHtmlComments(lines, doc, diagnostics);
-  checkBlankLines(lines, doc, diagnostics, structure);
+  const diagnostics = runAllChecks(text, doc);
 
   function offsetToLine(offset: number): number {
     for (let i = 0; i < lineStarts.length - 1; i++) {
@@ -81,21 +91,8 @@ export const markdownLinter = linter(
 
     const doc = view.state.doc;
     const text = doc.toString();
-    const lines = text.split("\n");
-    const structure = getDocumentStructure(text);
 
-    const diagnostics: Diagnostic[] = [];
-
-    checkHeadings(structure, doc, diagnostics);
-    checkLinks(structure, doc, diagnostics);
-    checkTables(structure, doc, diagnostics);
-    checkFrontmatter(structure, doc, diagnostics);
-    checkLists(structure, doc, diagnostics);
-    checkEmphasis(lines, doc, diagnostics);
-    checkCodeBlocks(lines, doc, diagnostics);
-    checkFootnotes(lines, doc, diagnostics);
-    checkHtmlComments(lines, doc, diagnostics);
-    checkBlankLines(lines, doc, diagnostics, structure);
+    const diagnostics = runAllChecks(text, doc);
 
     // comrak-based CommonMark validation (block structure checks)
     try {

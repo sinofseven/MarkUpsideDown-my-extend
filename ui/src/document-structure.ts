@@ -3,6 +3,8 @@
  * Used by markdown-lint.ts (diagnostics) and MCP bridge (get_document_structure).
  */
 
+import { splitTableCells } from "./normalize.ts";
+
 export function isPositionInCode(doc: string, pos: number): boolean {
   const before = doc.slice(0, pos);
 
@@ -187,17 +189,12 @@ export function parseTables(lines: string[], codeRanges: [number, number][]): Ta
 
     if (tableLines.length < 2) continue;
 
-    const colCounts = tableLines.map(
-      (line) => line.replace(/^\|/, "").replace(/\|$/, "").split("|").length,
-    );
+    const colCounts = tableLines.map((line) => splitTableCells(line).length);
 
     const headerCols = colCounts[0];
-    const sepLine = tableLines[1];
-    const hasSeparator = sepLine
-      .replace(/^\|/, "")
-      .replace(/\|$/, "")
-      .split("|")
-      .every((cell) => /^\s*:?-+:?\s*$/.test(cell));
+    const hasSeparator = splitTableCells(tableLines[1]).every((cell) =>
+      /^\s*:?-+:?\s*$/.test(cell),
+    );
 
     const columnMismatch = colCounts.some((c) => c !== headerCols);
 
