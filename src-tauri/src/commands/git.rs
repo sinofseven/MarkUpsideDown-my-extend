@@ -330,18 +330,18 @@ pub async fn git_diff(repo_path: String, file_path: String, staged: bool) -> Res
 #[tauri::command]
 pub async fn git_discard(repo_path: String, file_path: String) -> Result<()> {
     spawn_blocking(move || {
-        // Check if the file is untracked
-        let status_output = run_git(&repo_path, &["status", "--porcelain", "--", &file_path])?;
+        // Hold GIT_LOCK for the entire check-then-act to prevent TOCTOU races
+        let _guard = GIT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let status_output =
+            run_git_unlocked(&repo_path, &["status", "--porcelain", "--", &file_path])?;
         let is_untracked = status_output.lines().any(|l| l.starts_with("??"));
 
         if is_untracked {
-            // Delete untracked file
             let full_path = std::path::Path::new(&repo_path).join(&file_path);
             std::fs::remove_file(&full_path)
                 .map_err(|e| AppError::Io(format!("Failed to delete {}: {e}", file_path)))?;
         } else {
-            // Restore tracked file
-            run_git(&repo_path, &["checkout", "--", &file_path])?;
+            run_git_unlocked(&repo_path, &["checkout", "--", &file_path])?;
         }
         Ok(())
     })

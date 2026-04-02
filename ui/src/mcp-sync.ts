@@ -122,89 +122,113 @@ export function syncEditorState(cachedContent?: string) {
   }, 2000);
 }
 
+let unlistenFns: Array<() => void> = [];
+
 export function initBridgeListeners() {
   if (!window.__TAURI__?.event) return;
+
+  // Clean up previous listeners to prevent accumulation
+  for (const fn of unlistenFns) fn();
+  unlistenFns = [];
 
   const { listen } = window.__TAURI__.event;
   const { invoke } = window.__TAURI__.core;
   const writeTextFile = (path: string, content: string) =>
     invoke("write_text_file", { path, content });
 
-  listen<string>("bridge:set-content", (event) => {
-    loadContentAsTab(event.payload);
-  });
+  const track = (p: Promise<() => void>) => {
+    p.then((fn) => unlistenFns.push(fn));
+  };
 
-  listen<{ text: string; position: string }>("bridge:insert-text", (event) => {
-    const { text, position } = event.payload;
-    let pos: number;
-    if (position === "start") {
-      pos = 0;
-    } else if (position === "end") {
-      pos = editor.state.doc.length;
-    } else {
-      pos = editor.state.selection.main.head;
-    }
-    editor.dispatch({ changes: { from: pos, insert: text } });
-    renderPreview(editor.state.doc.toString());
-    updateStatus();
-  });
+  track(
+    listen<string>("bridge:set-content", (event) => {
+      loadContentAsTab(event.payload);
+    }),
+  );
 
-  listen<string>("bridge:open-file", async (event) => {
-    const path = event.payload;
-    try {
-      const content = await invoke<string>("read_text_file", { path: path });
-      loadContentAsTab(content, path);
+  track(
+    listen<{ text: string; position: string }>("bridge:insert-text", (event) => {
+      const { text, position } = event.payload;
+      let pos: number;
+      if (position === "start") {
+        pos = 0;
+      } else if (position === "end") {
+        pos = editor.state.doc.length;
+      } else {
+        pos = editor.state.selection.main.head;
+      }
+      editor.dispatch({ changes: { from: pos, insert: text } });
+      renderPreview(editor.state.doc.toString());
+      updateStatus();
+    }),
+  );
+
+  track(
+    listen<string>("bridge:open-file", async (event) => {
+      const path = event.payload;
+      try {
+        const content = await invoke<string>("read_text_file", { path: path });
+        loadContentAsTab(content, path);
+        syncEditorState();
+      } catch (e) {
+        statusEl.textContent = `Open failed: ${e}`;
+      }
+    }),
+  );
+
+  track(
+    listen<string>("bridge:save-file", async (event) => {
+      const currentFilePath = getCurrentFilePath();
+      const path = event.payload || currentFilePath;
+      if (!path) return;
+      try {
+        suppressNext(path);
+        await writeTextFile(path, editor.state.doc.toString());
+        if (!currentFilePath) {
+          updateActiveTab({ path, name: basename(path) });
+          updateStatus();
+        }
+        const tab = getActiveTab();
+        if (tab) markTabSaved(tab.id);
+        if (getRootPath()) {
+          refreshGitAndSync();
+          refreshTree();
+        }
+      } catch (e) {
+        statusEl.textContent = `Save failed: ${e}`;
+      }
+    }),
+  );
+
+  track(
+    listen("bridge:normalize", () => {
+      const content = editor.state.doc.toString();
+      const cleaned = normalizeMarkdown(content);
+      if (cleaned !== content) {
+        editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: cleaned } });
+        renderPreview(cleaned);
+      }
+      syncEditorState(cleaned);
+    }),
+  );
+
+  track(
+    listen<{ path?: string; tab_id?: string }>("bridge:switch-tab", (event) => {
+      const { path, tab_id } = event.payload;
+      if (tab_id) {
+        switchTab(tab_id);
+      } else if (path) {
+        const tab = getTabByPath(path);
+        if (tab) switchTab(tab.id);
+      }
       syncEditorState();
-    } catch (e) {
-      statusEl.textContent = `Open failed: ${e}`;
-    }
-  });
+    }),
+  );
 
-  listen<string>("bridge:save-file", async (event) => {
-    const currentFilePath = getCurrentFilePath();
-    const path = event.payload || currentFilePath;
-    if (!path) return;
-    try {
-      suppressNext(path);
-      await writeTextFile(path, editor.state.doc.toString());
-      if (!currentFilePath) {
-        updateActiveTab({ path, name: basename(path) });
-        updateStatus();
-      }
-      const tab = getActiveTab();
-      if (tab) markTabSaved(tab.id);
-      if (getRootPath()) {
-        refreshGitAndSync();
-        refreshTree();
-      }
-    } catch (e) {
-      statusEl.textContent = `Save failed: ${e}`;
-    }
-  });
-
-  listen("bridge:normalize", () => {
-    const content = editor.state.doc.toString();
-    const cleaned = normalizeMarkdown(content);
-    if (cleaned !== content) {
-      editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: cleaned } });
-      renderPreview(cleaned);
-    }
-    syncEditorState(cleaned);
-  });
-
-  listen<{ path?: string; tab_id?: string }>("bridge:switch-tab", (event) => {
-    const { path, tab_id } = event.payload;
-    if (tab_id) {
-      switchTab(tab_id);
-    } else if (path) {
-      const tab = getTabByPath(path);
-      if (tab) switchTab(tab.id);
-    }
-    syncEditorState();
-  });
-
-  listen("bridge:tags-changed", async () => {
-    await reloadTags();
-    refreshTree();
-  });
+  track(
+    listen("bridge:tags-changed", async () => {
+      await reloadTags();
+      refreshTree();
+    }),
+  );
 }
