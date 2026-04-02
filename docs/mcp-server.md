@@ -208,7 +208,7 @@ Tags are stored in `.markupsidedown/tags.json` per project. Changes made via MCP
 |------|-------------|------------|
 | `semantic_search` | Search indexed documents using natural language | `query: string`, `limit?: number` |
 
-Requires Vectorize to be configured in the Worker. Documents must be indexed first via the `/embed` endpoint.
+Requires Vectorize to be configured in the Worker. Documents are auto-indexed when crawled or imported/converted via the app. Manual indexing is also available via the `/embed` endpoint.
 
 </details>
 

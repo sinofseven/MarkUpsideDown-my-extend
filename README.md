@@ -28,7 +28,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 - **Live preview** — Split-pane with real-time rendering, DOM-diffing (idiomorph), and bidirectional scroll sync
 - **Multi-tab editing** — Open multiple files in tabs, drag to reorder
 - **CodeMirror 6** — Syntax highlighting, line numbers, bracket matching, search & replace
-- **Command palette** — Fuzzy search over all commands (<kbd>Cmd</kbd>+<kbd>K</kbd>)
+- **Command palette** — Fuzzy search over all commands (<kbd>Cmd</kbd>+<kbd>K</kbd>); type `?` to switch to semantic search
 - **Formatting shortcuts** — Bold, italic, strikethrough, inline code, link insertion
 - **Document cleanup** — Normalize headings, tables, list markers, whitespace, CJK emphasis spacing in one click
 - **Markdown linting** — 11 structural checks: heading hierarchy, broken links, table formatting, CommonMark emphasis flanking, code blocks, footnotes, blank lines
@@ -43,6 +43,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 - **Auto link title** — Paste a URL to auto-fetch the page title and format as `[Title](url)`
 - **Smart typography** — Auto-convert `...` → `…`, `--` → `–`, `---` → `—` as you type
 - **Note refactor** — Extract selected text into a new linked Markdown file
+- **Semantic search** — Natural language search across indexed documents via Vectorize (<kbd>Cmd</kbd>+<kbd>5</kbd> or `?` in command palette); crawled and imported files are auto-indexed
 - **Auto-save & auto-reload** — File-backed tabs auto-save; external changes detected and reloaded
 - **SVG inlining** — Remote SVG images rendered inline with sanitization
 

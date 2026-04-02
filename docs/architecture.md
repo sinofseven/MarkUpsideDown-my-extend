@@ -70,7 +70,7 @@ MCP Server (mcp-server-rs/)
 | Document structure | Heading tree, links, tables, stats parser | `ui/src/document-structure.ts` |
 | Markdown lint | Structural linting (11 checks: headings, links, tables, emphasis flanking, code blocks, footnotes, etc.) | `ui/src/markdown-lint.ts` |
 | Image paste | Clipboard paste / drag-drop images to `./assets/` | `ui/src/image-paste.ts` |
-| Command palette | Fuzzy search over all commands (Cmd+K) | `ui/src/command-palette.ts` |
+| Command palette | Fuzzy search commands (Cmd+K), `?` prefix for semantic search | `ui/src/command-palette.ts` |
 | Frontmatter panel | Collapsible YAML frontmatter display | `ui/src/frontmatter-panel.ts` |
 | TOC panel | Heading navigation with active tracking (Cmd+4) | `ui/src/toc-panel.ts` |
 | Presentation mode | Slide presentation (split at `---`) | `ui/src/presentation.ts` |
