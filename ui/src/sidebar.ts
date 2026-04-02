@@ -1638,6 +1638,8 @@ async function promptNewFile(dirPath: string) {
     expandedDirs.add(dirPath);
     saveState();
     await refreshTree();
+    // Open the newly created file
+    onFileOpen?.("", path);
   } catch (e) {
     message(`Failed to create file: ${e}`, { kind: "error" });
   }

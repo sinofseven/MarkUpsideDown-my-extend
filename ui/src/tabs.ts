@@ -106,8 +106,12 @@ export function openTab(path: string | null, name: string, content: string): Tab
   if (path) {
     const existing = tabs.find((t) => t.path === path);
     if (existing) {
-      existing.content = content;
-      existing.savedContent = content;
+      // Only overwrite content if the tab is not dirty (unsaved edits)
+      const dirty = existing.savedContent !== null && existing.content !== existing.savedContent;
+      if (!dirty) {
+        existing.content = content;
+        existing.savedContent = content;
+      }
       if (existing.id === activeTabId) {
         // Already active but content was refreshed — update the editor
         onTabSwitch?.(existing);
