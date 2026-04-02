@@ -14,6 +14,7 @@ import { getRootPath } from "./sidebar.ts";
 import { suppressNext } from "./file-watcher.ts";
 import { getDocumentStructure } from "./document-structure.ts";
 import { normalizeMarkdown } from "./normalize.ts";
+import { writeTextFile } from "./html-utils.ts";
 import { reloadTags } from "./tags.ts";
 import { getLintDiagnostics, isLintEnabled } from "./markdown-lint.ts";
 
@@ -133,8 +134,6 @@ export function initBridgeListeners() {
 
   const { listen } = window.__TAURI__.event;
   const { invoke } = window.__TAURI__.core;
-  const writeTextFile = (path: string, content: string) =>
-    invoke("write_text_file", { path, content });
 
   const track = (p: Promise<() => void>) => {
     p.then((fn) => unlistenFns.push(fn));

@@ -1,12 +1,8 @@
 import type { EditorView } from "@codemirror/view";
 import { basename, dirname, buildRelativePath } from "./path-utils.ts";
+import { writeTextFile } from "./html-utils.ts";
 
 const { save } = window.__TAURI__.dialog;
-const { invoke } = window.__TAURI__.core;
-
-function writeTextFile(path: string, content: string): Promise<void> {
-  return invoke("write_text_file", { path, content });
-}
 
 interface NoteRefactorDeps {
   editor: EditorView;

@@ -101,33 +101,35 @@ export async function handleBatchFile(batchId: string, index: number, env: Env):
   return jsonResponse({ markdown });
 }
 
-/** Queue consumer: process batch conversion messages. */
+/** Queue consumer: process batch conversion messages concurrently. */
 export async function processBatchQueue(batch: MessageBatch<ConvertMessage>, env: Env): Promise<void> {
-  for (const msg of batch.messages) {
-    const { batchId, index, name } = msg.body;
-    try {
-      const dataKey = `batch:${batchId}:data:${index}`;
-      const content = await env.CACHE!.get(dataKey);
-      if (!content) {
-        await updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "failed", "File data expired or missing");
+  await Promise.allSettled(
+    batch.messages.map(async (msg) => {
+      const { batchId, index, name } = msg.body;
+      try {
+        const dataKey = `batch:${batchId}:data:${index}`;
+        const content = await env.CACHE!.get(dataKey);
+        if (!content) {
+          await updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "failed", "File data expired or missing");
+          msg.ack();
+          return;
+        }
+        const blob = base64ToBlob(content, name);
+        const result = await env.AI.toMarkdown([{ name, blob }]);
+        const markdown = result
+          .filter((r) => r.format === "markdown")
+          .map((r) => r.data)
+          .join("\n\n");
+        await Promise.all([
+          kvPut(env, `batch:${batchId}:${index}`, markdown, BATCH_TTL, { name }),
+          updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "done"),
+        ]);
+        await env.CACHE!.delete(dataKey);
         msg.ack();
-        continue;
+      } catch (e) {
+        await updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "failed", e instanceof Error ? e.message : String(e));
+        msg.retry();
       }
-      const blob = base64ToBlob(content, name);
-      const result = await env.AI.toMarkdown([{ name, blob }]);
-      const markdown = result
-        .filter((r) => r.format === "markdown")
-        .map((r) => r.data)
-        .join("\n\n");
-      await Promise.all([
-        kvPut(env, `batch:${batchId}:${index}`, markdown, BATCH_TTL, { name }),
-        updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "done"),
-      ]);
-      await env.CACHE!.delete(dataKey);
-      msg.ack();
-    } catch (e) {
-      await updateBatchFileStatus(env, `batch:${batchId}:status:${index}`, "failed", e instanceof Error ? e.message : String(e));
-      msg.retry();
-    }
-  }
+    }),
+  );
 }

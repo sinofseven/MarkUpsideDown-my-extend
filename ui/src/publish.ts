@@ -3,12 +3,9 @@
 
 import { basename } from "./path-utils.ts";
 import { workerFetch } from "./worker-fetch.ts";
+import { writeTextFile } from "./html-utils.ts";
 
 const { invoke } = window.__TAURI__.core;
-
-function writeTextFile(path: string, content: string): Promise<void> {
-  return invoke("write_text_file", { path, content });
-}
 const { join } = window.__TAURI__.path;
 
 // --- Types ---

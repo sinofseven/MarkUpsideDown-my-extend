@@ -8,12 +8,10 @@ import { indexDocument } from "./semantic-search.ts";
 import { getActiveTab, isTabDirty, markTabSaved, updateActiveTab } from "./tabs.ts";
 import { suppressNext } from "./file-watcher.ts";
 
+import { writeTextFile } from "./html-utils.ts";
+
 const { invoke } = window.__TAURI__.core;
 const { open, save, confirm } = window.__TAURI__.dialog;
-
-function writeTextFile(path: string, content: string): Promise<void> {
-  return invoke("write_text_file", { path, content });
-}
 
 export interface ConvertResult {
   markdown: string;

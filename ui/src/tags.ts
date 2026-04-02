@@ -1,10 +1,8 @@
 // File tagging system — stores tags in .markupsidedown/tags.json per project.
 
-const { invoke } = window.__TAURI__.core;
+import { writeTextFile } from "./html-utils.ts";
 
-function writeTextFile(path: string, content: string): Promise<void> {
-  return invoke("write_text_file", { path, content });
-}
+const { invoke } = window.__TAURI__.core;
 
 interface TagDef {
   color: string;

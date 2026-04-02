@@ -479,6 +479,18 @@ async function openFileByPath(path: string) {
 window.__TAURI__.event.listen<string>("cli:open-file", (e) => openFileByPath(e.payload));
 window.__TAURI__.event.listen<string>("menu:open-recent", (e) => openFileByPath(e.payload));
 
+async function openSearchResult(filePath: string) {
+  const root = getRootPath();
+  if (!root) return;
+  const absPath = `${root}/${filePath}`;
+  try {
+    const content = await invoke<string>("read_text_file", { path: absPath });
+    loadContentAsTab(content, absPath);
+  } catch (e) {
+    statusEl.textContent = `Failed to open: ${e}`;
+  }
+}
+
 // --- Scroll Sync Event Listeners ---
 
 cmScroller.addEventListener(
@@ -947,17 +959,7 @@ document.addEventListener("keydown", (e) => {
     toggleTocPanel();
   } else if (e.key === "5") {
     e.preventDefault();
-    openSearchUI(async (filePath: string) => {
-      const root = getRootPath();
-      if (!root) return;
-      const absPath = `${root}/${filePath}`;
-      try {
-        const content = await invoke<string>("read_text_file", { path: absPath });
-        loadContentAsTab(content, absPath);
-      } catch (err) {
-        statusEl.textContent = `Failed to open: ${err}`;
-      }
-    });
+    openSearchUI(openSearchResult);
   } else if (e.key === "c") {
     // Cmd+C with no selection: copy entire content from focused pane
     const active = document.activeElement;
@@ -991,17 +993,7 @@ document.addEventListener("keydown", (e) => {
 
 // --- Command Palette Registry ---
 
-setSemanticSearchHandler(async (filePath: string) => {
-  const root = getRootPath();
-  if (!root) return;
-  const absPath = `${root}/${filePath}`;
-  try {
-    const content = await invoke<string>("read_text_file", { path: absPath });
-    loadContentAsTab(content, absPath);
-  } catch (e) {
-    statusEl.textContent = `Failed to open: ${e}`;
-  }
-});
+setSemanticSearchHandler(openSearchResult);
 
 registerCommands([
   { id: "file.open", label: "Open File", shortcut: "⌘O", category: "File", run: openFile },
@@ -1143,18 +1135,7 @@ registerCommands([
     label: "Semantic Search",
     shortcut: "⌘5",
     category: "Search",
-    run: () =>
-      openSearchUI(async (filePath: string) => {
-        const root = getRootPath();
-        if (!root) return;
-        const absPath = `${root}/${filePath}`;
-        try {
-          const content = await invoke<string>("read_text_file", { path: absPath });
-          loadContentAsTab(content, absPath);
-        } catch (e) {
-          statusEl.textContent = `Failed to open: ${e}`;
-        }
-      }),
+    run: () => openSearchUI(openSearchResult),
   },
   {
     id: "app.settings",

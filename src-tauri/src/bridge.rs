@@ -440,6 +440,9 @@ async fn list_files(
     let Some(path) = path else {
         return not_found_json("No path specified and no project root available");
     };
+    if let Err(e) = commands::validate_path(&path) {
+        return e.to_bridge_json();
+    }
 
     if query.recursive.unwrap_or(false) {
         match list_recursive(&path).await {
@@ -513,6 +516,9 @@ async fn search_files(
     let Some(search_path) = search_path else {
         return not_found_json("No path specified and no project root available");
     };
+    if let Err(e) = commands::validate_path(&search_path) {
+        return e.to_bridge_json();
+    }
 
     // Fast path: use git ls-files for git repos
     if let Some(matches) = git_search_files(&search_path, &query.query).await {

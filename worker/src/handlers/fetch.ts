@@ -22,8 +22,8 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
 
   // KV cache lookup
   const bypass = shouldBypassCache(request);
+  const cacheKey = `md:fetch:${await sha256(body.url)}`;
   if (!bypass) {
-    const cacheKey = `md:fetch:${await sha256(body.url)}`;
     const cached = await kvGet(env, cacheKey);
     if (cached) {
       const parsed = JSON.parse(cached);
@@ -47,7 +47,6 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     if (contentType.includes("text/markdown")) {
       const markdown = await response.text();
       const result = { markdown, source: "markdown-for-agents", spa_detected: false };
-      const cacheKey = `md:fetch:${await sha256(body.url)}`;
       await kvPut(env, cacheKey, JSON.stringify(result), FETCH_KV_TTL, { url: body.url, endpoint: "fetch" });
       return jsonResponse({ ...result, cache: "miss" });
     }
@@ -57,7 +56,6 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     const spaDetected = detectSpa(html);
     const markdown = await htmlToMarkdown(html, env);
     const result = { markdown, source: "ai-to-markdown", spa_detected: spaDetected };
-    const cacheKey = `md:fetch:${await sha256(body.url)}`;
     await kvPut(env, cacheKey, JSON.stringify(result), FETCH_KV_TTL, { url: body.url, endpoint: "fetch" });
     return jsonResponse({ ...result, cache: "miss" });
   } catch (e) {

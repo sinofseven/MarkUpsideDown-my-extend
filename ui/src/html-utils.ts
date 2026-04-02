@@ -1,3 +1,8 @@
+/** Write a text file via Tauri IPC. Shared helper to avoid duplicating the invoke wrapper. */
+export function writeTextFile(path: string, content: string): Promise<void> {
+  return window.__TAURI__.core.invoke("write_text_file", { path, content });
+}
+
 /** Escape HTML special characters to prevent injection. */
 export function escapeHtml(s: string): string {
   return s

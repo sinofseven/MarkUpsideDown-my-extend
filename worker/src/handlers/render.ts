@@ -17,6 +17,7 @@ export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): P
   const edgeCacheKey = new Request(`${url.origin}/render?url=${encodeURIComponent(targetUrl)}`);
   const cache = caches.default;
 
+  const kvKey = `md:render:${await sha256(targetUrl)}`;
   if (!skipCache) {
     // Layer 1: Edge Cache API (fast)
     const cached = await cache.match(edgeCacheKey);
@@ -26,7 +27,6 @@ export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): P
       return new Response(cached.body, { status: cached.status, headers });
     }
     // Layer 2: KV cache (persistent)
-    const kvKey = `md:render:${await sha256(targetUrl)}`;
     const kvCached = await kvGet(env, kvKey);
     if (kvCached) {
       const parsed = JSON.parse(kvCached);
@@ -88,10 +88,7 @@ export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): P
             headers: { ...CORS_HEADERS, "content-type": "application/json", "cache-control": `public, max-age=${RENDER_CACHE_TTL}` },
           }),
         ),
-        (async () => {
-          const kvKey = `md:render:${await sha256(targetUrl)}`;
-          await kvPut(env, kvKey, resultJson, RENDER_KV_TTL, { url: targetUrl, endpoint: "render" });
-        })(),
+        kvPut(env, kvKey, resultJson, RENDER_KV_TTL, { url: targetUrl, endpoint: "render" }),
       ]),
     );
 
