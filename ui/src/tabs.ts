@@ -391,12 +391,6 @@ function renderTabs(): void {
     el.addEventListener("drop", (e) => handleTabDrop(e, tab.id));
     el.addEventListener("dragend", handleTabDragEnd);
 
-    const nameEl = document.createElement("span");
-    nameEl.className = "tab-name";
-    nameEl.textContent = tab.name;
-    nameEl.title = tab.path || tab.name;
-    el.appendChild(nameEl);
-
     const closeBtn = document.createElement("button");
     closeBtn.className = "tab-close";
     closeBtn.textContent = "×";
@@ -406,6 +400,12 @@ function renderTabs(): void {
       closeTab(tab.id);
     });
     el.appendChild(closeBtn);
+
+    const nameEl = document.createElement("span");
+    nameEl.className = "tab-name";
+    nameEl.textContent = tab.name;
+    nameEl.title = tab.path || tab.name;
+    el.appendChild(nameEl);
 
     el.addEventListener("click", () => {
       if (didDrag) {

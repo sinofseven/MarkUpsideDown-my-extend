@@ -88,7 +88,9 @@ function suggestFilename(): string | undefined {
     .replace(/[/\\:*?"<>|]/g, "")
     .trim()
     .replace(/\s+/g, "-");
-  return safe ? `${safe}.md` : undefined;
+  if (!safe) return undefined;
+  const root = getRootPath();
+  return root ? `${root}/${safe}.md` : `${safe}.md`;
 }
 
 // --- Save ---
