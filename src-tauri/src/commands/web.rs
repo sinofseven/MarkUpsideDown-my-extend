@@ -1,7 +1,38 @@
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::time::Duration;
 
 use super::files::validate_path;
+
+// --- Shared Worker Request Helper ---
+
+/// Trait for Worker API responses that carry an optional error field.
+pub(crate) trait HasWorkerError {
+    fn take_error(&mut self) -> Option<String>;
+}
+
+/// Send a request to the Worker, parse the JSON response, and check for errors.
+pub(crate) async fn worker_request<T: DeserializeOwned + HasWorkerError>(
+    request: reqwest::RequestBuilder,
+) -> Result<T, String> {
+    let response = request
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    let status = response.status();
+    let mut body: T = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {e}"))?;
+
+    if !status.is_success() {
+        return Err(body
+            .take_error()
+            .unwrap_or_else(|| format!("Worker returned {status}")));
+    }
+
+    Ok(body)
+}
 
 // --- Worker Health Check ---
 
@@ -189,6 +220,10 @@ struct RenderWorkerResponse {
     error: Option<String>,
 }
 
+impl HasWorkerError for RenderWorkerResponse {
+    fn take_error(&mut self) -> Option<String> { self.error.take() }
+}
+
 #[tauri::command]
 pub async fn fetch_rendered_url_as_markdown(
     url: String,
@@ -197,22 +232,10 @@ pub async fn fetch_rendered_url_as_markdown(
 ) -> Result<String, String> {
     let render_url = format!("{worker_url}/render?url={}", urlencoding::encode(&url));
 
-    let response = client
-        .get(&render_url)
-        .timeout(Duration::from_secs(60))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = response.status();
-    let body: RenderWorkerResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-    if !status.is_success() {
-        return Err(body.error.unwrap_or_else(|| format!("Worker returned {status}")));
-    }
+    let body: RenderWorkerResponse = worker_request(
+        client.get(&render_url).timeout(Duration::from_secs(60)),
+    )
+    .await?;
 
     body.markdown.ok_or_else(|| "No markdown in response".to_string())
 }
@@ -234,6 +257,10 @@ struct FetchWorkerResponse {
     error: Option<String>,
 }
 
+impl HasWorkerError for FetchWorkerResponse {
+    fn take_error(&mut self) -> Option<String> { self.error.take() }
+}
+
 #[tauri::command]
 pub async fn fetch_url_via_worker(
     url: String,
@@ -242,23 +269,13 @@ pub async fn fetch_url_via_worker(
 ) -> Result<WorkerFetchResult, String> {
     let fetch_url = format!("{}/fetch", worker_url.trim_end_matches('/'));
 
-    let response = client
-        .post(&fetch_url)
-        .timeout(Duration::from_secs(60))
-        .json(&serde_json::json!({ "url": url }))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = response.status();
-    let body: FetchWorkerResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-    if !status.is_success() {
-        return Err(body.error.unwrap_or_else(|| format!("Worker returned {status}")));
-    }
+    let body: FetchWorkerResponse = worker_request(
+        client
+            .post(&fetch_url)
+            .timeout(Duration::from_secs(60))
+            .json(&serde_json::json!({ "url": url })),
+    )
+    .await?;
 
     Ok(WorkerFetchResult {
         markdown: body.markdown.ok_or_else(|| "No markdown in response".to_string())?,
@@ -273,6 +290,10 @@ pub async fn fetch_url_via_worker(
 struct JsonWorkerResponse {
     data: Option<serde_json::Value>,
     error: Option<String>,
+}
+
+impl HasWorkerError for JsonWorkerResponse {
+    fn take_error(&mut self) -> Option<String> { self.error.take() }
 }
 
 #[derive(Serialize)]
@@ -290,31 +311,21 @@ pub async fn fetch_json_via_worker(
 ) -> Result<JsonExtractResult, String> {
     let json_url = format!("{}/json", worker_url.trim_end_matches('/'));
 
-    let mut body = serde_json::json!({ "url": url });
+    let mut req_body = serde_json::json!({ "url": url });
     if let Some(ref p) = prompt {
-        body["prompt"] = serde_json::json!(p);
+        req_body["prompt"] = serde_json::json!(p);
     }
     if let Some(ref rf) = response_format {
-        body["response_format"] = rf.clone();
+        req_body["response_format"] = rf.clone();
     }
 
-    let response = client
-        .post(&json_url)
-        .timeout(Duration::from_secs(60))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = response.status();
-    let resp: JsonWorkerResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-    if !status.is_success() {
-        return Err(resp.error.unwrap_or_else(|| format!("Worker returned {status}")));
-    }
+    let resp: JsonWorkerResponse = worker_request(
+        client
+            .post(&json_url)
+            .timeout(Duration::from_secs(60))
+            .json(&req_body),
+    )
+    .await?;
 
     Ok(JsonExtractResult {
         data: resp.data.ok_or_else(|| "No data in response".to_string())?,
@@ -412,6 +423,10 @@ struct ConvertWorkerResponse {
     warning: Option<String>,
 }
 
+impl HasWorkerError for ConvertWorkerResponse {
+    fn take_error(&mut self) -> Option<String> { self.error.take() }
+}
+
 #[derive(Serialize)]
 pub struct ConvertResponse {
     pub markdown: String,
@@ -437,24 +452,14 @@ pub async fn convert_file_to_markdown(
     )
     .ok_or_else(|| format!("Unsupported file extension: {}", file_path))?;
 
-    let response = client
-        .post(format!("{worker_url}/convert"))
-        .timeout(Duration::from_secs(120))
-        .header("Content-Type", mime_type)
-        .body(bytes)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = response.status();
-    let body: ConvertWorkerResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-    if !status.is_success() {
-        return Err(body.error.unwrap_or_else(|| format!("Worker returned {status}")));
-    }
+    let body: ConvertWorkerResponse = worker_request(
+        client
+            .post(format!("{worker_url}/convert"))
+            .timeout(Duration::from_secs(120))
+            .header("Content-Type", mime_type)
+            .body(bytes),
+    )
+    .await?;
 
     Ok(ConvertResponse {
         markdown: body.markdown.unwrap_or_default(),

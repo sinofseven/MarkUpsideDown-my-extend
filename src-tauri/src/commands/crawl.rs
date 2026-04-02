@@ -1,12 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+use super::web::{worker_request, HasWorkerError};
+
 // --- Website Crawl via Browser Rendering /crawl API ---
 
 #[derive(Deserialize)]
 struct CrawlStartWorkerResponse {
     job_id: Option<String>,
     error: Option<String>,
+}
+
+impl HasWorkerError for CrawlStartWorkerResponse {
+    fn take_error(&mut self) -> Option<String> { self.error.take() }
 }
 
 #[derive(Serialize)]
@@ -53,23 +59,13 @@ pub async fn crawl_website(
         }
     }
 
-    let response = client
-        .post(&crawl_url)
-        .timeout(Duration::from_secs(30))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = response.status();
-    let resp: CrawlStartWorkerResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-    if !status.is_success() {
-        return Err(resp.error.unwrap_or_else(|| format!("Worker returned {status}")));
-    }
+    let resp: CrawlStartWorkerResponse = worker_request(
+        client
+            .post(&crawl_url)
+            .timeout(Duration::from_secs(30))
+            .json(&body),
+    )
+    .await?;
 
     Ok(CrawlStartResult {
         job_id: resp.job_id.ok_or("No job_id in response")?,
@@ -100,6 +96,10 @@ struct CrawlStatusWorkerResponse {
     success: Option<bool>,
     result: Option<CrawlResultInner>,
     error: Option<String>,
+}
+
+impl HasWorkerError for CrawlStatusWorkerResponse {
+    fn take_error(&mut self) -> Option<String> { self.error.take() }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -135,22 +135,10 @@ pub async fn crawl_status(
         status_url.push_str(&format!("&cursor={}", urlencoding::encode(c)));
     }
 
-    let response = client
-        .get(&status_url)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = response.status();
-    let resp: CrawlStatusWorkerResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse response: {e}"))?;
-
-    if !status.is_success() {
-        return Err(resp.error.unwrap_or_else(|| format!("Worker returned {status}")));
-    }
+    let resp: CrawlStatusWorkerResponse = worker_request(
+        client.get(&status_url).timeout(Duration::from_secs(30)),
+    )
+    .await?;
 
     let result = resp.result.ok_or("No result in response")?;
 

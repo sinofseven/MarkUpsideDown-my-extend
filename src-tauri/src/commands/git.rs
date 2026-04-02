@@ -83,6 +83,15 @@ fn run_git_unlocked(repo_path: &str, args: &[&str]) -> Result<String, String> {
     run_cli("git", &full_args)
 }
 
+/// Run a blocking closure on the tokio thread pool, mapping join errors.
+async fn spawn_blocking<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("Task error: {e}"))?
+}
+
 #[derive(Serialize)]
 pub struct GitFileStatus {
     pub path: String,
@@ -103,14 +112,13 @@ pub struct GitStatus {
 
 #[tauri::command]
 pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
-    let rp = repo_path;
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         // Hold lock for all three commands to avoid racing with multi-step
         // operations like git_revert (stash -> revert -> pop).
         let _guard = GIT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let status_result = run_git_unlocked(&rp, &["status", "-b", "--porcelain=v1"]).ok();
-        let unstaged_raw = run_git_unlocked(&rp, &["diff", "--numstat"]).ok();
-        let staged_raw = run_git_unlocked(&rp, &["diff", "--cached", "--numstat"]).ok();
+        let status_result = run_git_unlocked(&repo_path, &["status", "-b", "--porcelain=v1"]).ok();
+        let unstaged_raw = run_git_unlocked(&repo_path, &["diff", "--numstat"]).ok();
+        let staged_raw = run_git_unlocked(&repo_path, &["diff", "--cached", "--numstat"]).ok();
 
         let output = match status_result {
             Some(o) => o,
@@ -232,7 +240,6 @@ pub async fn git_status(repo_path: String) -> Result<GitStatus, String> {
         })
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 fn parse_numstat_line(line: &str) -> Option<(u32, u32, String)> {
@@ -245,58 +252,46 @@ fn parse_numstat_line(line: &str) -> Option<(u32, u32, String)> {
 
 #[tauri::command]
 pub async fn git_stage_all(repo_path: String) -> Result<(), String> {
-    let rp = repo_path;
-    tokio::task::spawn_blocking(move || {
-        run_git(&rp, &["add", "-A"])?;
+    spawn_blocking(move || {
+        run_git(&repo_path, &["add", "-A"])?;
         Ok(())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub async fn git_stage(repo_path: String, file_path: String) -> Result<(), String> {
-    let rp = repo_path;
-    let fp = file_path;
-    tokio::task::spawn_blocking(move || {
-        run_git(&rp, &["add", "--", &fp])?;
+    spawn_blocking(move || {
+        run_git(&repo_path, &["add", "--", &file_path])?;
         Ok(())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub async fn git_unstage(repo_path: String, file_path: String) -> Result<(), String> {
-    let rp = repo_path;
-    let fp = file_path;
-    tokio::task::spawn_blocking(move || {
-        run_git(&rp, &["reset", "HEAD", "--", &fp])?;
+    spawn_blocking(move || {
+        run_git(&repo_path, &["reset", "HEAD", "--", &file_path])?;
         Ok(())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub async fn git_commit(repo_path: String, message: String) -> Result<String, String> {
-    let rp = repo_path;
-    let msg = message;
-    tokio::task::spawn_blocking(move || {
-        let output = run_git(&rp, &["commit", "-m", &msg])?;
+    spawn_blocking(move || {
+        let output = run_git(&repo_path, &["commit", "-m", &message])?;
         Ok(output.trim().to_string())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 async fn git_remote_command(repo_path: String, cmd: &'static str) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         let output = run_git(&repo_path, &[cmd])?;
         Ok(output.trim().to_string())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
@@ -318,7 +313,7 @@ pub async fn git_fetch(repo_path: String) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn git_diff(repo_path: String, file_path: String, staged: bool) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         let mut args = vec!["diff"];
         if staged {
             args.push("--cached");
@@ -328,14 +323,13 @@ pub async fn git_diff(repo_path: String, file_path: String, staged: bool) -> Res
         run_git(&repo_path, &args)
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 // --- Discard ---
 
 #[tauri::command]
 pub async fn git_discard(repo_path: String, file_path: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         // Check if the file is untracked
         let status_output = run_git(&repo_path, &["status", "--porcelain", "--", &file_path])?;
         let is_untracked = status_output.lines().any(|l| l.starts_with("??"));
@@ -352,12 +346,11 @@ pub async fn git_discard(repo_path: String, file_path: String) -> Result<(), Str
         Ok(())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub async fn git_discard_all(repo_path: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         // Restore all tracked files
         run_git(&repo_path, &["checkout", "--", "."])?;
         // Remove all untracked files and directories
@@ -365,7 +358,6 @@ pub async fn git_discard_all(repo_path: String) -> Result<(), String> {
         Ok(())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 // --- Log ---
@@ -382,7 +374,7 @@ pub struct GitLogEntry {
 #[tauri::command]
 pub async fn git_log(repo_path: String, limit: Option<u32>) -> Result<Vec<GitLogEntry>, String> {
     let limit = limit.unwrap_or(10);
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         let limit_str = format!("-{}", limit);
         let output = run_git(
             &repo_path,
@@ -409,14 +401,13 @@ pub async fn git_log(repo_path: String, limit: Option<u32>) -> Result<Vec<GitLog
         Ok(entries)
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 // --- Revert ---
 
 #[tauri::command]
 pub async fn git_revert(repo_path: String, commit_hash: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         let _guard = GIT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
         // Require clean working tree
@@ -441,36 +432,32 @@ pub async fn git_revert(repo_path: String, commit_hash: String) -> Result<String
         Ok(commit_result.trim().to_string())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 // --- Show commit diff ---
 
 #[tauri::command]
 pub async fn git_show(repo_path: String, commit_hash: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         run_git(&repo_path, &["show", "--patch", "--format=", &commit_hash])
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 // --- Clone ---
 
 #[tauri::command]
 pub async fn git_clone(url: String, dest: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         run_cli("git", &["clone", &url, &dest]).map(|s| s.trim().to_string())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
 
 #[tauri::command]
 pub async fn git_init(repo_path: String) -> Result<String, String> {
-    tokio::task::spawn_blocking(move || {
+    spawn_blocking(move || {
         run_cli("git", &["init", &repo_path]).map(|s| s.trim().to_string())
     })
     .await
-    .map_err(|e| format!("Task error: {e}"))?
 }
