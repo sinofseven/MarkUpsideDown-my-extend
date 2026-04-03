@@ -1200,4 +1200,4 @@ checkFirstRun();
 checkForUpdate();
 
 // Preload heavy optional modules during idle time
-requestIdleCallback(() => getMermaid());
+(globalThis.requestIdleCallback ?? setTimeout)(() => getMermaid());

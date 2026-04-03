@@ -117,7 +117,8 @@ const mathExtension = {
         return src.indexOf("$");
       },
       tokenizer(src: string) {
-        const match = src.match(/^\$([^\s$](?:[^$]*[^\s$])?)\$/);
+        // (?!\d) prevents matching currency like $0.01
+        const match = src.match(/^\$(?!\d)([^\s$](?:[^$\n]*[^\s$])?)\$/);
         if (match) {
           return { type: "mathInline", raw: match[0], text: match[1] };
         }
@@ -211,98 +212,105 @@ function slAttr(sourceLine: number | undefined) {
 
 // --- Shared renderer ---
 
-const previewRenderer = new marked.Renderer() as any;
-previewRenderer.code = function ({ text, lang, _sourceLine }: any) {
-  const sl = slAttr(_sourceLine);
-  // Parse lang:filename (e.g. "ts:src/main.ts")
-  let hlLang = lang || "";
-  let filename = "";
-  const colonIdx = hlLang.indexOf(":");
-  if (colonIdx > 0) {
-    filename = hlLang.slice(colonIdx + 1);
-    hlLang = hlLang.slice(0, colonIdx);
-  }
-  if (hlLang === "mermaid") {
-    return `<div${sl} class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
-  }
-  const escaped = escapeHtml(text);
-  const langAttr = hlLang ? ` data-hljs-lang="${hlLang}"` : "";
-  const filenameEl = filename ? `<div class="code-filename">${escapeHtml(filename)}</div>` : "";
-  return `${filenameEl}<pre${sl}><code class="hljs"${langAttr}>${escaped}</code></pre>`;
-};
-previewRenderer.heading = function (this: any, { tokens, depth, _sourceLine }: any) {
-  return `<h${depth}${slAttr(_sourceLine)}>${this.parser.parseInline(tokens)}</h${depth}>\n`;
-};
-previewRenderer.paragraph = function (this: any, { tokens, _sourceLine }: any) {
-  return `<p${slAttr(_sourceLine)}>${this.parser.parseInline(tokens)}</p>\n`;
-};
-previewRenderer.blockquote = function (this: any, { tokens, _sourceLine }: any) {
-  const alertTypes: Record<string, { icon: string; label: string }> = {
-    NOTE: { icon: "ℹ", label: "Note" },
-    TIP: { icon: "💡", label: "Tip" },
-    IMPORTANT: { icon: "❗", label: "Important" },
-    WARNING: { icon: "⚠", label: "Warning" },
-    CAUTION: { icon: "🔴", label: "Caution" },
-  };
-  const first = tokens[0];
-  if (first?.type === "paragraph" && first.tokens?.length > 0) {
-    const text = first.tokens[0]?.text as string | undefined;
-    if (text) {
-      const m = text.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/);
-      if (m) {
-        const type = m[1] as string;
-        const alert = alertTypes[type]!;
-        const clone = structuredClone(tokens);
-        const firstClone = clone[0];
-        firstClone.tokens[0] = {
-          ...firstClone.tokens[0],
-          raw: firstClone.tokens[0].raw.slice(m[0].length),
-          text: firstClone.tokens[0].text.slice(m[0].length),
-        };
-        if (!firstClone.tokens[0].text && firstClone.tokens.length > 1) {
-          const next = firstClone.tokens[1];
-          if (next?.type === "br" || (next?.type === "text" && next.text === "\n")) {
-            firstClone.tokens.splice(0, 2);
-          } else {
-            firstClone.tokens.splice(0, 1);
+// Register custom renderer via marked.use() so extension token renderers
+// (mathInline, mathBlock, figureBlock) remain accessible during parsing.
+// Previously, passing a Renderer instance to marked.parser() would shadow
+// extension renderers, causing "Token with 'mathInline' type was not found"
+// errors on documents containing dollar signs (e.g. "$0.01").
+marked.use({
+  renderer: {
+    code({ text, lang, _sourceLine }: any) {
+      const sl = slAttr(_sourceLine);
+      let hlLang = lang || "";
+      let filename = "";
+      const colonIdx = hlLang.indexOf(":");
+      if (colonIdx > 0) {
+        filename = hlLang.slice(colonIdx + 1);
+        hlLang = hlLang.slice(0, colonIdx);
+      }
+      if (hlLang === "mermaid") {
+        return `<div${sl} class="mermaid-container" data-mermaid-source="${encodeURIComponent(text)}"></div>`;
+      }
+      const escaped = escapeHtml(text);
+      const langAttr = hlLang ? ` data-hljs-lang="${hlLang}"` : "";
+      const filenameEl = filename ? `<div class="code-filename">${escapeHtml(filename)}</div>` : "";
+      return `${filenameEl}<pre${sl}><code class="hljs"${langAttr}>${escaped}</code></pre>`;
+    },
+    heading(this: any, { tokens, depth, _sourceLine }: any) {
+      return `<h${depth}${slAttr(_sourceLine)}>${this.parser.parseInline(tokens)}</h${depth}>\n`;
+    },
+    paragraph(this: any, { tokens, _sourceLine }: any) {
+      return `<p${slAttr(_sourceLine)}>${this.parser.parseInline(tokens)}</p>\n`;
+    },
+    blockquote(this: any, { tokens, _sourceLine }: any) {
+      const alertTypes: Record<string, { icon: string; label: string }> = {
+        NOTE: { icon: "ℹ", label: "Note" },
+        TIP: { icon: "💡", label: "Tip" },
+        IMPORTANT: { icon: "❗", label: "Important" },
+        WARNING: { icon: "⚠", label: "Warning" },
+        CAUTION: { icon: "🔴", label: "Caution" },
+      };
+      const first = tokens[0];
+      if (first?.type === "paragraph" && first.tokens?.length > 0) {
+        const text = first.tokens[0]?.text as string | undefined;
+        if (text) {
+          const m = text.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/);
+          if (m) {
+            const type = m[1] as string;
+            const alert = alertTypes[type]!;
+            const clone = structuredClone(tokens);
+            const firstClone = clone[0];
+            firstClone.tokens[0] = {
+              ...firstClone.tokens[0],
+              raw: firstClone.tokens[0].raw.slice(m[0].length),
+              text: firstClone.tokens[0].text.slice(m[0].length),
+            };
+            if (!firstClone.tokens[0].text && firstClone.tokens.length > 1) {
+              const next = firstClone.tokens[1];
+              if (next?.type === "br" || (next?.type === "text" && next.text === "\n")) {
+                firstClone.tokens.splice(0, 2);
+              } else {
+                firstClone.tokens.splice(0, 1);
+              }
+            }
+            firstClone.raw = firstClone.tokens.map((t: any) => t.raw).join("");
+            firstClone.text = firstClone.tokens.map((t: any) => t.text ?? t.raw).join("");
+            const body = this.parser.parse(clone);
+            const typeLower = type.toLowerCase();
+            return `<blockquote class="gfm-alert gfm-alert-${typeLower}"${slAttr(_sourceLine)}>\n<p class="gfm-alert-title"><span class="gfm-alert-icon">${alert.icon}</span> ${alert.label}</p>\n${body}</blockquote>\n`;
           }
         }
-        firstClone.raw = firstClone.tokens.map((t: any) => t.raw).join("");
-        firstClone.text = firstClone.tokens.map((t: any) => t.text ?? t.raw).join("");
-        const body = this.parser.parse(clone);
-        const typeLower = type.toLowerCase();
-        return `<blockquote class="gfm-alert gfm-alert-${typeLower}"${slAttr(_sourceLine)}>\n<p class="gfm-alert-title"><span class="gfm-alert-icon">${alert.icon}</span> ${alert.label}</p>\n${body}</blockquote>\n`;
       }
-    }
-  }
-  return `<blockquote${slAttr(_sourceLine)}>\n${this.parser.parse(tokens)}</blockquote>\n`;
-};
-previewRenderer.list = function (this: any, { items, ordered, start, _sourceLine }: any) {
-  const tag = ordered ? "ol" : "ul";
-  const startAttr = ordered && start !== 1 ? ` start="${start}"` : "";
-  const body = items.map((item: any) => this.listitem(item)).join("");
-  return `<${tag}${startAttr}${slAttr(_sourceLine)}>\n${body}</${tag}>\n`;
-};
-previewRenderer.listitem = function (this: any, { tokens, _sourceLine }: any) {
-  return `<li${slAttr(_sourceLine)}>${this.parser.parse(tokens)}</li>\n`;
-};
-previewRenderer.table = function (this: any, { header, rows, _sourceLine }: any) {
-  const headerRow = `<tr>${header.map((h: any) => `<th${h.align ? ` align="${h.align}"` : ""}>${this.parser.parseInline(h.tokens)}</th>`).join("")}</tr>`;
-  const bodyRows = rows
-    .map(
-      (row: any) =>
-        `<tr>${row.map((c: any) => `<td${c.align ? ` align="${c.align}"` : ""}>${this.parser.parseInline(c.tokens)}</td>`).join("")}</tr>`,
-    )
-    .join("\n");
-  const tbody = bodyRows ? `<tbody>${bodyRows}</tbody>` : "";
-  return `<div class="table-wrapper"${slAttr(_sourceLine)}><table><thead>${headerRow}</thead>${tbody}</table></div>\n`;
-};
-previewRenderer.hr = function ({ _sourceLine }: any) {
-  return `<hr${slAttr(_sourceLine)}>\n`;
-};
-previewRenderer.html = function ({ text, _sourceLine }: any) {
-  return _sourceLine ? text.replace(/^<(\w+)/, `<$1${slAttr(_sourceLine)}`) : text;
-};
+      return `<blockquote${slAttr(_sourceLine)}>\n${this.parser.parse(tokens)}</blockquote>\n`;
+    },
+    list(this: any, { items, ordered, start, _sourceLine }: any) {
+      const tag = ordered ? "ol" : "ul";
+      const startAttr = ordered && start !== 1 ? ` start="${start}"` : "";
+      const body = items.map((item: any) => this.listitem(item)).join("");
+      return `<${tag}${startAttr}${slAttr(_sourceLine)}>\n${body}</${tag}>\n`;
+    },
+    listitem(this: any, { tokens, _sourceLine }: any) {
+      return `<li${slAttr(_sourceLine)}>${this.parser.parse(tokens)}</li>\n`;
+    },
+    table(this: any, { header, rows, _sourceLine }: any) {
+      const headerRow = `<tr>${header.map((h: any) => `<th${h.align ? ` align="${h.align}"` : ""}>${this.parser.parseInline(h.tokens)}</th>`).join("")}</tr>`;
+      const bodyRows = rows
+        .map(
+          (row: any) =>
+            `<tr>${row.map((c: any) => `<td${c.align ? ` align="${c.align}"` : ""}>${this.parser.parseInline(c.tokens)}</td>`).join("")}</tr>`,
+        )
+        .join("\n");
+      const tbody = bodyRows ? `<tbody>${bodyRows}</tbody>` : "";
+      return `<div class="table-wrapper"${slAttr(_sourceLine)}><table><thead>${headerRow}</thead>${tbody}</table></div>\n`;
+    },
+    hr({ _sourceLine }: any) {
+      return `<hr${slAttr(_sourceLine)}>\n`;
+    },
+    html({ text, _sourceLine }: any) {
+      return _sourceLine ? text.replace(/^<(\w+)/, `<$1${slAttr(_sourceLine)}`) : text;
+    },
+  },
+});
 
 // --- SVG inlining ---
 
@@ -380,7 +388,7 @@ export async function renderPreview(source: string) {
   const tokens = marked.lexer(fixCjkEmphasis(source));
   annotateTokensWithSourceLines(tokens);
 
-  const html = marked.parser(tokens, { renderer: previewRenderer });
+  const html = marked.parser(tokens);
 
   const sanitizedHtml = DOMPurify.sanitize(
     `<article class="preview-page" lang="en">${html}</article>`,
