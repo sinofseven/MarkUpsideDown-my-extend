@@ -2342,7 +2342,7 @@ dependencies = [
 
 [[package]]
 name = "markupsidedown"
-version = "0.1.152"
+version = "0.1.153"
 dependencies = [
  "axum",
  "comrak",
