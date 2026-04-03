@@ -11,6 +11,11 @@ const watchers = new Map<string, UnwatchFn>();
 const suppressUntil = new Map<string, number>();
 const SUPPRESS_WINDOW_MS = 1000;
 
+// Per-path debounce for reload: coalesces rapid external changes (e.g. Claude Code
+// writing multiple times within a second) into a single reload.
+const reloadTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const RELOAD_DEBOUNCE_MS = 800;
+
 // Poll fallback: macOS FSEvents can miss events for individual file watches,
 // especially with atomic writes (write temp → rename). Periodic content polling
 // catches changes the watcher misses.
@@ -57,19 +62,31 @@ async function reloadPath(path: string) {
   await deps.reloadTab(path);
 }
 
-async function handleReload(event: WatchEvent) {
+function scheduleReload(path: string) {
+  const existing = reloadTimers.get(path);
+  if (existing) clearTimeout(existing);
+  reloadTimers.set(
+    path,
+    setTimeout(() => {
+      reloadTimers.delete(path);
+      reloadPath(path);
+    }, RELOAD_DEBOUNCE_MS),
+  );
+}
+
+function handleReload(event: WatchEvent) {
   for (const path of event.paths) {
     if (!path || isRecentlySuppressed(path)) continue;
-    await reloadPath(path);
+    scheduleReload(path);
   }
 }
 
-async function onFileChanged(event: WatchEvent) {
+function onFileChanged(event: WatchEvent) {
   const kind = event.type;
 
   // 'any' — generic event (common on macOS FSEvents); treat as modify
   if (kind === "any") {
-    await handleReload(event);
+    handleReload(event);
     return;
   }
 
@@ -89,7 +106,7 @@ async function onFileChanged(event: WatchEvent) {
   // Create events cover atomic writes (write temp file → rename over original)
   // used by most editors (Vim, Zed, sed -i) and tools (Claude Code Edit)
   if ("modify" in kind || "create" in kind) {
-    await handleReload(event);
+    handleReload(event);
   }
 }
 
@@ -137,11 +154,18 @@ export function stopWatching(filePath: string) {
     unwatch();
     watchers.delete(filePath);
   }
+  const timer = reloadTimers.get(filePath);
+  if (timer) {
+    clearTimeout(timer);
+    reloadTimers.delete(filePath);
+  }
 }
 
 export function stopAll() {
   for (const unwatch of watchers.values()) unwatch();
   watchers.clear();
+  for (const timer of reloadTimers.values()) clearTimeout(timer);
+  reloadTimers.clear();
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
