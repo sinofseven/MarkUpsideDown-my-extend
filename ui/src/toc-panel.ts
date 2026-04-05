@@ -9,6 +9,7 @@ let panelEl: HTMLElement | null = null;
 let editor: EditorView;
 let collapsed = true;
 let lastHeadings: Heading[] = [];
+let lastContent: string | null = null;
 
 export function initTocPanel(ed: EditorView, container: HTMLElement) {
   editor = ed;
@@ -41,6 +42,8 @@ export function initTocPanel(ed: EditorView, container: HTMLElement) {
 
 export function updateTocPanel(content: string) {
   if (!panelEl) return;
+  if (content === lastContent) return;
+  lastContent = content;
 
   const lines = content.split("\n");
   const codeRanges = findCodeBlockRanges(lines);

@@ -9,6 +9,7 @@ let panelEl: HTMLElement | null = null;
 let editor: EditorView;
 let lastFm: FrontmatterInfo | null = null;
 let lastFmRaw: string | null = null;
+let lastContent: string | null = null;
 
 export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
   editor = ed;
@@ -41,6 +42,8 @@ export function initFrontmatterPanel(ed: EditorView, container: HTMLElement) {
 
 export function updateFrontmatterPanel(content: string) {
   if (!panelEl) return;
+  if (content === lastContent) return;
+  lastContent = content;
 
   const lines = content.split("\n");
   const fm = parseFrontmatter(lines);

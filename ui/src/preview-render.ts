@@ -210,6 +210,16 @@ function slAttr(sourceLine: number | undefined) {
   return sourceLine ? ` data-source-line="${sourceLine}"` : "";
 }
 
+// --- GFM alert types (hoisted for hot-path reuse) ---
+
+const ALERT_TYPES: Record<string, { icon: string; label: string }> = {
+  NOTE: { icon: "ℹ", label: "Note" },
+  TIP: { icon: "💡", label: "Tip" },
+  IMPORTANT: { icon: "❗", label: "Important" },
+  WARNING: { icon: "⚠", label: "Warning" },
+  CAUTION: { icon: "🔴", label: "Caution" },
+};
+
 // --- Shared renderer ---
 
 // Register custom renderer via marked.use() so extension token renderers
@@ -243,13 +253,6 @@ marked.use({
       return `<p${slAttr(_sourceLine)}>${this.parser.parseInline(tokens)}</p>\n`;
     },
     blockquote(this: any, { tokens, _sourceLine }: any) {
-      const alertTypes: Record<string, { icon: string; label: string }> = {
-        NOTE: { icon: "ℹ", label: "Note" },
-        TIP: { icon: "💡", label: "Tip" },
-        IMPORTANT: { icon: "❗", label: "Important" },
-        WARNING: { icon: "⚠", label: "Warning" },
-        CAUTION: { icon: "🔴", label: "Caution" },
-      };
       const first = tokens[0];
       if (first?.type === "paragraph" && first.tokens?.length > 0) {
         const text = first.tokens[0]?.text as string | undefined;
@@ -257,7 +260,7 @@ marked.use({
           const m = text.match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/);
           if (m) {
             const type = m[1] as string;
-            const alert = alertTypes[type]!;
+            const alert = ALERT_TYPES[type]!;
             const clone = structuredClone(tokens);
             const firstClone = clone[0];
             firstClone.tokens[0] = {

@@ -18,6 +18,7 @@ import {
   KEY_SIDEBAR_SHOW_DOTFILES,
   windowKey,
 } from "./storage-keys.ts";
+import { getStorageBool, setStorageBool } from "./storage-utils.ts";
 import {
   loadTags,
   getFileTags,
@@ -166,7 +167,7 @@ function updateSelectionDOM() {
 type SortBy = "name" | "date" | "type" | "tag";
 let sortBy: SortBy = (localStorage.getItem(KEY_SIDEBAR_SORT) as SortBy) || "name";
 let tagFilter: string | null = null; // null = no filter, string = filter by tag name
-let showDotfiles = localStorage.getItem(KEY_SIDEBAR_SHOW_DOTFILES) !== "0"; // default: show
+let showDotfiles = getStorageBool(KEY_SIDEBAR_SHOW_DOTFILES, true);
 
 export type SidebarPanel = "files" | "git" | "clone";
 let activePanel: SidebarPanel = "files";
@@ -275,7 +276,7 @@ function populateHeaderActions(container: Element) {
       '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2"/></svg>';
     dotBtn.addEventListener("click", () => {
       showDotfiles = !showDotfiles;
-      localStorage.setItem(KEY_SIDEBAR_SHOW_DOTFILES, showDotfiles ? "1" : "0");
+      setStorageBool(KEY_SIDEBAR_SHOW_DOTFILES, showDotfiles);
       dotBtn.title = showDotfiles ? "Hide dotfiles" : "Show dotfiles";
       dotBtn.className = showDotfiles ? "dotfile-toggle active" : "dotfile-toggle";
       refreshTree();
@@ -1542,7 +1543,7 @@ function showMultiContextMenu(event: MouseEvent) {
   if (rootPath) {
     const convertiblePaths = [...selectedPaths].filter((p) => {
       const ext = getExtension(basename(p));
-      return IMPORT_EXTENSIONS.has(ext);
+      return IMPORT_EXTENSIONS.includes(ext);
     });
     if (convertiblePaths.length > 0) {
       items.push(null);
