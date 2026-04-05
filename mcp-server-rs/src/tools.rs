@@ -405,20 +405,6 @@ impl McpTools {
         Ok(url)
     }
 
-    // --- Window Tools ---
-
-    #[tool(name = "list_windows", description = "List all open MarkUpsideDown windows with their labels and project root paths. Shows which window is currently focused. Useful for multi-window workflows.", annotations(read_only_hint = true, open_world_hint = false))]
-    async fn list_windows(&self) -> Result<CallToolResult, rmcp::ErrorData> {
-        match self.bridge.list_windows().await {
-            Ok((windows, focused)) => {
-                let json = serde_json::json!({ "windows": windows, "focused": focused });
-                let text = serde_json::to_string_pretty(&json).unwrap_or_default();
-                Ok(CallToolResult::success(vec![Content::text(text)]))
-            }
-            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
-        }
-    }
-
     // --- Editor Tools (require running app) ---
 
     #[tool(name = "get_editor_content", description = "Get current Markdown content from the editor", annotations(read_only_hint = true, open_world_hint = false))]
@@ -1899,6 +1885,19 @@ impl McpTools {
         }
     }
 
+    // --- Window Tools ---
+
+    #[tool(name = "list_windows", description = "List all open MarkUpsideDown windows with their labels and project root paths. Shows which window is currently focused. Useful for multi-window workflows.", annotations(read_only_hint = true, open_world_hint = false))]
+    async fn list_windows(&self) -> Result<CallToolResult, rmcp::ErrorData> {
+        match self.bridge.list_windows().await {
+            Ok((windows, focused)) => {
+                let json = serde_json::json!({ "windows": windows, "focused": focused });
+                let text = serde_json::to_string_pretty(&json).unwrap_or_default();
+                Ok(CallToolResult::success(vec![Content::text(text)]))
+            }
+            Err(e) => Ok(CallToolResult::error(vec![Content::text(e)])),
+        }
+    }
 }
 
 #[tool_handler]

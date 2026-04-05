@@ -340,14 +340,46 @@ if should_run "git-write"; then
         FAILURES+=("git_pull")
       fi
 
-      # git_commit, git_push, git_revert, git_discard_all — skip in automated test
-      # These are destructive and need careful setup
-      skip_test "git_commit" "destructive — test manually"
+      # git_commit + git_revert: create temp commit then revert it
+      TEMP_REVERT_FILE="${ROOT}/.mcp-revert-test.tmp"
+      echo "revert-test" > "$TEMP_REVERT_FILE"
+      curl -sf -X POST -H "Content-Type: application/json" \
+        -d '{"path":".mcp-revert-test.tmp"}' "${BASE_URL}/git/stage" > /dev/null 2>&1
+
+      test_post "git_commit" "/git/commit" \
+        '{"message":"test: temp commit for git_revert E2E test"}' 'has("output")'
+
+      REVERT_HASH=$(curl -sf "${BASE_URL}/git/log?limit=1" | jq -r '.entries[0].hash // ""')
+      if [[ -n "$REVERT_HASH" ]]; then
+        test_post "git_revert" "/git/revert" \
+          "{\"commit_hash\":\"${REVERT_HASH}\"}" 'has("output")'
+
+        # Clean up: reset the 2 test commits (local only)
+        git -C "$ROOT" reset --soft HEAD~2 > /dev/null 2>&1
+        git -C "$ROOT" reset HEAD -- . > /dev/null 2>&1
+      else
+        echo -e "  ${RED}FAIL${NC} git_revert — no commit hash"
+        FAIL=$((FAIL + 1))
+        FAILURES+=("git_revert")
+      fi
+      rm -f "$TEMP_REVERT_FILE" 2>/dev/null
+
+      # git_clone: clone a small public repo to /tmp
+      CLONE_DEST="/tmp/mcp-clone-test-$$"
+      test_post "git_clone" "/git/clone" \
+        "{\"url\":\"https://github.com/octocat/Hello-World.git\",\"dest\":\"${CLONE_DEST}\"}" 'has("output")'
+      rm -rf "$CLONE_DEST" 2>/dev/null
+
+      # git_init: initialize a temp directory
+      INIT_DIR="/tmp/mcp-init-test-$$"
+      mkdir -p "$INIT_DIR"
+      test_post "git_init" "/git/init" \
+        "{\"path\":\"${INIT_DIR}\"}" 'has("output")'
+      rm -rf "$INIT_DIR" 2>/dev/null
+
+      # git_push, git_discard_all — skip in automated test (destructive)
       skip_test "git_push" "destructive — test manually"
-      skip_test "git_revert" "destructive — test manually"
       skip_test "git_discard_all" "destructive — test manually"
-      skip_test "git_clone" "requires URL and dest — test manually"
-      skip_test "git_init" "requires empty dir — test manually"
     fi
   fi
 fi
