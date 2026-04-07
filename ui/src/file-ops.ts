@@ -3,7 +3,7 @@ import { basename, getExtension, IMAGE_EXTENSIONS, MD_EXTENSIONS } from "./path-
 import { ensureWorkerUrl, isImageConversionAllowed, isAutoSaveEnabled } from "./settings.ts";
 import { getUrlAsMarkdown, fetchUrlAsMarkdown, renderUrlAsMarkdown } from "./fetch-markdown.ts";
 import { normalizeMarkdown } from "./normalize.ts";
-import { getRootPath, refreshTree } from "./sidebar.ts";
+import { getRootPath, refreshTree, hasPendingExternalDrop } from "./sidebar.ts";
 import { indexDocument } from "./semantic-search.ts";
 import { getActiveTab, isTabDirty, markTabSaved, updateActiveTab } from "./tabs.ts";
 import { suppressNext } from "./file-watcher.ts";
@@ -365,6 +365,9 @@ export function initDragDrop(appEl: HTMLElement) {
 
   if (window.__TAURI__?.event) {
     window.__TAURI__.event.listen<{ paths: string[] }>("tauri://drag-drop", async (event) => {
+      // Sidebar handles its own external drops
+      if (hasPendingExternalDrop()) return;
+
       const paths = event.payload.paths;
       if (!paths || paths.length === 0) return;
 
