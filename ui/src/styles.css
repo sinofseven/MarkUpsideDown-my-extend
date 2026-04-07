@@ -3361,6 +3361,12 @@ body {
   line-height: 1.5;
 }
 
+.settings-mcp-warning {
+  color: var(--warning, #d4a017);
+  font-style: normal;
+  margin-top: 8px;
+}
+
 /* Crawl dialog */
 .crawl-dialog-overlay {
   position: fixed;

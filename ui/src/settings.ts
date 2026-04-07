@@ -1033,6 +1033,9 @@ function renderClaudeDesktopCodeTab(container: HTMLElement, binaryPath: string, 
     <div class="settings-mcp-note">
       Changes to files are auto-detected by MarkUpsideDown's file-watcher — no manual reload needed.
     </div>
+    <div class="settings-mcp-note settings-mcp-warning">
+      ⚠ The config contains your secret Worker URL. Do not commit <code>.mcp.json</code> to public repositories — add it to <code>.gitignore</code>.
+    </div>
   `;
   for (const btn of container.querySelectorAll<HTMLButtonElement>(".settings-mcp-copy-btn")) {
     btn.addEventListener("click", async () => {
@@ -1067,6 +1070,9 @@ function renderClaudeCodeTerminalTab(
     <div class="settings-mcp-config-label">Add to <code>.mcp.json</code> in your project root, or <code>~/.claude/settings.json</code> (global)</div>
     <pre class="settings-code settings-mcp-json">${escapeHtml(json)}</pre>
     <button class="settings-mcp-copy-btn" data-copy-text="${escapeHtml(json)}">Copy to clipboard</button>
+    <div class="settings-mcp-note settings-mcp-warning">
+      ⚠ The config contains your secret Worker URL. Do not commit <code>.mcp.json</code> to public repositories — add it to <code>.gitignore</code>.
+    </div>
   `;
   attachCopyHandler(container);
 }

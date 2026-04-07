@@ -17,6 +17,7 @@ app-icon.png
 *.pem
 credentials.csv
 *-service-account.json
+.mcp.json
 
 # OS files
 .DS_Store
