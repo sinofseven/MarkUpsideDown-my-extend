@@ -108,12 +108,12 @@ let clipboardPaths = new Set<string>();
 let clipboardMode: "cut" | "copy" | null = null;
 let dirWatcherUnwatch: UnwatchFn | null = null;
 
-// Pending external drop target — set by DOM drop, consumed by tauri://drag-drop.
-let pendingExternalDropTarget: string | null = null;
+// Pending folder drop target — set by DOM drop for folders, consumed by tauri://drag-drop.
+let pendingFolderDropTarget: string | null = null;
 
-/** Check whether sidebar has a pending external drop (for file-ops.ts coordination). */
+/** Check whether sidebar has a pending folder drop (for file-ops.ts coordination). */
 export function hasPendingExternalDrop(): boolean {
-  return pendingExternalDropTarget !== null;
+  return pendingFolderDropTarget !== null;
 }
 let dirWatchDebounce: ReturnType<typeof setTimeout> | null = null;
 // Poll fallback interval — mirrors file-watcher.ts design.
@@ -247,11 +247,13 @@ export function initSidebar(
     startDirWatcher();
   }
 
-  // Handle external file/folder drops from Finder via Tauri's native drag-drop
+  // Handle folder drops from Finder via Tauri's native drag-drop.
+  // Files are handled by handleExternalFileDrop() in DOM drop; folders need
+  // tauri://drag-drop because FileList cannot represent directories.
   if (window.__TAURI__?.event) {
     window.__TAURI__.event.listen<{ paths: string[] }>("tauri://drag-drop", async (event) => {
-      const target = pendingExternalDropTarget;
-      pendingExternalDropTarget = null;
+      const target = pendingFolderDropTarget;
+      pendingFolderDropTarget = null;
       if (!target) return;
 
       const paths = event.payload.paths;
@@ -268,17 +270,6 @@ export function initSidebar(
           }
           saveState();
           await refreshTree();
-
-          // Open single markdown file after import
-          if (imported.length === 1) {
-            const ext = getExtension(imported[0]);
-            if (MD_EXTENSIONS.has(ext)) {
-              const content = await invoke<string>("read_text_file", { path: imported[0] });
-              onFileOpen?.(content, imported[0]);
-            } else if (IMPORT_EXTENSIONS.includes(ext)) {
-              await convertFile(imported[0]);
-            }
-          }
         }
       } catch (e) {
         await message(`Failed to import: ${e}`, { kind: "error" });
@@ -789,9 +780,15 @@ function attachTreeListeners(el: HTMLElement) {
     if (!rootPath) return;
     if ((e.target as HTMLElement).closest(".sidebar-tree-item[data-is-dir='true']")) return;
     e.preventDefault();
-    // External file drop (from Finder) — delegate to tauri://drag-drop for path access
+    // External file drop from Finder
     if (e.dataTransfer?.types.includes("Files") && e.dataTransfer.files.length > 0) {
-      pendingExternalDropTarget = rootPath;
+      // FileList contains files — handle directly via arrayBuffer copy
+      if (e.dataTransfer.files[0].size > 0 || e.dataTransfer.files[0].type !== "") {
+        handleExternalFileDrop(e.dataTransfer.files, rootPath);
+      } else {
+        // Likely a folder drop — delegate to tauri://drag-drop for path access
+        pendingFolderDropTarget = rootPath;
+      }
       return;
     }
     // Internal file/folder move to root
@@ -1102,8 +1099,13 @@ function createTreeItem(entry: DirEntry, depth: number, displayName?: string) {
       e.preventDefault();
       e.stopPropagation();
       item.classList.remove("drop-target");
+      // External file drop from Finder
       if (e.dataTransfer?.types.includes("Files") && e.dataTransfer.files.length > 0) {
-        pendingExternalDropTarget = entry.path;
+        if (e.dataTransfer.files[0].size > 0 || e.dataTransfer.files[0].type !== "") {
+          handleExternalFileDrop(e.dataTransfer.files, entry.path);
+        } else {
+          pendingFolderDropTarget = entry.path;
+        }
         return;
       }
       if (dragSourcePaths.size === 0) return;
@@ -1238,6 +1240,39 @@ function clearTreeDropTarget() {
   if (!treeEl) return;
   for (const el of treeEl.querySelectorAll(".drop-target")) {
     el.classList.remove("drop-target");
+  }
+}
+
+async function handleExternalFileDrop(files: FileList, targetDir: string) {
+  let copiedCount = 0;
+
+  for (const file of files) {
+    const ext = getExtension(file.name);
+    const targetPath = `${targetDir}/${file.name}`;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const data = Array.from(new Uint8Array(buffer));
+      await invoke("write_file_bytes", { path: targetPath, data });
+      copiedCount++;
+
+      if (MD_EXTENSIONS.has(ext)) {
+        const content = await invoke<string>("read_text_file", { path: targetPath });
+        onFileOpen?.(content, targetPath);
+      } else if (IMPORT_EXTENSIONS.includes(ext)) {
+        await convertFile(targetPath);
+      }
+    } catch (e) {
+      await message(`Failed to copy "${file.name}": ${e}`, { kind: "error" });
+    }
+  }
+
+  if (copiedCount > 0) {
+    if (!expandedDirs.has(targetDir)) {
+      expandedDirs.add(targetDir);
+    }
+    saveState();
+    await refreshTree();
   }
 }
 
