@@ -403,9 +403,6 @@ pub async fn download_image_with(
 ) -> Result<String> {
     let validated_url = validate_url(url)?;
     let validated_path = validate_path(dest_path)?;
-    let dest_path = validated_path
-        .to_str()
-        .ok_or(AppError::Validation("Invalid path encoding".into()))?;
     let response = client
         .get(validated_url)
         .timeout(Duration::from_secs(30))
@@ -424,17 +421,17 @@ pub async fn download_image_with(
         .await
         .map_err(|e| AppError::Network(format!("Failed to read image: {e}")))?;
 
-    if let Some(parent) = std::path::Path::new(dest_path).parent() {
+    if let Some(parent) = validated_path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
             .map_err(|e| AppError::Io(format!("Failed to create directory: {e}")))?;
     }
 
-    tokio::fs::write(dest_path, &bytes)
+    tokio::fs::write(&validated_path, &bytes)
         .await
         .map_err(|e| AppError::Io(format!("Failed to write image: {e}")))?;
 
-    Ok(dest_path.to_string())
+    Ok(validated_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]

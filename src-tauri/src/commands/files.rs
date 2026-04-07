@@ -291,6 +291,9 @@ pub async fn duplicate_entry(path: String) -> Result<String> {
 }
 
 async fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> Result<()> {
+    let canonical_src = src
+        .canonicalize()
+        .map_err(|e| AppError::Io(format!("Failed to resolve source path: {e}")))?;
     tokio::fs::create_dir(dest)
         .await
         .map_err(|e| AppError::Io(format!("Failed to create directory: {e}")))?;
@@ -303,11 +306,21 @@ async fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> Re
         .map_err(|e| AppError::Io(format!("Failed to read entry: {e}")))?
     {
         let entry_path = entry.path();
+        // Prevent symlink traversal: ensure the entry resolves within the source directory
+        let canonical_entry = entry_path
+            .canonicalize()
+            .map_err(|e| AppError::Io(format!("Failed to resolve path: {e}")))?;
+        if !canonical_entry.starts_with(&canonical_src) {
+            return Err(AppError::Validation(format!(
+                "Symlink escape detected: {}",
+                entry_path.display()
+            )));
+        }
         let dest_path = dest.join(entry.file_name());
-        if entry_path.is_dir() {
-            Box::pin(copy_dir_recursive(&entry_path, &dest_path)).await?;
+        if canonical_entry.is_dir() {
+            Box::pin(copy_dir_recursive(&canonical_entry, &dest_path)).await?;
         } else {
-            tokio::fs::copy(&entry_path, &dest_path)
+            tokio::fs::copy(&canonical_entry, &dest_path)
                 .await
                 .map_err(|e| AppError::Io(format!("Failed to copy file: {e}")))?;
         }
