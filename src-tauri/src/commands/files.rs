@@ -342,10 +342,7 @@ pub async fn import_paths(sources: Vec<String>, target_dir: String) -> Result<Ve
             .ok_or(AppError::Validation("Invalid source path".into()))?;
         let dest = target.join(file_name);
         if dest.exists() {
-            return Err(AppError::Io(format!(
-                "'{}' already exists in destination",
-                file_name.to_string_lossy()
-            )));
+            continue;
         }
         if src.is_dir() {
             copy_dir_recursive(&src, &dest).await?;
