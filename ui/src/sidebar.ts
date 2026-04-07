@@ -1314,7 +1314,7 @@ function showPublishMenu(x: number, y: number, absPath: string, relPath: string)
       try {
         const content = await invoke<string>("read_text_file", { path: absPath });
         const entry = await publishFile(relPath, content, expiry);
-        await navigator.clipboard.writeText(entry.url);
+        await copyToClipboard(entry.url);
         message(`Published! URL copied to clipboard.\n${entry.url}`, {
           title: "Published",
           kind: "info",
