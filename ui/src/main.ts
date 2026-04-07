@@ -109,6 +109,7 @@ import {
   KEY_SIDEBAR_COLLAPSED,
   KEY_EDITOR_COLLAPSED,
   KEY_PREVIEW_COLLAPSED,
+  KEY_V2_WINDOW_MIGRATED,
   initWindowLabel,
   windowKey,
   getWindowLabel,
@@ -141,8 +142,7 @@ const isFreshWindow = new URLSearchParams(window.location.search).has("fresh");
 
 // --- One-time migration: copy unscoped keys to window-scoped keys for "main" window ---
 {
-  const MIGRATION_KEY = "markupsidedown:v2-window-migrated";
-  if (!localStorage.getItem(MIGRATION_KEY) && !isFreshWindow) {
+  if (!localStorage.getItem(KEY_V2_WINDOW_MIGRATED) && !isFreshWindow) {
     const keysToMigrate = [
       "markupsidedown:tabs",
       "markupsidedown:sidebar",
@@ -155,7 +155,7 @@ const isFreshWindow = new URLSearchParams(window.location.search).has("fresh");
       const val = localStorage.getItem(key);
       if (val !== null) localStorage.setItem(windowKey(key), val);
     }
-    localStorage.setItem(MIGRATION_KEY, "1");
+    localStorage.setItem(KEY_V2_WINDOW_MIGRATED, "1");
   }
 }
 

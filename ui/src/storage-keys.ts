@@ -51,6 +51,9 @@ export const KEY_SIDEBAR_SHOW_DOTFILES = "markupsidedown:sidebar-show-dotfiles";
 // --- Tabs ---
 export const KEY_TABS = "markupsidedown:tabs";
 
+// --- Migration ---
+export const KEY_V2_WINDOW_MIGRATED = "markupsidedown:v2-window-migrated";
+
 // --- Update check ---
 export const KEY_UPDATE_LAST_CHECK = "markupsidedown:updateLastCheck";
 export const KEY_UPDATE_DISMISSED_VERSION = "markupsidedown:updateDismissedVersion";

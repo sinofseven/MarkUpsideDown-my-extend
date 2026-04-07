@@ -99,9 +99,10 @@ export async function saveBatchResults(
   targetDir: string,
 ): Promise<string[]> {
   const saved: string[] = [];
-  for (const f of progress.files) {
+  for (let i = 0; i < progress.files.length; i++) {
+    const f = progress.files[i];
     if (f.status !== "done") continue;
-    const md = await getBatchResult(batchId, progress.files.indexOf(f));
+    const md = await getBatchResult(batchId, i);
     const mdName = f.name.replace(/\.[^.]+$/, ".md");
     const outPath = `${targetDir}/${mdName}`;
     await writeTextFile(outPath, md);

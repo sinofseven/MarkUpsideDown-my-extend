@@ -105,8 +105,11 @@ function saveState(): void {
     activeTabId,
   });
   // Save to project-specific key and the window-scoped global key
-  localStorage.setItem(windowKey(tabsKey(currentProjectRoot)), data);
-  localStorage.setItem(windowKey(KEY_TABS), data);
+  const projectKey = tabsKey(currentProjectRoot);
+  localStorage.setItem(windowKey(projectKey), data);
+  if (projectKey !== KEY_TABS) {
+    localStorage.setItem(windowKey(KEY_TABS), data);
+  }
 }
 
 // --- Public API ---

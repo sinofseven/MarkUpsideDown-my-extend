@@ -713,7 +713,7 @@ async function startDirWatcher() {
   // to detect changes the watcher missed (mirrors file-watcher.ts design).
   const watchRoot = rootPath;
   dirPollTimer = setInterval(async () => {
-    if (!rootPath || rootPath !== watchRoot) return;
+    if (!rootPath || rootPath !== watchRoot || document.hidden) return;
     try {
       const entries = await invoke<DirEntry[]>("list_directory", {
         path: rootPath,

@@ -1,7 +1,7 @@
 import { normalizeMarkdown } from "./normalize.ts";
 import { ensureWorkerUrl } from "./settings.ts";
 import { escapeHtml } from "./html-utils.ts";
-import { basename as pathBasename } from "./path-utils.ts";
+import { basename as pathBasename, dirname } from "./path-utils.ts";
 import { getRootPath } from "./sidebar.ts";
 import { indexDocuments } from "./semantic-search.ts";
 
@@ -108,7 +108,7 @@ export async function crawlUrl(urlInput: HTMLInputElement, urlBar: HTMLElement) 
           content: page.markdown,
           metadata: {
             filename: pathBasename(relPath),
-            dir: relPath.split("/").slice(0, -1).join("/"),
+            dir: dirname(relPath),
           },
         };
       });

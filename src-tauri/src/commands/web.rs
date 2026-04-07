@@ -51,7 +51,7 @@ pub(crate) async fn worker_request<T: DeserializeOwned + HasWorkerError>(
 
 // --- Worker Health Check ---
 
-/// Must match WORKER_VERSION in worker/src/index.ts.
+/// Must match WORKER_VERSION in worker/src/config.ts.
 const EXPECTED_WORKER_VERSION: u32 = 6;
 
 #[derive(Serialize)]

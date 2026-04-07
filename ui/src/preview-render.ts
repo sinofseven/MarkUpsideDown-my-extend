@@ -261,7 +261,7 @@ marked.use({
           if (m) {
             const type = m[1] as string;
             const alert = ALERT_TYPES[type]!;
-            const clone = structuredClone(tokens);
+            const clone = tokens.map((t: any, i: number) => (i === 0 ? structuredClone(t) : t));
             const firstClone = clone[0];
             firstClone.tokens[0] = {
               ...firstClone.tokens[0],
