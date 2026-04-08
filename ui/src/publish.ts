@@ -48,7 +48,13 @@ export async function loadPublishState(): Promise<void> {
 
 async function savePublishState(): Promise<void> {
   const path = await statePath();
-  if (!path) return;
+  if (!path || !projectRoot) return;
+  const dir = await join(projectRoot, ".markupsidedown");
+  try {
+    await invoke("create_directory", { path: dir });
+  } catch {
+    // already exists
+  }
   await writeTextFile(path, JSON.stringify(state, null, 2));
 }
 
