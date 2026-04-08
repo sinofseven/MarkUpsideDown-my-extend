@@ -396,11 +396,16 @@ fn parse_kv_namespace_id(output: &str) -> Option<String> {
 
 fn find_existing_kv_namespace(account_id: &str) -> Result<String, String> {
     let env = [("CLOUDFLARE_ACCOUNT_ID", account_id)];
-    let output = run_wrangler(&["kv", "namespace", "list", "--json"], None, 15, &env)?;
+    let output = run_wrangler(&["kv", "namespace", "list"], None, 15, &env)?;
 
-    // Output is JSON array: [{"id":"...","title":"..."},...]
+    // Output may contain banner lines before JSON. Find the JSON array.
+    let json_str = output
+        .find('[')
+        .and_then(|start| output.rfind(']').map(|end| &output[start..=end]))
+        .ok_or_else(|| format!("No JSON array found in KV list output:\n{output}"))?;
+
     let namespaces: Vec<serde_json::Value> =
-        serde_json::from_str(&output).map_err(|e| format!("Failed to parse KV list: {e}"))?;
+        serde_json::from_str(json_str).map_err(|e| format!("Failed to parse KV list: {e}"))?;
 
     for ns in &namespaces {
         let title = ns["title"].as_str().unwrap_or("");
