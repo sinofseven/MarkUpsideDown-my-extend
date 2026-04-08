@@ -187,6 +187,7 @@ fn main() {
             cloudflare::deploy_worker,
             cloudflare::setup_worker_secrets,
             cloudflare::setup_worker_secrets_with_token,
+            cloudflare::set_r2_public_url,
             menu::add_recent_file,
             commands::validate_markdown,
             commands::save_window_registry,

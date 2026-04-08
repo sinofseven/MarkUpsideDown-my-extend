@@ -396,7 +396,7 @@ fn parse_kv_namespace_id(output: &str) -> Option<String> {
 
 fn find_existing_kv_namespace(account_id: &str) -> Result<String, String> {
     let env = [("CLOUDFLARE_ACCOUNT_ID", account_id)];
-    let output = run_wrangler(&["kv", "namespace", "list"], None, 15, &env)?;
+    let output = run_wrangler(&["kv", "namespace", "list", "--json"], None, 15, &env)?;
 
     // Output is JSON array: [{"id":"...","title":"..."},...]
     let namespaces: Vec<serde_json::Value> =
@@ -604,6 +604,21 @@ pub async fn setup_worker_secrets_with_token(
     worker_name: Option<String>,
 ) -> crate::error::Result<()> {
     set_secrets_with_token(account_id, api_token, worker_name).await
+}
+
+#[tauri::command]
+pub async fn set_r2_public_url(
+    account_id: String,
+    worker_name: String,
+    url: String,
+) -> crate::error::Result<()> {
+    use crate::error::AppError;
+    tokio::task::spawn_blocking(move || {
+        set_wrangler_secret("R2_PUBLIC_URL", &url, &account_id, &worker_name)
+    })
+    .await?
+    .map_err(AppError::Wrangler)?;
+    Ok(())
 }
 
 async fn set_secrets_with_token(

@@ -68,11 +68,7 @@ The MCP server resolves the Worker URL in this order:
 
 ### Worker Version Compatibility
 
-The MCP server's conversion and crawl tools require a compatible Worker. If tools like `extract_json` or `crawl_website` return endpoint errors, your Worker may need redeployment:
-
-```bash
-cd worker && wrangler deploy
-```
+The MCP server's conversion and crawl tools require a compatible Worker. If tools like `extract_json` or `crawl_website` return endpoint errors, your Worker may need updating — click **Update Worker** in Settings.
 
 Check Worker health and version: `curl https://your-worker-url/health`
 

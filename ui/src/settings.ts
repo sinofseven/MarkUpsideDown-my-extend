@@ -144,7 +144,7 @@ function featureRows(status: WorkerStatus | null) {
       name: "Publish to R2",
       ok: Boolean(status && status.publish_available),
       hint: status?.publish_available
-        ? "Ready \u2014 enable R2 public access to hide Worker URL"
+        ? "Ready"
         : hasWorker
           ? "Needs R2 bucket"
           : "Needs Worker URL + R2",
@@ -400,11 +400,7 @@ async function startAutoSetup(
         );
       }
       if (testStatus.publish_available) {
-        showSetupMessage(
-          progressContainer,
-          "setup-info",
-          "Tip: Enable R2 public access in the Cloudflare dashboard to keep the Worker URL secret when sharing published links.",
-        );
+        showR2PublicAccessTip(progressContainer);
       }
     } else {
       update("verify", "error");
@@ -427,6 +423,53 @@ function showSetupMessage(container: HTMLElement, className: string, message: st
   div.className = className;
   div.textContent = message;
   container.appendChild(div);
+}
+
+function showR2PublicAccessTip(container: HTMLElement) {
+  const div = document.createElement("div");
+  div.className = "setup-info setup-r2-tip";
+  div.innerHTML =
+    "<strong>Tip: Hide Worker subdomain in published links</strong><br>" +
+    "Published links currently expose the Worker URL. To use a separate R2 URL instead:<br>" +
+    '1. Open <a href="https://dash.cloudflare.com/" target="_blank" style="color:var(--accent)">Cloudflare Dashboard</a>' +
+    " &rarr; R2 Object Storage &rarr; <strong>markupsidedown-publish</strong><br>" +
+    "2. Settings tab &rarr; Public access &rarr; Allow access<br>" +
+    "3. Copy the R2 public URL (e.g. <code>https://pub-xxx.r2.dev</code>) and paste below" +
+    '<div class="setup-r2-url-row" style="display:flex;gap:6px;margin-top:6px">' +
+    '<input type="url" class="setup-r2-url-input" placeholder="https://pub-xxx.r2.dev" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px" />' +
+    '<button class="setup-r2-url-save" style="font-size:12px;padding:4px 12px">Save</button>' +
+    "</div>" +
+    '<div class="setup-r2-url-result" style="font-size:11px;margin-top:4px"></div>';
+  container.appendChild(div);
+
+  const input = div.querySelector<HTMLInputElement>(".setup-r2-url-input")!;
+  const saveBtn = div.querySelector<HTMLButtonElement>(".setup-r2-url-save")!;
+  const result = div.querySelector<HTMLElement>(".setup-r2-url-result")!;
+
+  saveBtn.addEventListener("click", async () => {
+    const url = input.value.trim();
+    if (!url) return;
+    const accountId = localStorage.getItem(KEY_ACCOUNT_ID);
+    if (!accountId) {
+      result.textContent = "Account ID not found. Run Setup first.";
+      result.style.color = "var(--error)";
+      return;
+    }
+    const workerName = `markupsidedown-${getWorkerSuffix()}`;
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving\u2026";
+    try {
+      await invoke("set_r2_public_url", { accountId, workerName, url });
+      result.textContent = "Saved! Published links will now use this URL.";
+      result.style.color = "var(--success, green)";
+    } catch (e) {
+      result.textContent = `Failed: ${e}`;
+      result.style.color = "var(--error)";
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save";
+    }
+  });
 }
 
 function showApiTokenInput(container: HTMLElement, accountId: string): Promise<string> {
@@ -567,29 +610,6 @@ export function showSettings({
         <div id="settings-feature-list" class="settings-feature-list"></div>
       </div>
 
-      <div class="settings-section settings-secrets-help" id="settings-secrets-help" style="display:none">
-        <div class="settings-section-title">Missing: Worker Secrets</div>
-        <div class="settings-description">
-          The <code>/render</code> endpoint needs two secrets. Run these once after deploy:
-        </div>
-        <pre class="settings-code">cd worker
-wrangler secret put CLOUDFLARE_ACCOUNT_ID
-wrangler secret put CLOUDFLARE_API_TOKEN</pre>
-      </div>
-
-      <details class="settings-section settings-manual-deploy">
-        <summary class="settings-section-title">Manual deploy instructions</summary>
-        <div class="settings-description">
-          Deploy the Worker yourself from the terminal, then paste the URL above.
-        </div>
-        <pre class="settings-code">cd worker && wrangler deploy</pre>
-        <div class="settings-description">
-          To enable Render JS, also set secrets:
-        </div>
-        <pre class="settings-code">cd worker
-wrangler secret put CLOUDFLARE_ACCOUNT_ID
-wrangler secret put CLOUDFLARE_API_TOKEN</pre>
-      </details>
 
       <div class="settings-section">
         <div class="settings-section-title">Editor</div>
@@ -727,7 +747,6 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   const testBtn = document.getElementById("settings-test-btn") as HTMLButtonElement;
   const testResult = document.getElementById("settings-test-result")!;
   const featureList = document.getElementById("settings-feature-list")!;
-  const secretsHelp = document.getElementById("settings-secrets-help") as HTMLElement;
   const autoSetupBtn = document.getElementById("settings-auto-setup-btn") as HTMLButtonElement;
   const updateWorkerBtn = document.getElementById(
     "settings-update-worker-btn",
@@ -747,9 +766,6 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
   // Initial feature list
   renderFeatureList(featureList, currentTestStatus);
   showUpdateButton(currentTestStatus);
-  if (currentTestStatus?.reachable && !currentTestStatus?.render_available) {
-    secretsHelp.style.display = "";
-  }
 
   const allowImageCheckbox = document.getElementById("settings-allow-image") as HTMLInputElement;
   allowImageCheckbox.checked = isImageConversionAllowed();
@@ -781,8 +797,6 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       if (testStatus) {
         renderFeatureList(featureList, testStatus);
         showUpdateButton(testStatus);
-        secretsHelp.style.display =
-          testStatus.reachable && !testStatus.render_available ? "" : "none";
       }
       autoSetupBtn.disabled = false;
       autoSetupBtn.textContent = "Setup with Cloudflare";
@@ -837,6 +851,15 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
             accountId: resolvedAccountId,
           });
           updateResources = res.resources;
+          const failed: string[] = [];
+          if (res.kv_error) failed.push(`KV: ${res.kv_error}`);
+          if (res.r2_error) failed.push(`R2: ${res.r2_error}`);
+          if (res.queue_error) failed.push(`Queue: ${res.queue_error}`);
+          if (res.vectorize_error) failed.push(`Vectorize: ${res.vectorize_error}`);
+          if (failed.length > 0) {
+            updateResult.className = "settings-test-result test-warn";
+            updateResult.textContent = `Some resources failed: ${failed.join(", ")}`;
+          }
         } catch {
           // Continue with defaults — Worker will deploy without optional bindings
         }
@@ -856,7 +879,6 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
       lastTestedUrl = newUrl;
       renderFeatureList(featureList, status);
       showUpdateButton(status);
-      secretsHelp.style.display = status.reachable && !status.render_available ? "" : "none";
       if (status.reachable && !status.update_available) {
         updateResult.className = "settings-test-result test-ok";
         updateResult.textContent = "Worker updated and verified \u2014 all features refreshed";
@@ -909,14 +931,12 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
 
       renderFeatureList(featureList, status);
       showUpdateButton(status);
-      secretsHelp.style.display = status.reachable && !status.render_available ? "" : "none";
     } catch (e) {
       testResult.className = "settings-test-result test-error";
       testResult.textContent = `Error: ${e}`;
       currentTestStatus = null;
       renderFeatureList(featureList, null);
       showUpdateButton(null);
-      secretsHelp.style.display = "none";
     } finally {
       testBtn.disabled = false;
       testBtn.textContent = "Test";
@@ -954,7 +974,6 @@ wrangler secret put CLOUDFLARE_API_TOKEN</pre>
     testResult.className = "settings-test-result";
     testResult.textContent = "";
     renderFeatureList(featureList, null);
-    secretsHelp.style.display = "none";
   });
 
   overlay.addEventListener("click", (e) => {

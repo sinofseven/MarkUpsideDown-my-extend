@@ -58,17 +58,13 @@ Each step shows its status: pending (○), running (●), done (✓), error (✗
 
 ### Manual Setup
 
-If you prefer to set things up manually:
+If you already have a deployed Worker, you can connect it manually:
 
-1. Install wrangler: `npm install -g wrangler`
-2. Deploy the Worker: `cd worker && wrangler deploy`
-3. Set secrets (for Render JS and Crawl):
-   ```bash
-   cd worker
-   wrangler secret put CLOUDFLARE_ACCOUNT_ID
-   wrangler secret put CLOUDFLARE_API_TOKEN
-   ```
-4. In Settings, paste the Worker URL, click **Test**, then **Save**
+1. In Settings, paste your Worker URL (e.g. `https://markupsidedown-XXXXXX.workers.dev`)
+2. Click **Test** to verify the connection
+3. Click **Save**
+
+For full manual deployment instructions (including CLI commands), see [Worker Deployment Guide](../worker-deployment.md#manual-setup).
 
 ### Testing the Connection
 

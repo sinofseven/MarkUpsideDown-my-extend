@@ -78,14 +78,11 @@ wrangler secret put CLOUDFLARE_API_TOKEN    # paste the same API token
 
 By default, published URLs contain the Worker subdomain. To hide the Worker URL, enable **R2 public access** on the publish bucket:
 
-1. Go to Cloudflare Dashboard → R2 → `markupsidedown-publish` → Settings → **Public Access**
-2. Enable public access — Cloudflare generates a `pub-{hash}.r2.dev` URL
-3. Set the URL as a Worker variable:
-   ```bash
-   cd worker
-   wrangler secret put R2_PUBLIC_URL   # paste: https://pub-abc123.r2.dev
-   ```
-4. Redeploy the Worker: `wrangler deploy`
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → R2 Object Storage → **markupsidedown-publish** → Settings → **Public Access** → Allow access
+2. Copy the generated public URL (e.g. `https://pub-abc123.r2.dev`)
+3. Set the URL on your Worker — choose one:
+   - **In-app:** After setup completes, paste the R2 public URL in the input field shown in the Settings tip and click **Save**
+   - **CLI:** `wrangler secret put R2_PUBLIC_URL --name markupsidedown-XXXXXX` (paste the URL when prompted)
 
 Published URLs will now use the R2 public URL (e.g. `https://pub-abc123.r2.dev/my-document`) instead of the Worker URL. The `GET /p/:key` endpoint is kept as a fallback.
 
@@ -169,15 +166,11 @@ If you skip this step, the Worker is still deployed and Document Import works �
 
 ### Updating the Worker
 
-The app shows an **"Update available"** badge in Settings when your deployed Worker is older than the version bundled with the app. To update:
+The app shows an **"Update available"** badge in Settings when your deployed Worker is older than the version bundled with the app. Click the **Update Worker** button to re-deploy with the latest code.
 
-```bash
-cd worker && wrangler deploy
-```
+The URL stays the same. Secrets and resource bindings persist across deploys. The feature list refreshes automatically after update.
 
-No app-side changes needed — the URL stays the same. Secrets persist across deploys. Click **Test** in Settings to verify the new version.
-
-**When to update:** After installing a new version of MarkUpsideDown, check Settings → Worker Status. If it shows "Update available", redeploy the Worker. New MCP tools (e.g., `extract_json`) may require Worker endpoints that don't exist in older versions.
+**When to update:** After installing a new version of MarkUpsideDown, check Settings → Worker Status. If it shows "Update available", click Update Worker. New MCP tools (e.g., `extract_json`) may require Worker endpoints that don't exist in older versions.
 
 ### Worker version
 
