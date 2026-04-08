@@ -1641,19 +1641,7 @@ function showMultiContextMenu(event: MouseEvent) {
 }
 
 async function copyToClipboard(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    // Fallback for older WebKit
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand("copy");
-    ta.remove();
-  }
+  await invoke("copy_to_clipboard", { text });
 }
 
 async function revealInFinder(path: string) {

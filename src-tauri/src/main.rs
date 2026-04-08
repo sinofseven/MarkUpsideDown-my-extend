@@ -151,6 +151,7 @@ fn main() {
             commands::create_cowork_workspace,
             commands::read_text_file,
             commands::write_text_file,
+            commands::copy_to_clipboard,
             commands::read_file_bytes,
             commands::list_directory,
             commands::create_file,

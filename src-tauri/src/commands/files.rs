@@ -75,6 +75,28 @@ pub async fn write_text_file(path: String, content: String) -> Result<()> {
 }
 
 #[tauri::command]
+pub async fn copy_to_clipboard(text: String) -> Result<()> {
+    tokio::task::spawn_blocking(move || {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let mut child = Command::new("pbcopy")
+            .stdin(Stdio::piped())
+            .spawn()
+            .map_err(|e| AppError::Io(format!("pbcopy failed: {e}")))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(text.as_bytes())
+                .map_err(|e| AppError::Io(format!("pbcopy write failed: {e}")))?;
+        }
+        child
+            .wait()
+            .map_err(|e| AppError::Io(format!("pbcopy failed: {e}")))?;
+        Ok(())
+    })
+    .await?
+}
+
+#[tauri::command]
 pub async fn read_file_bytes(path: String) -> Result<Vec<u8>> {
     let path = validate_path(&path)?;
     tokio::fs::read(&path)
