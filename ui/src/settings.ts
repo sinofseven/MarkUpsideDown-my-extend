@@ -429,7 +429,7 @@ function showR2PublicAccessTip(container: HTMLElement) {
     "Published links currently expose the Worker URL. To use a separate R2 URL instead:<br>" +
     '1. Open <a href="https://dash.cloudflare.com/" target="_blank" style="color:var(--accent)">Cloudflare Dashboard</a>' +
     " &rarr; R2 Object Storage &rarr; <strong>markupsidedown-publish</strong><br>" +
-    "2. Settings tab &rarr; Public access &rarr; Allow access<br>" +
+    "2. Settings tab &rarr; <strong>Public Development URL</strong> &rarr; Enable<br>" +
     "3. Copy the R2 public URL (e.g. <code>https://pub-xxx.r2.dev</code>) and paste below" +
     '<div class="setup-r2-url-row" style="display:flex;gap:6px;margin-top:6px">' +
     '<input type="url" class="setup-r2-url-input" placeholder="https://pub-xxx.r2.dev" style="flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px" />' +

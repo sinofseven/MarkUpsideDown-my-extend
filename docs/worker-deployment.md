@@ -78,7 +78,7 @@ wrangler secret put CLOUDFLARE_API_TOKEN    # paste the same API token
 
 By default, published URLs contain the Worker subdomain. To hide the Worker URL, enable **R2 public access** on the publish bucket:
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → R2 Object Storage → **markupsidedown-publish** → Settings → **Public Access** → Allow access
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/) → R2 Object Storage → **markupsidedown-publish** → Settings → **Public Development URL** → Enable
 2. Copy the generated public URL (e.g. `https://pub-abc123.r2.dev`)
 3. Set the URL on your Worker — choose one:
    - **In-app:** After setup completes, paste the R2 public URL in the input field shown in the Settings tip and click **Save**

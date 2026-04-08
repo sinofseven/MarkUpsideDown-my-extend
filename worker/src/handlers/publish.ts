@@ -21,8 +21,11 @@ export async function handlePublish(request: Request, env: Env): Promise<Respons
     return jsonResponse({ error: "Invalid JSON body" }, 400);
   }
 
-  if (!body.key || !body.content) {
-    return jsonResponse({ error: "Missing 'key' and 'content' fields" }, 400);
+  if (!body.key || body.content == null) {
+    return jsonResponse(
+      { error: `Missing required fields: ${!body.key ? "'key'" : ""}${!body.key && body.content == null ? " and " : ""}${body.content == null ? "'content'" : ""}` },
+      400,
+    );
   }
 
   const now = new Date();
