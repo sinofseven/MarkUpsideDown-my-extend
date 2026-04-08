@@ -36,7 +36,10 @@ export async function handlePublish(request: Request, env: Env): Promise<Respons
     },
   });
 
-  const base = env.R2_PUBLIC_URL?.replace(/\/+$/, "");
+  let base = env.R2_PUBLIC_URL;
+  if (base) {
+    while (base.endsWith("/")) base = base.slice(0, -1);
+  }
   const publicUrl = base ? `${base}/${body.key}` : `${new URL(request.url).origin}/p/${body.key}`;
 
   return jsonResponse({
