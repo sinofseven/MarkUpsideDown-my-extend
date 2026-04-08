@@ -144,7 +144,7 @@ function featureRows(status: WorkerStatus | null) {
       name: "Publish to R2",
       ok: Boolean(status && status.publish_available),
       hint: status?.publish_available
-        ? "Ready"
+        ? "Ready \u2014 enable R2 public access to hide Worker URL"
         : hasWorker
           ? "Needs R2 bucket"
           : "Needs Worker URL + R2",
@@ -397,6 +397,13 @@ async function startAutoSetup(
           progressContainer,
           "setup-info",
           `Worker ready at ${workerUrl}\nImport works. To enable Render JS, add secrets later from the panel below.`,
+        );
+      }
+      if (testStatus.publish_available) {
+        showSetupMessage(
+          progressContainer,
+          "setup-info",
+          "Tip: Enable R2 public access in the Cloudflare dashboard to keep the Worker URL secret when sharing published links.",
         );
       }
     } else {
