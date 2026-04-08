@@ -64,7 +64,7 @@ Powered by [Tauri v2](https://v2.tauri.app/), [CodeMirror 6](https://codemirror.
 
 ### Publishing
 
-- **Publish to R2** — Share Markdown files via Cloudflare R2 with permanent or time-limited URLs
+- **Publish to R2** — Share Markdown files via Cloudflare R2 with permanent or time-limited URLs. Optional R2 public access keeps the Worker URL secret
 
 ### AI Agent Integration
 

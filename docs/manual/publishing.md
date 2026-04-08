@@ -18,7 +18,7 @@ Publishing requires the **PUBLISH_BUCKET** R2 binding in your Cloudflare Worker.
 
 ![Publish context menu with expiry options](images/publishing/publish-context-menu.png)
 
-The file is uploaded to R2 and you receive a shareable URL. The URL format is `https://your-worker.workers.dev/p/:key`.
+The file is uploaded to R2 and you receive a shareable URL. By default, the URL format is `https://your-worker.workers.dev/p/:key`. If [R2 public access](../worker-deployment.md#r2-public-access-for-published-urls-optional) is configured, URLs use the R2 public domain instead (e.g. `https://pub-abc123.r2.dev/:key`), keeping the Worker URL secret.
 
 ## Published File Indicator
 
@@ -36,3 +36,5 @@ To remove a published file, use the unpublish option from the context menu. The 
 - No authentication is required to view published files (anyone with the URL can access them)
 
 > **Note:** Published URLs are not easily guessable (they use generated keys), but they are not password-protected. Don't publish sensitive content.
+>
+> **Note:** If using R2 public access, time-limited URLs will remain accessible until the R2 object is deleted. The Worker's `/p/:key` endpoint enforces expiration, but the R2 public URL does not.

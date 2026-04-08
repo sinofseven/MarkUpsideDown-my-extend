@@ -11,6 +11,9 @@
   "r2_buckets": [
     { "binding": "PUBLISH_BUCKET", "bucket_name": "markupsidedown-publish" }
   ],
+  // Set R2_PUBLIC_URL after enabling R2 public access in Cloudflare dashboard.
+  // Example: "https://pub-abc123.r2.dev"
+  // "vars": { "R2_PUBLIC_URL": "" },
   "queues": {
     "producers": [
       { "binding": "CONVERT_QUEUE", "queue": "markupsidedown-convert" }

@@ -74,6 +74,23 @@ wrangler secret put CLOUDFLARE_ACCOUNT_ID   # paste your Account ID
 wrangler secret put CLOUDFLARE_API_TOKEN    # paste the same API token
 ```
 
+### R2 Public Access for Published URLs (Optional)
+
+By default, published URLs contain the Worker subdomain. To hide the Worker URL, enable **R2 public access** on the publish bucket:
+
+1. Go to Cloudflare Dashboard → R2 → `markupsidedown-publish` → Settings → **Public Access**
+2. Enable public access — Cloudflare generates a `pub-{hash}.r2.dev` URL
+3. Set the URL as a Worker variable:
+   ```bash
+   cd worker
+   wrangler secret put R2_PUBLIC_URL   # paste: https://pub-abc123.r2.dev
+   ```
+4. Redeploy the Worker: `wrangler deploy`
+
+Published URLs will now use the R2 public URL (e.g. `https://pub-abc123.r2.dev/my-document`) instead of the Worker URL. The `GET /p/:key` endpoint is kept as a fallback.
+
+> **Note:** R2 public access serves objects directly without expiration checks. Time-limited published files will remain accessible via the R2 URL until the object is deleted. The Worker's `GET /p/:key` endpoint still enforces expiration.
+
 ### Configure the App
 
 1. Open Settings in the toolbar (or wait for the first-launch prompt)
@@ -167,7 +184,7 @@ No app-side changes needed — the URL stays the same. Secrets persist across de
 The Worker exposes its version via `GET /health`:
 
 ```json
-{ "status": "ok", "version": 6, "capabilities": { "fetch": true, "convert": true, "render": true, "json": true, "crawl": true, "cache": true, "batch": true, "publish": true, "search": true } }
+{ "status": "ok", "version": 7, "capabilities": { "fetch": true, "convert": true, "render": true, "json": true, "crawl": true, "cache": true, "batch": true, "publish": true, "search": true } }
 ```
 
 The `capabilities` object shows which features are available:

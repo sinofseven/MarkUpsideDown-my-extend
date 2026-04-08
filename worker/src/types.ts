@@ -5,6 +5,7 @@ export interface Env {
   CACHE?: KVNamespace;
   CONVERT_QUEUE?: Queue;
   PUBLISH_BUCKET?: R2Bucket;
+  R2_PUBLIC_URL?: string;
   VECTORS?: VectorizeIndex;
 }
 
