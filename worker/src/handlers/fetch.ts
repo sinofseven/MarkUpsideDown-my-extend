@@ -15,12 +15,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return jsonResponse({ error: "Missing 'url' field" }, 400);
   }
 
-  const ssrfError = await validateUrlForSsrf(body.url);
-  if (ssrfError) {
-    return jsonResponse({ error: ssrfError }, 400);
-  }
-
-  // KV cache lookup
+  // KV cache lookup (before SSRF validation to avoid unnecessary DNS-over-HTTPS on cache hits)
   const bypass = shouldBypassCache(request);
   const cacheKey = `md:fetch:${await sha256(body.url)}`;
   if (!bypass) {
@@ -29,6 +24,11 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
       const parsed = JSON.parse(cached);
       return jsonResponse({ ...parsed, cache: "hit" });
     }
+  }
+
+  const ssrfError = await validateUrlForSsrf(body.url);
+  if (ssrfError) {
+    return jsonResponse({ error: ssrfError }, 400);
   }
 
   try {

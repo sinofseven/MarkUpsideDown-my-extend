@@ -1,6 +1,10 @@
 import { linter, type Diagnostic } from "@codemirror/lint";
 import { marked } from "marked";
-import { getDocumentStructure, type DocumentStructure } from "./document-structure.ts";
+import {
+  getDocumentStructure,
+  isInCodeBlock,
+  type DocumentStructure,
+} from "./document-structure.ts";
 import { getStorageBool, setStorageBool } from "./storage-utils.ts";
 import { KEY_LINT_ENABLED } from "./storage-keys.ts";
 
@@ -38,11 +42,11 @@ function runAllChecks(
   checkTables(structure, doc, diagnostics);
   checkFrontmatter(structure, doc, diagnostics);
   checkLists(structure, doc, diagnostics);
-  checkEmphasis(lines, doc, diagnostics);
-  checkCodeBlocks(lines, doc, diagnostics);
-  checkFootnotes(lines, doc, diagnostics);
-  checkHtmlComments(lines, doc, diagnostics);
-  checkBlankLines(lines, doc, diagnostics, structure);
+  checkEmphasis(lines, structure.codeRanges, doc, diagnostics);
+  checkCodeBlocks(lines, structure.codeRanges, doc, diagnostics);
+  checkFootnotes(lines, structure.codeRanges, doc, diagnostics);
+  checkHtmlComments(lines, structure.codeRanges, doc, diagnostics);
+  checkBlankLines(lines, structure.codeRanges, doc, diagnostics, structure);
 
   return diagnostics;
 }
@@ -284,18 +288,13 @@ function checkLists(
 
 function checkEmphasis(
   lines: string[],
+  codeRanges: [number, number][],
   doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
-  let inFence = false;
-
   for (let i = 0; i < lines.length; i++) {
+    if (isInCodeBlock(i, codeRanges)) continue;
     const line = lines[i];
-    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
     if (!/[*_]/.test(line)) continue;
 
     const lineObj = doc.line(i + 1);
@@ -346,36 +345,24 @@ function checkEmphasis(
 
 function checkCodeBlocks(
   lines: string[],
+  codeRanges: [number, number][],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
 ) {
-  let inFence = false;
-  let fenceChar = "";
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trimStart();
+  for (const [start] of codeRanges) {
+    const trimmed = lines[start].trimStart();
     const fenceMatch = trimmed.match(/^(`{3,}|~{3,})(.*)?$/);
     if (!fenceMatch) continue;
-
-    const char = fenceMatch[1][0];
-
-    if (!inFence) {
-      inFence = true;
-      fenceChar = char;
-      const lang = (fenceMatch[2] || "").trim();
-      if (!lang) {
-        const lineObj = doc.line(i + 1);
-        diagnostics.push({
-          from: lineObj.from,
-          to: lineObj.to,
-          severity: "info",
-          message:
-            "Code block without language specifier — consider adding a language for syntax highlighting",
-        });
-      }
-    } else if (char === fenceChar) {
-      inFence = false;
-      fenceChar = "";
+    const lang = (fenceMatch[2] || "").trim();
+    if (!lang) {
+      const lineObj = doc.line(start + 1);
+      diagnostics.push({
+        from: lineObj.from,
+        to: lineObj.to,
+        severity: "info",
+        message:
+          "Code block without language specifier — consider adding a language for syntax highlighting",
+      });
     }
   }
 }
@@ -384,21 +371,16 @@ function checkCodeBlocks(
 
 function checkFootnotes(
   lines: string[],
+  codeRanges: [number, number][],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
 ) {
-  let inFence = false;
-
   const refs = new Map<string, { line: number; col: number }[]>();
   const defs = new Map<string, { line: number; col: number }>();
 
   for (let i = 0; i < lines.length; i++) {
+    if (isInCodeBlock(i, codeRanges)) continue;
     const line = lines[i];
-    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
 
     // Mask inline code
     const noCode = line.replace(/`[^`]*`/g, (m) => " ".repeat(m.length));
@@ -455,18 +437,13 @@ const COMMENT_KEYWORDS = /\b(TODO|FIXME|HACK|XXX|BUG|NOTE)\b/i;
 
 function checkHtmlComments(
   lines: string[],
+  codeRanges: [number, number][],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
 ) {
-  let inFence = false;
-
   for (let i = 0; i < lines.length; i++) {
+    if (isInCodeBlock(i, codeRanges)) continue;
     const line = lines[i];
-    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
 
     // Single-line comments: <!-- ... -->
     const commentRe = /<!--([\s\S]*?)-->/g;
@@ -491,30 +468,25 @@ function checkHtmlComments(
 
 function checkBlankLines(
   lines: string[],
+  codeRanges: [number, number][],
   doc: { line: (n: number) => { from: number; to: number } },
   diagnostics: Diagnostic[],
   structure: DocumentStructure,
 ) {
-  let inFence = false;
-
   // Determine frontmatter end line (0-based index)
   const fmEndIdx = structure.frontmatter ? structure.frontmatter.endLine - 1 : -1;
 
+  // Check blank line before opening fences
+  for (const [start] of codeRanges) {
+    checkNeedsBlankBefore(start, lines, fmEndIdx, "Fenced code block", doc, diagnostics);
+  }
+
   for (let i = 0; i < lines.length; i++) {
+    if (isInCodeBlock(i, codeRanges)) continue;
     const trimmed = lines[i].trimStart();
 
-    // Track fenced code blocks
-    if (/^(`{3,}|~{3,})/.test(trimmed)) {
-      if (!inFence) {
-        // Opening fence — check blank line before it
-        checkNeedsBlankBefore(i, lines, fmEndIdx, "Fenced code block", doc, diagnostics);
-        inFence = true;
-      } else {
-        inFence = false;
-      }
-      continue;
-    }
-    if (inFence) continue;
+    // Skip fence lines (already handled above)
+    if (/^(`{3,}|~{3,})/.test(trimmed)) continue;
 
     // Standalone image (full-line image only)
     if (/^!\[[^\]]*\]\([^)]*\)\s*$/.test(trimmed)) {

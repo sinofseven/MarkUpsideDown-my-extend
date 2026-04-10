@@ -2,7 +2,7 @@
 // quick navigation to any section in the editor.
 
 import type { EditorView } from "@codemirror/view";
-import { parseHeadings, findCodeBlockRanges, type Heading } from "./document-structure.ts";
+import { getDocumentStructure, type Heading } from "./document-structure.ts";
 import { escapeHtml } from "./html-utils.ts";
 
 let panelEl: HTMLElement | null = null;
@@ -45,9 +45,7 @@ export function updateTocPanel(content: string) {
   if (content === lastContent) return;
   lastContent = content;
 
-  const lines = content.split("\n");
-  const codeRanges = findCodeBlockRanges(lines);
-  const headings = parseHeadings(lines, codeRanges);
+  const headings = getDocumentStructure(content).headings;
 
   if (headings.length === 0) {
     if (lastHeadings.length > 0) {

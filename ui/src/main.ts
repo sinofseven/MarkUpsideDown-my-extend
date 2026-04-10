@@ -106,6 +106,9 @@ import {
 import { basename, buildRelativePath } from "./path-utils.ts";
 import { getStorageBool, setStorageBool } from "./storage-utils.ts";
 import {
+  KEY_TABS,
+  KEY_SIDEBAR,
+  KEY_SIDEBAR_PANEL,
   KEY_SIDEBAR_COLLAPSED,
   KEY_EDITOR_COLLAPSED,
   KEY_PREVIEW_COLLAPSED,
@@ -144,12 +147,12 @@ const isFreshWindow = new URLSearchParams(window.location.search).has("fresh");
 {
   if (!localStorage.getItem(KEY_V2_WINDOW_MIGRATED) && !isFreshWindow) {
     const keysToMigrate = [
-      "markupsidedown:tabs",
-      "markupsidedown:sidebar",
-      "markupsidedown:sidebarPanel",
-      "markupsidedown:sidebarCollapsed",
-      "markupsidedown:editorCollapsed",
-      "markupsidedown:previewCollapsed",
+      KEY_TABS,
+      KEY_SIDEBAR,
+      KEY_SIDEBAR_PANEL,
+      KEY_SIDEBAR_COLLAPSED,
+      KEY_EDITOR_COLLAPSED,
+      KEY_PREVIEW_COLLAPSED,
     ];
     for (const key of keysToMigrate) {
       const val = localStorage.getItem(key);

@@ -831,7 +831,9 @@ export async function refreshTree() {
 
   // Restore focus to the same path in the new DOM
   if (focusedPath) {
-    const el = newTree.querySelector(`.sidebar-tree-item[data-path="${CSS.escape(focusedPath)}"]`) as HTMLElement | null;
+    const el = newTree.querySelector(
+      `.sidebar-tree-item[data-path="${CSS.escape(focusedPath)}"]`,
+    ) as HTMLElement | null;
     if (el) {
       el.focus();
       el.scrollIntoView({ block: "nearest" });

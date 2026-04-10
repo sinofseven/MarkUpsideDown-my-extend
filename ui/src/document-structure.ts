@@ -71,6 +71,7 @@ export interface DocumentStructure {
   frontmatter: FrontmatterInfo | null;
   stats: DocumentStats;
   anchors: Set<string>;
+  codeRanges: [number, number][];
 }
 
 /** Check if a line is valid simple YAML (key: value, list item, comment, or empty). */
@@ -109,7 +110,7 @@ export function findCodeBlockRanges(lines: string[]): [number, number][] {
   return ranges;
 }
 
-function isInCodeBlock(lineIdx: number, ranges: [number, number][]): boolean {
+export function isInCodeBlock(lineIdx: number, ranges: [number, number][]): boolean {
   // Binary search: ranges are sorted by start index
   let lo = 0;
   let hi = ranges.length - 1;
@@ -319,6 +320,7 @@ export function getDocumentStructure(text: string): DocumentStructure {
     lists,
     frontmatter,
     anchors,
+    codeRanges,
     stats: {
       wordCount,
       headingCount: headings.length,

@@ -2,7 +2,7 @@
 // showing parsed key-value pairs from the document frontmatter.
 
 import type { EditorView } from "@codemirror/view";
-import { parseFrontmatter, type FrontmatterInfo } from "./document-structure.ts";
+import { getDocumentStructure, type FrontmatterInfo } from "./document-structure.ts";
 import { escapeHtml } from "./html-utils.ts";
 
 let panelEl: HTMLElement | null = null;
@@ -45,8 +45,7 @@ export function updateFrontmatterPanel(content: string) {
   if (content === lastContent) return;
   lastContent = content;
 
-  const lines = content.split("\n");
-  const fm = parseFrontmatter(lines);
+  const fm = getDocumentStructure(content).frontmatter;
 
   if (!fm || !fm.parsed || Object.keys(fm.parsed).length === 0) {
     if (lastFm !== null) {

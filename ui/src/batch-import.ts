@@ -49,12 +49,13 @@ function arrayBufferToBase64(buf: ArrayBuffer): string {
 export async function submitBatch(
   filePaths: string[],
 ): Promise<{ batchId: string; total: number }> {
-  const files: BatchFile[] = [];
-  for (const fp of filePaths) {
-    const bytes = await invoke<number[]>("read_file_bytes", { path: fp });
-    const b64 = arrayBufferToBase64(new Uint8Array(bytes).buffer);
-    files.push({ name: basename(fp), content: b64 });
-  }
+  const files: BatchFile[] = await Promise.all(
+    filePaths.map(async (fp) => {
+      const bytes = await invoke<number[]>("read_file_bytes", { path: fp });
+      const b64 = arrayBufferToBase64(new Uint8Array(bytes).buffer);
+      return { name: basename(fp), content: b64 };
+    }),
+  );
 
   const resp = await workerFetch<BatchSubmitResponse>("/batch", {
     method: "POST",
@@ -98,15 +99,18 @@ export async function saveBatchResults(
   progress: BatchProgress,
   targetDir: string,
 ): Promise<string[]> {
-  const saved: string[] = [];
-  for (let i = 0; i < progress.files.length; i++) {
-    const f = progress.files[i];
-    if (f.status !== "done") continue;
-    const md = await getBatchResult(batchId, i);
-    const mdName = f.name.replace(/\.[^.]+$/, ".md");
-    const outPath = `${targetDir}/${mdName}`;
-    await writeTextFile(outPath, md);
-    saved.push(outPath);
-  }
-  return saved;
+  const doneFiles = progress.files
+    .map((f, i) => ({ ...f, index: i }))
+    .filter((f) => f.status === "done");
+
+  const results = await Promise.all(
+    doneFiles.map(async (f) => {
+      const md = await getBatchResult(batchId, f.index);
+      const mdName = f.name.replace(/\.[^.]+$/, ".md");
+      const outPath = `${targetDir}/${mdName}`;
+      await writeTextFile(outPath, md);
+      return outPath;
+    }),
+  );
+  return results;
 }
