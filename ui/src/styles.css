@@ -1989,8 +1989,7 @@ body {
 
 /* Markdown preview — Safari Reader-inspired reading experience */
 #preview-pane .preview-page {
-  max-width: var(--content-width);
-  margin: 0 auto;
+  margin: 0;
   background: var(--page);
   border-radius: 8px;
   padding: 40px 24px;
