@@ -1,6 +1,6 @@
 import type { Env } from "../types.js";
 import { PUBLISH_LIST_LIMIT } from "../config.js";
-import { jsonResponse, CORS_HEADERS } from "../utils.js";
+import { jsonResponse, parseJsonBody, CORS_HEADERS } from "../utils.js";
 
 interface PublishRequest {
   key: string;
@@ -14,12 +14,8 @@ export async function handlePublish(request: Request, env: Env): Promise<Respons
     return jsonResponse({ error: "R2 bucket not configured" }, 500);
   }
 
-  let body: PublishRequest;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  const body = await parseJsonBody<PublishRequest>(request);
+  if (body instanceof Response) return body;
 
   if (!body.key || body.content == null) {
     return jsonResponse(

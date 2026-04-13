@@ -1,15 +1,11 @@
 import type { Env } from "../types.js";
 import { FETCH_KV_TTL } from "../config.js";
-import { jsonResponse, sha256, shouldBypassCache, kvGet, kvPut, htmlToMarkdown, detectSpa } from "../utils.js";
+import { jsonResponse, parseJsonBody, sha256, shouldBypassCache, kvGet, kvPut, htmlToMarkdown, detectSpa } from "../utils.js";
 import { validateUrlForSsrf } from "../ssrf.js";
 
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
-  let body: { url: string };
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  const body = await parseJsonBody<{ url: string }>(request);
+  if (body instanceof Response) return body;
 
   if (!body.url) {
     return jsonResponse({ error: "Missing 'url' field" }, 400);

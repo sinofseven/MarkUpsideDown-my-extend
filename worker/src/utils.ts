@@ -17,6 +17,14 @@ export function jsonResponse(body: unknown, status = 200, extraHeaders: Record<s
   });
 }
 
+export async function parseJsonBody<T>(request: Request): Promise<T | Response> {
+  try {
+    return await request.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400);
+  }
+}
+
 // --- Capability checks ---
 
 export function hasSecrets(env: Env): boolean {
@@ -86,20 +94,10 @@ export function detectSpa(html: string): boolean {
   if (noscript && /javascript|enable|activate/i.test(noscript[1])) return true;
 
   // Low text content ratio: strip tags, check visible text length
-  let stripped = html;
-  let prev: string;
-  do {
-    prev = stripped;
-    stripped = stripped.replace(/<script\b[^<]*(?:(?!<\/script[\s>])<[^<]*)*<\/script\b[^>]*>/gi, "");
-  } while (stripped !== prev);
-  do {
-    prev = stripped;
-    stripped = stripped.replace(/<style\b[^<]*(?:(?!<\/style[\s>])<[^<]*)*<\/style\b[^>]*>/gi, "");
-  } while (stripped !== prev);
-  do {
-    prev = stripped;
-    stripped = stripped.replace(/<[^>]+>/g, "");
-  } while (stripped !== prev);
+  const stripped = html
+    .replace(/<script\b[^<]*(?:(?!<\/script[\s>])<[^<]*)*<\/script\b[^>]*>/gi, "")
+    .replace(/<style\b[^<]*(?:(?!<\/style[\s>])<[^<]*)*<\/style\b[^>]*>/gi, "")
+    .replace(/<[^>]+>/g, "");
   const textContent = stripped.replace(/\s+/g, " ").trim();
   if (html.length > 5000 && textContent.length < 200) return true;
 

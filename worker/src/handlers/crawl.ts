@@ -1,6 +1,6 @@
 import type { Env } from "../types.js";
 import { CRAWL_LIMIT_MAX, CRAWL_LIMIT_DEFAULT, CRAWL_DEPTH_DEFAULT } from "../config.js";
-import { jsonResponse, hasSecrets, wrapJsonSchema } from "../utils.js";
+import { jsonResponse, parseJsonBody, hasSecrets, wrapJsonSchema } from "../utils.js";
 import { validateUrlForSsrf } from "../ssrf.js";
 
 export async function handleCrawlStart(request: Request, env: Env): Promise<Response> {
@@ -8,7 +8,7 @@ export async function handleCrawlStart(request: Request, env: Env): Promise<Resp
     return jsonResponse({ error: "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required for crawling" }, 500);
   }
 
-  let body: {
+  const body = await parseJsonBody<{
     url: string;
     limit?: number;
     depth?: number;
@@ -17,12 +17,8 @@ export async function handleCrawlStart(request: Request, env: Env): Promise<Resp
     excludePatterns?: string[];
     formats?: string[];
     response_format?: unknown;
-  };
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  }>(request);
+  if (body instanceof Response) return body;
 
   if (!body.url) {
     return jsonResponse({ error: "Missing 'url' field" }, 400);

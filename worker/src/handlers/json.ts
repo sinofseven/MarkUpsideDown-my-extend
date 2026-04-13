@@ -1,5 +1,5 @@
 import type { Env } from "../types.js";
-import { jsonResponse, hasSecrets, wrapJsonSchema } from "../utils.js";
+import { jsonResponse, parseJsonBody, hasSecrets, wrapJsonSchema } from "../utils.js";
 import { validateUrlForSsrf } from "../ssrf.js";
 
 export async function handleJson(request: Request, env: Env): Promise<Response> {
@@ -7,16 +7,12 @@ export async function handleJson(request: Request, env: Env): Promise<Response> 
     return jsonResponse({ error: "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN secrets are required for JSON extraction" }, 500);
   }
 
-  let body: {
+  const body = await parseJsonBody<{
     url: string;
     prompt?: string;
     response_format?: unknown;
-  };
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  }>(request);
+  if (body instanceof Response) return body;
 
   if (!body.url) {
     return jsonResponse({ error: "Missing 'url' field" }, 400);

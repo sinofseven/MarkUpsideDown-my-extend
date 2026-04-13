@@ -1,6 +1,6 @@
 import type { Env, ConvertMessage } from "../types.js";
 import { BATCH_TTL, BATCH_SEND_MAX, EXT_TO_MIME } from "../config.js";
-import { jsonResponse, kvPut } from "../utils.js";
+import { jsonResponse, parseJsonBody, kvPut } from "../utils.js";
 
 function base64ToBlob(b64: string, name: string): Blob {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -27,12 +27,8 @@ export async function handleBatchSubmit(request: Request, env: Env): Promise<Res
     return jsonResponse({ error: "Batch conversion requires Queue and KV bindings" }, 500);
   }
 
-  let body: { files: { name: string; content: string }[] };
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  const body = await parseJsonBody<{ files: { name: string; content: string }[] }>(request);
+  if (body instanceof Response) return body;
 
   if (!body.files?.length) {
     return jsonResponse({ error: "Missing 'files' array" }, 400);

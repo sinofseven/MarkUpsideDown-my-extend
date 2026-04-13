@@ -1,6 +1,6 @@
 import type { Env } from "../types.js";
 import { EMBEDDING_MODEL, MAX_CHUNK_CHARS, VECTORIZE_UPSERT_MAX, EMBED_DELETE_MAX_CHUNKS } from "../config.js";
-import { jsonResponse } from "../utils.js";
+import { jsonResponse, parseJsonBody } from "../utils.js";
 
 interface EmbedDocument {
   id: string;
@@ -51,12 +51,8 @@ export async function handleEmbed(request: Request, env: Env): Promise<Response>
     return jsonResponse({ error: "Vectorize index not configured" }, 500);
   }
 
-  let body: { documents: EmbedDocument[] };
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  const body = await parseJsonBody<{ documents: EmbedDocument[] }>(request);
+  if (body instanceof Response) return body;
 
   if (!body.documents?.length) {
     return jsonResponse({ error: "Missing 'documents' array" }, 400);
@@ -91,12 +87,8 @@ export async function handleSearch(request: Request, env: Env): Promise<Response
     return jsonResponse({ error: "Vectorize index not configured" }, 500);
   }
 
-  let body: { query: string; limit?: number };
-  try {
-    body = await request.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
+  const body = await parseJsonBody<{ query: string; limit?: number }>(request);
+  if (body instanceof Response) return body;
 
   if (!body.query) {
     return jsonResponse({ error: "Missing 'query' field" }, 400);
