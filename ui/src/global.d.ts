@@ -28,18 +28,36 @@ interface TauriWebviewWindowModule {
   getCurrentWebviewWindow(): TauriWebviewWindow;
 }
 
+interface TauriPath {
+  join(...paths: string[]): Promise<string>;
+}
+
+interface TauriApp {
+  getVersion(): Promise<string>;
+}
+
 interface TauriGlobal {
   core: TauriCore;
   dialog: TauriDialog;
   fs: TauriFs;
+  path: TauriPath;
+  app: TauriApp;
   event?: TauriEvent;
   webviewWindow?: TauriWebviewWindowModule;
 }
 
-declare global {
-  interface Window {
-    __TAURI__: TauriGlobal;
-  }
+interface Window {
+  __TAURI__: TauriGlobal;
 }
 
-export {};
+declare module "*.css";
+
+declare module "idiomorph" {
+  export const Idiomorph: {
+    morph(
+      oldNode: Element | ChildNode | string,
+      newContent: Element | ChildNode | string,
+      options?: Record<string, unknown>,
+    ): void;
+  };
+}

@@ -31,7 +31,7 @@ export interface LintDiagnostic {
 
 function runAllChecks(
   text: string,
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
 ): Diagnostic[] {
   const lines = text.split("\n");
   const structure = getDocumentStructure(text);
@@ -64,6 +64,7 @@ export function getLintDiagnostics(text: string): LintDiagnostic[] {
     line: (n: number) => ({
       from: lineStarts[n - 1] ?? 0,
       to: (lineStarts[n - 1] ?? 0) + (lines[n - 1]?.length ?? 0),
+      text: lines[n - 1] ?? "",
     }),
   };
 
@@ -122,7 +123,7 @@ export const markdownLinter = linter(
 
 function checkHeadings(
   structure: DocumentStructure,
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   const { headings } = structure;
@@ -200,7 +201,7 @@ function checkLinks(
 
 function checkTables(
   structure: DocumentStructure,
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   for (const table of structure.tables) {
@@ -229,7 +230,7 @@ function checkTables(
 
 function checkFrontmatter(
   structure: DocumentStructure,
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   if (!structure.frontmatter) return;
@@ -247,7 +248,7 @@ function checkFrontmatter(
 
 function checkLists(
   structure: DocumentStructure,
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   for (const list of structure.lists) {
@@ -346,7 +347,7 @@ function checkEmphasis(
 function checkCodeBlocks(
   lines: string[],
   codeRanges: [number, number][],
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   for (const [start] of codeRanges) {
@@ -372,7 +373,7 @@ function checkCodeBlocks(
 function checkFootnotes(
   lines: string[],
   codeRanges: [number, number][],
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   const refs = new Map<string, { line: number; col: number }[]>();
@@ -438,7 +439,7 @@ const COMMENT_KEYWORDS = /\b(TODO|FIXME|HACK|XXX|BUG|NOTE)\b/i;
 function checkHtmlComments(
   lines: string[],
   codeRanges: [number, number][],
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   for (let i = 0; i < lines.length; i++) {
@@ -469,7 +470,7 @@ function checkHtmlComments(
 function checkBlankLines(
   lines: string[],
   codeRanges: [number, number][],
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
   structure: DocumentStructure,
 ) {
@@ -524,7 +525,7 @@ function checkNeedsBlankBefore(
   lines: string[],
   fmEndIdx: number,
   label: string,
-  doc: { line: (n: number) => { from: number; to: number } },
+  doc: { line: (n: number) => { from: number; to: number; text: string } },
   diagnostics: Diagnostic[],
 ) {
   if (i === 0) return;
@@ -561,7 +562,7 @@ function checkEmphasisPattern(
     const after = afterIdx < originalLine.length ? originalLine[afterIdx] : " ";
     const context = before + m[0] + after;
 
-    const html = marked.parseInline(context);
+    const html = marked.parseInline(context) as string;
     if (html.includes(`<${htmlTag}>`)) continue;
 
     // Emphasis failed to parse — determine the reason for a helpful message

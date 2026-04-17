@@ -1,4 +1,4 @@
-import { ViewPlugin, ViewUpdate } from "@codemirror/view";
+import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { isPositionInCode } from "./document-structure.ts";
 
 const { invoke } = window.__TAURI__.core;

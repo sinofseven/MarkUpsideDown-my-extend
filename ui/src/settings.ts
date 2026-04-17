@@ -469,86 +469,87 @@ function showR2PublicAccessTip(container: HTMLElement) {
 }
 
 function showApiTokenInput(container: HTMLElement, accountId: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const div = document.createElement("div");
-    div.className = "setup-token-input";
-    div.innerHTML = `
-      <div class="setup-token-label">
-        <strong>API Token required</strong> for Render JS, Website Crawl, and Extract JSON.<br>
-        Create a token at <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="color:var(--accent)">dash.cloudflare.com/profile/api-tokens</a>
+  const { promise, resolve, reject } = Promise.withResolvers<string>();
+  const div = document.createElement("div");
+  div.className = "setup-token-input";
+  div.innerHTML = `
+    <div class="setup-token-label">
+      <strong>API Token required</strong> for Render JS, Website Crawl, and Extract JSON.<br>
+      Create a token at <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank" style="color:var(--accent)">dash.cloudflare.com/profile/api-tokens</a>
+    </div>
+    <div class="setup-token-scopes">
+      <strong>Required scopes:</strong>
+      <ul style="margin:4px 0 0 16px;padding:0;font-size:12px">
+        <li>Account &gt; Workers AI &gt; Read</li>
+        <li>Account &gt; Browser Rendering &gt; Edit</li>
+      </ul>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Account ID: <code>${escapeHtml(accountId)}</code>
       </div>
-      <div class="setup-token-scopes">
-        <strong>Required scopes:</strong>
-        <ul style="margin:4px 0 0 16px;padding:0;font-size:12px">
-          <li>Account &gt; Workers AI &gt; Read</li>
-          <li>Account &gt; Browser Rendering &gt; Edit</li>
-        </ul>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-          Account ID: <code>${escapeHtml(accountId)}</code>
-        </div>
-      </div>
-      <input type="password" class="setup-token-field" placeholder="API Token" />
-      <div class="setup-token-actions">
-        <button class="setup-token-skip">Skip for now</button>
-        <button class="setup-token-confirm primary">Set Secrets</button>
-      </div>
-    `;
-    container.appendChild(div);
+    </div>
+    <input type="password" class="setup-token-field" placeholder="API Token" />
+    <div class="setup-token-actions">
+      <button class="setup-token-skip">Skip for now</button>
+      <button class="setup-token-confirm primary">Set Secrets</button>
+    </div>
+  `;
+  container.appendChild(div);
 
-    const input = div.querySelector<HTMLInputElement>(".setup-token-field")!;
-    input.focus();
+  const input = div.querySelector<HTMLInputElement>(".setup-token-field")!;
+  input.focus();
 
-    const submit = () => {
-      const val = input.value.trim();
-      if (!val) return;
-      div.remove();
-      resolve(val);
-    };
+  const submit = () => {
+    const val = input.value.trim();
+    if (!val) return;
+    div.remove();
+    resolve(val);
+  };
 
-    div.querySelector(".setup-token-confirm")!.addEventListener("click", submit);
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submit();
-    });
-
-    div.querySelector(".setup-token-skip")!.addEventListener("click", () => {
-      div.remove();
-      reject("skipped");
-    });
+  div.querySelector(".setup-token-confirm")!.addEventListener("click", submit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submit();
   });
+
+  div.querySelector(".setup-token-skip")!.addEventListener("click", () => {
+    div.remove();
+    reject("skipped");
+  });
+
+  return promise;
 }
 
 function showAccountPicker(
   container: HTMLElement,
   accounts: { id: string; name: string }[],
 ): Promise<string> {
-  return new Promise((resolve) => {
-    const pickerDiv = document.createElement("div");
-    pickerDiv.className = "setup-account-picker";
+  const { promise, resolve } = Promise.withResolvers<string>();
+  const pickerDiv = document.createElement("div");
+  pickerDiv.className = "setup-account-picker";
 
-    const label = document.createElement("div");
-    label.className = "setup-account-label";
-    label.textContent = "Select your Cloudflare account:";
+  const label = document.createElement("div");
+  label.className = "setup-account-label";
+  label.textContent = "Select your Cloudflare account:";
 
-    const select = document.createElement("select");
-    select.className = "setup-account-select";
-    for (const a of accounts) {
-      const opt = document.createElement("option");
-      opt.value = a.id;
-      opt.textContent = `${a.name} (${a.id.slice(0, 8)}...)`;
-      select.appendChild(opt);
-    }
+  const select = document.createElement("select");
+  select.className = "setup-account-select";
+  for (const a of accounts) {
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    opt.textContent = `${a.name} (${a.id.slice(0, 8)}...)`;
+    select.appendChild(opt);
+  }
 
-    const btn = document.createElement("button");
-    btn.className = "setup-account-confirm";
-    btn.textContent = "Continue";
-    btn.addEventListener("click", () => {
-      pickerDiv.remove();
-      resolve(select.value);
-    });
-
-    pickerDiv.append(label, select, btn);
-    container.appendChild(pickerDiv);
+  const btn = document.createElement("button");
+  btn.className = "setup-account-confirm";
+  btn.textContent = "Continue";
+  btn.addEventListener("click", () => {
+    pickerDiv.remove();
+    resolve(select.value);
   });
+
+  pickerDiv.append(label, select, btn);
+  container.appendChild(pickerDiv);
+  return promise;
 }
 
 // --- Settings Panel ---
@@ -1212,10 +1213,11 @@ function attachCopyHandler(container: HTMLElement) {
 async function initMcpSection() {
   const bridgeStatus = document.getElementById("settings-mcp-bridge-status");
   const binaryPathEl = document.getElementById("settings-mcp-binary-path");
-  const tabContent = document.getElementById("settings-mcp-tab-content");
+  const tabContentEl = document.getElementById("settings-mcp-tab-content");
   const tabs = document.querySelectorAll<HTMLButtonElement>(".settings-mcp-tab");
 
-  if (!bridgeStatus || !binaryPathEl || !tabContent) return;
+  if (!bridgeStatus || !binaryPathEl || !tabContentEl) return;
+  const tabContent = tabContentEl;
 
   // Bridge status — always active when app is running
   bridgeStatus.textContent = "Active (app is running)";
@@ -1276,18 +1278,18 @@ export function ensureWorkerUrl(): Promise<string | null> {
   const url = getWorkerUrl();
   if (url) return Promise.resolve(url);
 
-  return new Promise((resolve) => {
-    let resolved = false;
-    showSettings({
-      onSave: (savedUrl) => {
-        resolved = true;
-        resolve(savedUrl || null);
-      },
-      onClose: () => {
-        if (!resolved) resolve(null);
-      },
-    });
+  const { promise, resolve } = Promise.withResolvers<string | null>();
+  let resolved = false;
+  showSettings({
+    onSave: (savedUrl) => {
+      resolved = true;
+      resolve(savedUrl || null);
+    },
+    onClose: () => {
+      if (!resolved) resolve(null);
+    },
   });
+  return promise;
 }
 
 // Show settings on first launch

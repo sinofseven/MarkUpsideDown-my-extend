@@ -39,37 +39,37 @@ const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { open: openDialog, confirm, message } = window.__TAURI__.dialog;
 
 function promptInput(label: string, defaultValue = ""): Promise<string | null> {
-  return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "prompt-overlay";
-    const box = document.createElement("div");
-    box.className = "prompt-box";
-    box.innerHTML = `
-      <label>${label}</label>
-      <input type="text" value="${escapeHtml(defaultValue)}" />
-      <div class="prompt-buttons">
-        <button class="prompt-cancel">Cancel</button>
-        <button class="prompt-ok">OK</button>
-      </div>`;
-    overlay.appendChild(box);
-    document.body.appendChild(overlay);
-    const input = box.querySelector("input")!;
-    input.select();
-    input.focus();
-    const close = (value: string | null) => {
-      overlay.remove();
-      resolve(value);
-    };
-    box.querySelector(".prompt-cancel")!.addEventListener("click", () => close(null));
-    box.querySelector(".prompt-ok")!.addEventListener("click", () => close(input.value));
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") close(input.value);
-      if (e.key === "Escape") close(null);
-    });
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) close(null);
-    });
+  const { promise, resolve } = Promise.withResolvers<string | null>();
+  const overlay = document.createElement("div");
+  overlay.className = "prompt-overlay";
+  const box = document.createElement("div");
+  box.className = "prompt-box";
+  box.innerHTML = `
+    <label>${label}</label>
+    <input type="text" value="${escapeHtml(defaultValue)}" />
+    <div class="prompt-buttons">
+      <button class="prompt-cancel">Cancel</button>
+      <button class="prompt-ok">OK</button>
+    </div>`;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  const input = box.querySelector("input")!;
+  input.select();
+  input.focus();
+  const close = (value: string | null) => {
+    overlay.remove();
+    resolve(value);
+  };
+  box.querySelector(".prompt-cancel")!.addEventListener("click", () => close(null));
+  box.querySelector(".prompt-ok")!.addEventListener("click", () => close(input.value));
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") close(input.value);
+    if (e.key === "Escape") close(null);
   });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close(null);
+  });
+  return promise;
 }
 
 interface DirEntry {

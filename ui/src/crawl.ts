@@ -166,7 +166,7 @@ async function pollCrawl(
     do {
       if (signal.aborted) return allPages;
 
-      const result = await invoke<CrawlStatusResult>("crawl_status", {
+      const result: CrawlStatusResult = await invoke("crawl_status", {
         jobId,
         workerUrl,
         cursor,
@@ -228,112 +228,111 @@ async function showCrawlDialog(url: string): Promise<CrawlOptions | null> {
   const rootPath = getRootPath();
   let defaultDir = rootPath || "";
 
-  return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "crawl-dialog-overlay";
+  const { promise, resolve } = Promise.withResolvers<CrawlOptions | null>();
+  const overlay = document.createElement("div");
+  overlay.className = "crawl-dialog-overlay";
 
-    const dialog = document.createElement("div");
-    dialog.className = "crawl-dialog";
+  const dialog = document.createElement("div");
+  dialog.className = "crawl-dialog";
 
-    const hostname = (() => {
-      try {
-        return new URL(url).hostname;
-      } catch {
-        return url;
-      }
-    })();
+  const hostname = (() => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
+  })();
 
-    dialog.innerHTML = `
-      <h3>Crawl Website</h3>
-      <p class="crawl-url">${escapeHtml(hostname)}</p>
-      <div class="crawl-field">
-        <label>Max depth</label>
-        <input type="number" id="crawl-depth" value="3" min="1" max="100" />
+  dialog.innerHTML = `
+    <h3>Crawl Website</h3>
+    <p class="crawl-url">${escapeHtml(hostname)}</p>
+    <div class="crawl-field">
+      <label>Max depth</label>
+      <input type="number" id="crawl-depth" value="3" min="1" max="100" />
+    </div>
+    <div class="crawl-field">
+      <label>Page limit</label>
+      <input type="number" id="crawl-limit" value="50" min="1" max="500" />
+    </div>
+    <div class="crawl-field">
+      <label>Render JavaScript</label>
+      <input type="checkbox" id="crawl-render" checked />
+    </div>
+    <div class="crawl-field">
+      <label>Include patterns</label>
+      <input type="text" id="crawl-include" placeholder="e.g. /articles/**, /blog/**" />
+    </div>
+    <div class="crawl-field">
+      <label>Exclude patterns</label>
+      <input type="text" id="crawl-exclude" placeholder="e.g. /tag/**, /author/**" />
+    </div>
+    <div class="crawl-field">
+      <label>Save to</label>
+      <div class="crawl-dir-row">
+        <input type="text" id="crawl-dir" value="${escapeHtml(defaultDir)}" readonly />
+        <button id="crawl-browse">Browse</button>
       </div>
-      <div class="crawl-field">
-        <label>Page limit</label>
-        <input type="number" id="crawl-limit" value="50" min="1" max="500" />
-      </div>
-      <div class="crawl-field">
-        <label>Render JavaScript</label>
-        <input type="checkbox" id="crawl-render" checked />
-      </div>
-      <div class="crawl-field">
-        <label>Include patterns</label>
-        <input type="text" id="crawl-include" placeholder="e.g. /articles/**, /blog/**" />
-      </div>
-      <div class="crawl-field">
-        <label>Exclude patterns</label>
-        <input type="text" id="crawl-exclude" placeholder="e.g. /tag/**, /author/**" />
-      </div>
-      <div class="crawl-field">
-        <label>Save to</label>
-        <div class="crawl-dir-row">
-          <input type="text" id="crawl-dir" value="${escapeHtml(defaultDir)}" readonly />
-          <button id="crawl-browse">Browse</button>
-        </div>
-      </div>
-      <p class="crawl-note">Pages with render=on use Browser Rendering hours ($0.09/hr after free tier).</p>
-      <div class="crawl-actions">
-        <button id="crawl-cancel">Cancel</button>
-        <button id="crawl-start" class="primary">Start Crawl</button>
-      </div>
-    `;
+    </div>
+    <p class="crawl-note">Pages with render=on use Browser Rendering hours ($0.09/hr after free tier).</p>
+    <div class="crawl-actions">
+      <button id="crawl-cancel">Cancel</button>
+      <button id="crawl-start" class="primary">Start Crawl</button>
+    </div>
+  `;
 
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
 
-    const dirInput = dialog.querySelector("#crawl-dir") as HTMLInputElement;
+  const dirInput = dialog.querySelector("#crawl-dir") as HTMLInputElement;
 
-    dialog.querySelector("#crawl-browse")!.addEventListener("click", async () => {
-      const dir = await openDialog({ directory: true });
-      if (dir) dirInput.value = dir;
-    });
+  dialog.querySelector("#crawl-browse")!.addEventListener("click", async () => {
+    const dir = await openDialog({ directory: true });
+    if (dir) dirInput.value = dir;
+  });
 
-    dialog.querySelector("#crawl-cancel")!.addEventListener("click", () => {
+  dialog.querySelector("#crawl-cancel")!.addEventListener("click", () => {
+    overlay.remove();
+    resolve(null);
+  });
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
       overlay.remove();
       resolve(null);
-    });
-
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) {
-        overlay.remove();
-        resolve(null);
-      }
-    });
-
-    dialog.querySelector("#crawl-start")!.addEventListener("click", () => {
-      const depth = parseInt((dialog.querySelector("#crawl-depth") as HTMLInputElement).value) || 3;
-      const limit =
-        parseInt((dialog.querySelector("#crawl-limit") as HTMLInputElement).value) || 50;
-      const render = (dialog.querySelector("#crawl-render") as HTMLInputElement).checked;
-      const saveDir = dirInput.value.trim();
-
-      const includeRaw = (dialog.querySelector("#crawl-include") as HTMLInputElement).value.trim();
-      const excludeRaw = (dialog.querySelector("#crawl-exclude") as HTMLInputElement).value.trim();
-      const includePatterns = includeRaw
-        ? includeRaw
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-      const excludePatterns = excludeRaw
-        ? excludeRaw
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : [];
-
-      if (!saveDir) {
-        dirInput.style.borderColor = "#c44";
-        return;
-      }
-
-      overlay.remove();
-      resolve({ depth, limit, render, saveDir, includePatterns, excludePatterns });
-    });
-
-    // Focus start button
-    (dialog.querySelector("#crawl-start") as HTMLElement).focus();
+    }
   });
+
+  dialog.querySelector("#crawl-start")!.addEventListener("click", () => {
+    const depth = parseInt((dialog.querySelector("#crawl-depth") as HTMLInputElement).value) || 3;
+    const limit = parseInt((dialog.querySelector("#crawl-limit") as HTMLInputElement).value) || 50;
+    const render = (dialog.querySelector("#crawl-render") as HTMLInputElement).checked;
+    const saveDir = dirInput.value.trim();
+
+    const includeRaw = (dialog.querySelector("#crawl-include") as HTMLInputElement).value.trim();
+    const excludeRaw = (dialog.querySelector("#crawl-exclude") as HTMLInputElement).value.trim();
+    const includePatterns = includeRaw
+      ? includeRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    const excludePatterns = excludeRaw
+      ? excludeRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
+    if (!saveDir) {
+      dirInput.style.borderColor = "#c44";
+      return;
+    }
+
+    overlay.remove();
+    resolve({ depth, limit, render, saveDir, includePatterns, excludePatterns });
+  });
+
+  // Focus start button
+  (dialog.querySelector("#crawl-start") as HTMLElement).focus();
+  return promise;
 }

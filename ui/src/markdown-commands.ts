@@ -1,5 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import type { Command } from "@codemirror/view";
+import { EditorSelection } from "@codemirror/state";
 
 /** Wrap or unwrap the selection with a symmetric marker (e.g. `**`, `*`, `~~`, `` ` ``). */
 function toggleWrap(marker: string): Command {
@@ -19,7 +20,7 @@ function toggleWrap(marker: string): Command {
             { from: range.from - len, to: range.from, insert: "" },
             { from: range.to, to: range.to + len, insert: "" },
           ],
-          range: { anchor: range.from - len, head: range.to - len },
+          range: EditorSelection.range(range.from - len, range.to - len),
         };
       }
 
@@ -27,10 +28,7 @@ function toggleWrap(marker: string): Command {
       const insert = `${marker}${selected}${marker}`;
       return {
         changes: { from: range.from, to: range.to, insert },
-        range: {
-          anchor: range.from + len,
-          head: range.from + len + selected.length,
-        },
+        range: EditorSelection.range(range.from + len, range.from + len + selected.length),
       };
     });
 
@@ -84,7 +82,7 @@ export const toggleBold: Command = (view: EditorView) => {
             { from: range.from - len, to: range.from, insert: "" },
             { from: range.to, to: range.to + len, insert: "" },
           ],
-          range: { anchor: range.from - len, head: range.to - len },
+          range: EditorSelection.range(range.from - len, range.to - len),
         };
       }
     }
@@ -93,7 +91,7 @@ export const toggleBold: Command = (view: EditorView) => {
     const insert = `__${selected}__`;
     return {
       changes: { from: range.from, to: range.to, insert },
-      range: { anchor: range.from + 2, head: range.from + 2 + selected.length },
+      range: EditorSelection.range(range.from + 2, range.from + 2 + selected.length),
     };
   });
 
@@ -119,7 +117,7 @@ export const toggleInlineCode: Command = (view: EditorView) => {
             { from: range.from - len, to: range.from, insert: "" },
             { from: range.to, to: range.to + len, insert: "" },
           ],
-          range: { anchor: range.from - len, head: range.to - len },
+          range: EditorSelection.range(range.from - len, range.to - len),
         };
       }
     }
@@ -133,10 +131,10 @@ export const toggleInlineCode: Command = (view: EditorView) => {
     const contentOffset = delimiter.length + space.length;
     return {
       changes: { from: range.from, to: range.to, insert },
-      range: {
-        anchor: range.from + contentOffset,
-        head: range.from + contentOffset + selected.length,
-      },
+      range: EditorSelection.range(
+        range.from + contentOffset,
+        range.from + contentOffset + selected.length,
+      ),
     };
   });
 

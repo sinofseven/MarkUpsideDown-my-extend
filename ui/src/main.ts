@@ -479,8 +479,8 @@ async function openFileByPath(path: string) {
     statusEl.textContent = `Failed to open: ${e}`;
   }
 }
-window.__TAURI__.event.listen<string>("cli:open-file", (e) => openFileByPath(e.payload));
-window.__TAURI__.event.listen<string>("menu:open-recent", (e) => openFileByPath(e.payload));
+window.__TAURI__.event?.listen<string>("cli:open-file", (e) => openFileByPath(e.payload));
+window.__TAURI__.event?.listen<string>("menu:open-recent", (e) => openFileByPath(e.payload));
 
 async function openSearchResult(filePath: string) {
   const root = getRootPath();
@@ -1158,13 +1158,16 @@ registerCommands([
 async function saveWindowRegistry() {
   try {
     // Load current registry and update this window's entry
-    const existing: Array<{
+    type WindowEntry = {
       label: string;
       x?: number;
       y?: number;
       width: number;
       height: number;
-    }> = await invoke("load_window_registry").catch(() => []);
+    };
+    const existing: WindowEntry[] = await invoke<WindowEntry[]>("load_window_registry").catch(
+      () => [] as WindowEntry[],
+    );
 
     const label = getWindowLabel();
     const entry = {
