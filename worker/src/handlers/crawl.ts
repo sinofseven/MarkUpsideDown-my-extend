@@ -31,14 +31,18 @@ export async function handleCrawlStart(request: Request, env: Env): Promise<Resp
 
   const crawlUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/crawl`;
   const formats = body.formats ?? ["markdown"];
+  const render = body.render ?? true;
   const crawlBody: Record<string, unknown> = {
     url: body.url,
     limit: Math.min(body.limit ?? CRAWL_LIMIT_DEFAULT, CRAWL_LIMIT_MAX),
     depth: body.depth ?? CRAWL_DEPTH_DEFAULT,
     formats,
-    render: body.render ?? true,
-    rejectResourceTypes: ["image", "media", "font", "stylesheet"],
+    render,
   };
+  if (render) {
+    crawlBody.gotoOptions = { waitUntil: "networkidle2", timeout: 45000 };
+    crawlBody.rejectResourceTypes = ["image", "media", "font", "stylesheet"];
+  }
   if (formats.includes("json")) {
     const jsonOptions: Record<string, unknown> = {};
     if (body.response_format) {

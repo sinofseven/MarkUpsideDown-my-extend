@@ -1,6 +1,6 @@
 import type { Env } from "../types.js";
 import { RENDER_CACHE_TTL, RENDER_KV_TTL } from "../config.js";
-import { jsonResponse, CORS_HEADERS, hasSecrets, sha256, kvGet, kvPut, htmlToMarkdown } from "../utils.js";
+import { jsonResponse, CORS_HEADERS, hasSecrets, sha256, kvGet, kvPut } from "../utils.js";
 import { validateUrlForSsrf } from "../ssrf.js";
 
 export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -19,18 +19,15 @@ export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): P
 
   const kvKey = `md:render:${await sha256(targetUrl)}`;
   if (!skipCache) {
-    // Layer 1: Edge Cache API (fast)
     const cached = await cache.match(edgeCacheKey);
     if (cached) {
       const headers = new Headers(cached.headers);
       headers.set("x-cache", "HIT");
       return new Response(cached.body, { status: cached.status, headers });
     }
-    // Layer 2: KV cache (persistent)
     const kvCached = await kvGet(env, kvKey);
     if (kvCached) {
       const parsed = JSON.parse(kvCached);
-      // Re-populate edge cache from KV
       ctx.waitUntil(
         cache.put(
           edgeCacheKey,
@@ -49,8 +46,8 @@ export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): P
   }
 
   try {
-    const contentResponse = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/content`,
+    const markdownResponse = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/markdown`,
       {
         method: "POST",
         headers: {
@@ -59,26 +56,23 @@ export async function handleRender(url: URL, env: Env, ctx: ExecutionContext): P
         },
         body: JSON.stringify({
           url: targetUrl,
-          gotoOptions: { waitUntil: "networkidle0" },
+          gotoOptions: { waitUntil: "networkidle2", timeout: 45000 },
           rejectResourceTypes: ["image", "media", "font", "stylesheet"],
         }),
       },
     );
 
-    if (!contentResponse.ok) {
-      const errorBody = await contentResponse.text();
-      return jsonResponse({ error: `Browser Rendering API error (${contentResponse.status}): ${errorBody}` }, contentResponse.status);
+    if (!markdownResponse.ok) {
+      const errorBody = await markdownResponse.text();
+      return jsonResponse({ error: `Browser Rendering API error (${markdownResponse.status}): ${errorBody}` }, markdownResponse.status);
     }
 
-    const contentData = await contentResponse.json<{ success: boolean; result: string; errors?: unknown[] }>();
-    if (!contentData.success) {
-      return jsonResponse({ error: "Browser Rendering content API returned failure", details: contentData.errors }, 500);
+    const data = await markdownResponse.json<{ success: boolean; result: string; errors?: unknown[] }>();
+    if (!data.success) {
+      return jsonResponse({ error: "Browser Rendering markdown API returned failure", details: data.errors }, 500);
     }
 
-    const markdown = await htmlToMarkdown(contentData.result, env);
-    const result = { markdown };
-
-    // Populate both edge cache and KV cache
+    const result = { markdown: data.result };
     const resultJson = JSON.stringify(result);
     ctx.waitUntil(
       Promise.all([

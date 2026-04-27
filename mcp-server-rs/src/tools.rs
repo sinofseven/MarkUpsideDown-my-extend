@@ -496,7 +496,7 @@ impl McpTools {
             let worker_url = self.resolve_worker_url().await?;
 
             let render_url = format!("{worker_url}/render?url={}", urlencoding::encode(&params.url));
-            let response = self.http.get(&render_url).timeout(std::time::Duration::from_secs(30)).send().await.map_err(|e| e.to_string())?;
+            let response = self.http.get(&render_url).timeout(std::time::Duration::from_secs(60)).send().await.map_err(|e| e.to_string())?;
 
             #[derive(Deserialize)]
             struct Resp {
@@ -581,7 +581,7 @@ impl McpTools {
                     }
 
                     let render_url = format!("{worker_url}/render?url={}", urlencoding::encode(&params.url));
-                    if let Ok(resp) = self.http.get(&render_url).timeout(std::time::Duration::from_secs(30)).send().await {
+                    if let Ok(resp) = self.http.get(&render_url).timeout(std::time::Duration::from_secs(60)).send().await {
                         if let Ok(rdata) = resp.json::<RenderResp>().await {
                             if rdata.error.is_none() {
                                 if let Some(rendered) = rdata.markdown {

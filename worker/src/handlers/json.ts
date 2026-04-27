@@ -30,7 +30,7 @@ export async function handleJson(request: Request, env: Env): Promise<Response> 
   const jsonUrl = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/browser-rendering/json`;
   const jsonBody: Record<string, unknown> = {
     url: body.url,
-    gotoOptions: { waitUntil: "networkidle0" },
+    gotoOptions: { waitUntil: "networkidle2", timeout: 45000 },
     rejectResourceTypes: ["image", "media", "font"],
   };
   if (body.prompt) jsonBody.prompt = body.prompt;
