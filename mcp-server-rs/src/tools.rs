@@ -33,6 +33,16 @@ fn get_worker_url(env_url: Option<&str>, bridge_url: Option<&str>) -> Result<Str
         })
 }
 
+/// Accept a JSON Schema as either an object or a JSON-encoded string.
+/// MCP clients vary in how they pass nested schemas, so we tolerate both.
+fn parse_schema_param(value: serde_json::Value) -> Result<serde_json::Value, String> {
+    match value {
+        serde_json::Value::String(s) => serde_json::from_str(&s)
+            .map_err(|e| format!("Invalid response_format JSON string: {e}")),
+        other => Ok(other),
+    }
+}
+
 // --- Parameter types ---
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -89,8 +99,8 @@ pub struct CrawlWebsiteParams {
     pub exclude_patterns: Option<Vec<String>>,
     #[schemars(description = "Output formats: [\"markdown\"], [\"json\"], or [\"markdown\", \"json\"] (default: [\"markdown\"])")]
     pub formats: Option<Vec<String>>,
-    #[schemars(description = "JSON Schema defining the output structure when formats includes \"json\" (passed as a JSON string)")]
-    pub response_format: Option<String>,
+    #[schemars(description = "JSON Schema defining the output structure when formats includes \"json\". Accepts either a JSON object or a JSON-encoded string.")]
+    pub response_format: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -99,8 +109,8 @@ pub struct ExtractJsonParams {
     pub url: String,
     #[schemars(description = "Natural language description of what to extract (e.g., \"Extract all product names and prices\")")]
     pub prompt: Option<String>,
-    #[schemars(description = "JSON Schema defining the expected output structure (passed as a JSON string)")]
-    pub response_format: Option<String>,
+    #[schemars(description = "JSON Schema defining the expected output structure. Accepts either a JSON object or a JSON-encoded string.")]
+    pub response_format: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, schemars::JsonSchema)]
@@ -911,10 +921,8 @@ impl McpTools {
             if let Some(ref p) = params.prompt {
                 body["prompt"] = serde_json::json!(p);
             }
-            if let Some(ref rf) = params.response_format {
-                let schema: serde_json::Value = serde_json::from_str(rf)
-                    .map_err(|e| format!("Invalid response_format JSON: {e}"))?;
-                body["response_format"] = schema;
+            if let Some(rf) = params.response_format {
+                body["response_format"] = parse_schema_param(rf)?;
             }
 
             let response = self
@@ -966,10 +974,8 @@ impl McpTools {
             if let Some(ref formats) = params.formats {
                 body["formats"] = serde_json::json!(formats);
             }
-            if let Some(ref rf) = params.response_format {
-                let schema: serde_json::Value = serde_json::from_str(rf)
-                    .map_err(|e| format!("Invalid response_format JSON: {e}"))?;
-                body["response_format"] = schema;
+            if let Some(rf) = params.response_format {
+                body["response_format"] = parse_schema_param(rf)?;
             }
 
             if let Some(ref patterns) = params.include_patterns {
